@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ferna Sundaree</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<style>
+  body { min-height: 100vh; display: grid; place-items: center; }
+  main { max-width: 600px; padding: 32px; }
+  .ic { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); margin-bottom: 18px; }
+  .ic .icon { width: 28px; height: 28px; }
+  main.danger .ic { background: rgba(220, 38, 38, .12); color: var(--danger); }
+  main.warn .ic { background: rgba(217, 119, 6, .14); color: var(--warn); }
+  h1 { font-size: 22px; margin: 0 0 10px; }
+  p { color: var(--ink-2); line-height: 1.6; margin: 0 0 12px; }
+  .url { font-family: var(--mono); font-size: 12px; word-break: break-all; color: var(--ink); background: var(--bg-sunken); padding: 6px 10px; border-radius: 6px; }
+  .acts { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  details { margin-top: 18px; color: var(--ink-3); font-size: 12px; }
+  /* Phishing / malware: Chrome-style red page */
+  body:has(main.red) { background: #b3261e; }
+  main.red, main.red h1, main.red p { color: #fff; }
+  main.red .ic { background: rgba(255,255,255,.16); color: #fff; }
+  main.red .url { background: rgba(0,0,0,.22); color: #fff; }
+  main.red .muted { color: rgba(255,255,255,.75); font-size: 12.5px; }
+  main.red .btn.primary { background: #fff; color: #b3261e; border-color: #fff; }
+  main.red details { color: rgba(255,255,255,.85); font-size: 13px; }
+  main.red details summary { cursor: pointer; text-decoration: underline; }
+  main.red details .btn.danger { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.7); margin-top: 4px; }
+</style>
+</head>
+<body>
+  <main id="m"></main>
+  <script src="/_shared/kit.js"></script>
+  <script src="interstitial.js"></script>
+</body>
+</html>

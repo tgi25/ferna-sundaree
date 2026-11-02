@@ -1,0 +1,6 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Zoom test page</title>
+<style>body{margin:0;font:16px system-ui} .wrap{width:600px;margin:0 auto} .small{font-size:12px} .em{font-size:1.5em} img{display:block;width:200px;height:100px;background:#3b82f6}</style></head>
+<body><div class="wrap"><p id="p">Normal paragraph text at 16 px.</p><p class="small" id="small">Small print at 12 px.</p>
+<div class="em" id="em">Relative 1.5em text <span id="inner">inner</span></div><img id="img" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></div>
+<script>setTimeout(()=>{const d=document.createElement('p');d.id='late';d.textContent='Loaded later';d.className='small';document.querySelector('.wrap').appendChild(d);},1500);</script>
+</body></html>

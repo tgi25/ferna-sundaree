@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ferna Sundaree</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+  <div id="tabs" class="region" role="tablist" aria-label="Tabs"></div>
+  <div id="edge-tabs" class="edge" aria-hidden="true"></div>
+  <div id="edge-toolbar" class="edge" aria-hidden="true"></div>
+
+  <div id="toolbar" class="region" role="toolbar" aria-label="Navigation">
+    <button class="tb" id="btn-back" title="Back (Alt+Left)"></button>
+    <button class="tb" id="btn-forward" title="Forward (Alt+Right)"></button>
+    <button class="tb" id="btn-reload" title="Reload (F5)"></button>
+    <div id="omnibox">
+      <span id="omni-icon" class="omni-icon"></span>
+      <span id="omni-container" hidden></span>
+      <input id="address" type="text" spellcheck="false" autocomplete="off" placeholder="Search or enter address" aria-label="Address and search bar">
+      <button class="tb small" id="btn-key" title="Saved passwords for this site" hidden></button>
+      <button class="tb small" id="btn-reader" title="Reading mode (F9)" hidden></button>
+      <button class="tb small" id="btn-translate" title="Translate this page (Alt+Shift+T)" hidden></button>
+      <button class="tb small" id="btn-star" title="Bookmark this page (Ctrl+D)"></button>
+    </div>
+    <button class="tb" id="btn-pip" title="Picture-in-Picture (Alt+P)" hidden></button>
+    <button class="tb" id="btn-media" title="Media controls (Alt+M)" hidden></button>
+    <button class="tb" id="btn-split" title="Split view (Alt+Shift+D)"></button>
+    <button class="tb" id="btn-eq" title="Equalizer (Alt+Q)" hidden><span class="eq-dot" id="eq-dot"></span></button>
+    <button class="tb" id="btn-zoom" title="Zoom (Alt+Z)"><span class="zl" id="zoom-level"></span></button>
+    <button class="tb" id="btn-shield" title="Tracker and ad blocking"><span class="count" id="blocked-count"></span></button>
+    <button class="tb" id="btn-shot" title="Screenshot (Alt+Shift+V / F / R / E)"></button>
+    <button class="tb" id="btn-bookmarks" title="Bookmarks (Ctrl+Shift+Y)"></button>
+    <div id="ext-actions" role="group" aria-label="Extensions"></div>
+    <button class="tb" id="btn-puzzle" title="Extensions"></button>
+    <button class="tb" id="btn-downloads" title="Downloads (Ctrl+J)" hidden></button>
+    <button class="tb" id="btn-assistant" title="AI assistant (Alt+A)"></button>
+    <button class="tb" id="btn-overview" title="Tab Overview (Ctrl+Shift+A)"></button>
+    <button class="tb" id="btn-menu" title="Menu"></button>
+    <div id="exam-bar"><span>🔒 Secure exam</span><span class="timer" id="exam-timer" hidden></span><button class="btn small" id="exam-end" title="The invigilator's password is needed">End exam</button></div>
+    <div class="winctl" id="winctl-tb" hidden></div>
+  </div>
+
+  <div id="bookmarks" class="region" role="toolbar" aria-label="Bookmarks bar"></div>
+
+  <div id="find" class="region" role="search">
+    <input id="find-input" type="text" spellcheck="false" placeholder="Find in page" aria-label="Find in page">
+    <span id="find-count"></span>
+    <button class="tb small" id="find-prev" title="Previous (Shift+Enter)"></button>
+    <button class="tb small" id="find-next" title="Next (Enter)"></button>
+    <button class="tb small" id="find-close" title="Close (Esc)"></button>
+  </div>
+
+  <div id="split-divider" hidden title="Drag to resize. Double-click: equal halves."><span></span></div>
+  <div id="app-title" hidden></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/_shared/kit.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>

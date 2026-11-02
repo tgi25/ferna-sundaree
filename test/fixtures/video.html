@@ -1,0 +1,11 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Video test page — symphony orchestra concert</title>
+<meta name="description" content="Symphony orchestra concert recording: a test page with a video, for Picture-in-Picture and the equalizer.">
+<style>body{font:15px system-ui;margin:24px} video{width:640px;height:360px;background:#000}</style></head><body>
+<h1>Video test</h1>
+<video id="v" src="media.webm" loop playsinline disablepictureinpicture controls></video>
+<p>Select this sentence to see the selection menu. Visit example.com for more.</p>
+<script>
+  const v = document.getElementById('v');
+  v.addEventListener('enterpictureinpicture', () => { document.title = 'PIP-IN'; });
+  v.addEventListener('leavepictureinpicture', () => { document.title = 'PIP-OUT'; });
+</script></body></html>

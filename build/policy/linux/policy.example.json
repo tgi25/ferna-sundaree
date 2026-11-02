@@ -1,0 +1,14 @@
+{
+  "HttpsFirst": true,
+  "AdBlocker": true,
+  "SafeBrowsing": true,
+  "BlockThirdPartyCookies": true,
+  "LookalikeWarnings": true,
+  "DefenderScan": true,
+  "AutoUpdate": true,
+  "HistoryDays": 90,
+  "PrivateWindowsAllowed": true,
+  "TorWindowsAllowed": false,
+  "DeveloperToolsAllowed": false,
+  "ExtensionInstallAllowed": false
+}

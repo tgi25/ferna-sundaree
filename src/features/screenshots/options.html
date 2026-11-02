@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings — Ferna Screenshots</title>
+<link rel="icon" href="icons/icon32.png">
+<link rel="stylesheet" href="ui.css">
+<style>
+  body { padding: 26px 28px 60px; }
+  .wrap { max-width: 1060px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 22px; align-items: start; }
+  header { max-width: 1060px; margin: 0 auto 18px; display: flex; align-items: center; gap: 12px; }
+  header img { width: 44px; height: 44px; border-radius: 10px; }
+  h1 { margin: 0; font-size: 21px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 6px 18px 12px; margin-bottom: 16px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 12px 0 4px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: none; }
+  .row > div { display: grid; gap: 2px; }
+  .row .muted { font-size: 12.5px; }
+  .row select, .row input[type=text] { min-width: 220px; }
+  .row input[type=number] { width: 110px; }
+  .side { position: sticky; top: 20px; }
+  #preview { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; background: #fff; }
+  code { font-size: 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  #saved { color: var(--ok); font-size: 13px; opacity: 0; transition: .3s; margin-left: auto; }
+  #saved.show { opacity: 1; }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } .side { position: static; } }
+</style>
+</head>
+<body>
+<header>
+  <img src="icons/icon48.png" alt="">
+  <div><h1>Ferna Screenshots — Settings</h1><div class="muted">Changes are saved automatically.</div></div>
+  <span id="saved">✓ Saved</span>
+</header>
+<div class="wrap">
+  <div>
+    <div class="card">
+      <h2>Page stamp</h2>
+      <div class="row"><div><b>Add page address &amp; time stamp</b><span class="muted">Drawn on every screenshot; you can still change it in the editor.</span></div><input type="checkbox" data-k="stamp.enabled"></div>
+      <div class="row"><div><b>Position</b><span class="muted">“Best corner” picks the quietest corner of each picture.</span></div>
+        <select id="placement">
+          <option value="corner:auto">Best corner (automatic)</option>
+          <option value="corner:tl">Top-left corner</option><option value="corner:tr">Top-right corner</option>
+          <option value="corner:bl">Bottom-left corner</option><option value="corner:br">Bottom-right corner</option>
+          <option value="footer">Strip below the picture</option><option value="header">Strip above the picture</option>
+        </select></div>
+      <div class="row"><div><b>Show</b></div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <label class="check"><input type="checkbox" data-k="stamp.title">Title</label>
+          <label class="check"><input type="checkbox" data-k="stamp.url">Address</label>
+          <label class="check"><input type="checkbox" data-k="stamp.time">Date &amp; time</label>
+          <label class="check"><input type="checkbox" data-k="stamp.details">Type &amp; size</label>
+          <label class="check"><input type="checkbox" data-k="stamp.brand">“Captured with Ferna Screenshots”</label>
+        </div></div>
+      <div class="row"><div><b>Time format</b></div>
+        <select data-k="stamp.timeFormat"><option value="local">Local with UTC offset</option><option value="iso">ISO 8601</option><option value="utc">UTC</option></select></div>
+      <div class="row"><div><b>Style</b></div><select data-k="stamp.theme"><option value="dark">Dark</option><option value="light">Light</option></select></div>
+      <div class="row"><div><b>Size</b></div><input type="range" min="0.7" max="1.8" step="0.05" data-k="stamp.size" data-num></div>
+      <div class="row"><div><b>Default note</b><span class="muted">Optional extra line, e.g. your name or a case number.</span></div><input type="text" maxlength="160" data-k="stamp.note"></div>
+    </div>
+
+    <div class="card">
+      <h2>Saving</h2>
+      <div class="row"><div><b>After a capture</b></div>
+        <select data-k="afterCapture"><option value="editor">Open the editor</option><option value="save">Save immediately</option></select></div>
+      <div class="row"><div><b>Format for “save immediately”</b></div>
+        <select data-k="quickFormat"><option value="png">PNG (lossless)</option><option value="jpg">JPG (smaller)</option><option value="pdf">PDF</option></select></div>
+      <div class="row"><div><b>JPG quality</b></div><input type="number" min="0.5" max="1" step="0.01" data-k="jpegQuality" data-num></div>
+      <div class="row"><div><b>PDF pages</b></div>
+        <select data-k="pdfPage"><option value="a4">A4 pages (long captures are split)</option><option value="single">One page per screenshot</option></select></div>
+      <div class="row"><div><b>Folder inside Downloads</b><span class="muted">Leave empty to save straight into Downloads.</span></div><input type="text" data-k="folder"></div>
+      <div class="row"><div><b>File name</b><span class="muted"><code>{domain}</code> <code>{title}</code> <code>{date}</code> <code>{time}</code> <code>{mode}</code> <code>{yyyy}</code> <code>{mm}</code> <code>{dd}</code> <code>{HH}</code> <code>{MM}</code> <code>{SS}</code></span><span class="muted" id="fnPreview"></span></div><input type="text" data-k="filePattern"></div>
+      <div class="row"><div><b>Ask where to save each file</b><span class="muted">Shows the “Save as” window so you can pick any folder.</span></div><input type="checkbox" data-k="saveAs"></div>
+    </div>
+
+    <div class="card">
+      <h2>Capturing</h2>
+      <div class="row"><div><b>Hide floating headers and buttons</b><span class="muted">Sticky headers and chat bubbles appear once instead of on every screen.</span></div><input type="checkbox" data-k="hideFixed"></div>
+      <div class="row"><div><b>Wait after each scroll (ms)</b><span class="muted">Raise it for pages that load pictures as you scroll.</span></div><input type="number" min="0" max="3000" step="50" data-k="scrollDelay" data-num></div>
+      <div class="row"><div><b>Longest page (CSS px)</b><span class="muted">Stops endless feeds from growing forever.</span></div><input type="number" min="2000" max="200000" step="1000" data-k="maxHeight" data-num></div>
+      <div class="row"><div><b>Resolution</b></div>
+        <select data-k="resolution"><option value="device">Sharp — screen pixels (HiDPI)</option><option value="css">Standard — 1 pixel per CSS pixel</option></select></div>
+      <div class="row"><div><b>Default delay (visible / entire page)</b></div>
+        <select data-k="delay" data-num><option value="0">None</option><option value="3">3 s</option><option value="5">5 s</option><option value="10">10 s</option></select></div>
+      <div class="row"><div><b>Screenshots kept in history</b></div><input type="number" min="1" max="500" step="1" data-k="historyLimit" data-num></div>
+      <div class="row"><div><b>Keyboard shortcuts</b><span class="muted" id="keys"></span></div><button class="btn" id="shortcuts">Change shortcuts</button></div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="card">
+      <h2>Stamp preview</h2>
+      <canvas id="preview" width="840" height="520"></canvas>
+      <p class="muted" style="font-size:12.5px">Your screenshots never leave your computer: they are kept in the browser’s own storage (History) and saved to your Downloads folder.</p>
+    </div>
+  </div>
+</div>
+<script src="ferna-shim.js"></script>
+<script type="module" src="options.js"></script>
+</body>
+</html>

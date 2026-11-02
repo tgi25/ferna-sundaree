@@ -1,0 +1,10 @@
+{
+  "adm-zip": {
+    "reason": "No fixed version exists. Ferna Sundaree does not extract with adm-zip: its own strict reader (src/main/zipsafe.js) handles every package, and the web store library's adm-zip extraction is redirected to it at startup (tested in test/unit/security.test.js). Review when a fixed adm-zip or a library update is available.",
+    "reviewed": "2026-11-01"
+  },
+  "electron-chrome-web-store": {
+    "reason": "Flagged only through its adm-zip dependency; see adm-zip.",
+    "reviewed": "2026-11-01"
+  }
+}

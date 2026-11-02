@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Downloads</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<style>
+  .dl { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .dl:first-child { border-top: 0; }
+  .dl .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--bg-sunken); display: grid; place-items: center; color: var(--ink-2); flex: none; }
+  .dl .grow { flex: 1; min-width: 0; }
+  .dl .name { font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .dl .name.gone { text-decoration: line-through; color: var(--ink-3); }
+  .dl .sub { color: var(--ink-3); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .dl .risky { color: var(--warn); font-weight: 600; }
+  .dl .ok-t { color: var(--ok); }
+  .prog { height: 4px; border-radius: 2px; background: var(--bg-sunken); margin-top: 6px; overflow: hidden; }
+  .prog i { display: block; height: 100%; background: var(--accent); }
+  .acts { display: flex; gap: 6px; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>Downloads</h1>
+    <p class="lead">Files are saved to your Downloads folder and marked as downloaded from the internet, and scanned for viruses (Microsoft Defender on Windows, ClamAV on Linux when it is installed).</p>
+    <div class="card"><div id="list"></div></div>
+    <button class="btn" id="folder">Open Downloads folder</button>
+  </div>
+  <script src="/_shared/kit.js"></script>
+  <script src="downloads.js"></script>
+</body>
+</html>

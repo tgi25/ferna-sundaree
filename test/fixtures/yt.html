@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Fake YouTube watch page</title>
+<script>
+  var ytInitialPlayerResponse = { adPlacements: [{ ad: 1 }], playerAds: [{ ad: 2 }], videoDetails: { title: 'clip' } };
+  window.__initialKeys = Object.keys(ytInitialPlayerResponse);
+  window.__parsedKeys = Object.keys(JSON.parse('{"adSlots":[1],"playerResponse":{"adPlacements":[1],"streamingData":{}}}'));
+</script></head><body>
+<ytd-ad-slot-renderer id="adslot" style="display:block;height:90px;background:#fc0">AD SLOT</ytd-ad-slot-renderer>
+<div class="html5-video-player ad-showing" id="player">
+  <video id="adv" src="media.webm" autoplay muted loop></video>
+  <button class="ytp-skip-ad-button" onclick="window.__skipClicked = (window.__skipClicked || 0) + 1; document.getElementById('player').classList.remove('ad-showing')">Skip</button>
+</div>
+<script>setTimeout(() => { window.__autoPopup = window.open('/long.html?auto', '_blank'); }, 1200);</script>
+</body></html>

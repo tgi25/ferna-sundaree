@@ -1,0 +1,52 @@
+html, body { height: 100%; overflow: hidden; }
+body { display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; z-index: 5; }
+.brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; margin-right: 4px; }
+.brand img { width: 24px; height: 24px; border-radius: 6px; }
+.group { display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.group.out { border: none; background: none; gap: 6px; padding: 0; }
+.sep { width: 1px; height: 22px; background: var(--line); margin: 0 3px; }
+.grow { flex: 1; }
+.tool { width: 32px; height: 32px; display: grid; place-items: center; border: none; background: none; border-radius: 7px; cursor: pointer; color: var(--text); }
+.tool:hover { background: var(--line); }
+.tool.on { background: var(--accent); color: #fff; }
+.tool:disabled { opacity: .35; cursor: default; background: none; }
+.tool svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tool[data-tool=select] svg { fill: currentColor; stroke-width: 1.4; }
+.sw { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); background: var(--c); cursor: pointer; margin: 0 2px; padding: 0; }
+.sw.on { box-shadow: 0 0 0 2px var(--accent); }
+.sw.custom { background: conic-gradient(#ef4444, #f59e0b, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444); position: relative; overflow: hidden; display: inline-block; }
+.sw.custom input { opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+.sizeg { padding: 3px 8px; gap: 6px; }
+.sizeg input[type=range] { width: 90px; }
+.tiny { width: 18px; height: 18px; stroke: var(--muted); }
+.fillc { font-size: 12px; gap: 4px; color: var(--muted); }
+.zpct { min-width: 54px; border: none; background: none; font-weight: 600; font-size: 12.5px; cursor: pointer; color: var(--text); border-radius: 6px; padding: 6px 2px; }
+.zpct:hover { background: var(--line); }
+
+main { flex: 1; display: flex; min-height: 0; }
+#viewport { flex: 1; overflow: auto; position: relative; outline: none;
+  background-color: var(--bg);
+  background-image: radial-gradient(color-mix(in srgb, var(--muted) 25%, transparent) 1px, transparent 1px);
+  background-size: 18px 18px; }
+#spacer { position: relative; }
+#view { position: absolute; left: 0; top: 0; display: block; }
+#viewport.pan, #viewport.pan * { cursor: grab !important; }
+.textedit { position: absolute; z-index: 3; margin: 0; padding: 0; border: 1px dashed var(--accent); background: rgba(255,255,255,.04);
+  font-weight: 600; font-family: system-ui, "Segoe UI", Roboto, sans-serif; line-height: 1.25; resize: none; overflow: hidden; outline: none; white-space: pre; min-width: 40px; }
+
+#side { width: 278px; flex: none; overflow: auto; background: var(--panel); border-left: 1px solid var(--line); padding: 4px 14px 20px; }
+#side section { padding: 12px 0; border-bottom: 1px solid var(--line); display: grid; gap: 9px; }
+#side section:last-child { border-bottom: none; }
+#side h3 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.field { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.field.col { flex-direction: column; align-items: stretch; gap: 4px; }
+.field select { max-width: 160px; }
+.chips { display: grid; gap: 6px; font-size: 13px; }
+.small { font-size: 12px; margin: 0; }
+.btn.small { padding: 5px 10px; font-size: 12px; justify-self: start; }
+dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 12.5px; }
+dt { color: var(--muted); }
+dd { margin: 0; word-break: break-all; }
+.help p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.9; }
+@media (max-width: 1100px) { #side { width: 230px; } .brand span { display: none; } }

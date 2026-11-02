@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<style>
+  .wrap { display: flex; max-width: 1080px; margin: 0 auto; }
+  nav { width: 210px; flex: none; padding: 32px 12px; position: sticky; top: 0; align-self: flex-start; }
+  nav a { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; color: var(--ink-2); text-decoration: none; }
+  nav a:hover { background: var(--bg-hover); color: var(--ink); }
+  nav a.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  nav .brand { display: flex; align-items: center; gap: 10px; padding: 0 12px 18px; font-weight: 650; font-size: 15px; }
+  nav .brand img { width: 28px; height: 28px; border-radius: 8px; }
+  .page { flex: 1; min-width: 0; }
+  section { scroll-margin-top: 20px; }
+  .ws-item { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .ws-item .head { display: flex; gap: 8px; align-items: center; }
+  .ws-item .head .field[type=text] { flex: 1; }
+  .ws-item input[type=color] { width: 36px; height: 32px; padding: 0; border: 1px solid var(--line-strong); border-radius: 8px; background: none; }
+  .ws-item textarea { width: 100%; margin-top: 8px; font: 12px var(--mono); }
+  .ws-item .ws-ico { width: 36px; height: 32px; border: 1px solid var(--line-strong); border-radius: 8px; display: grid; place-items: center; background: var(--bg-raised); cursor: pointer; padding: 0; color: var(--c); }
+  .ws-item .ws-ico .ws-glyph { font: 700 16px/1 "Segoe UI Emoji", "Segoe UI", system-ui, sans-serif; }
+  .ws-item .ws-ico .ws-img { width: 20px; height: 20px; object-fit: contain; }
+  .ws-item .icon-pick { display: none; margin-top: 8px; padding: 10px; border: 1px dashed var(--line-strong); border-radius: 8px; }
+  .ws-item.picking .icon-pick { display: block; }
+  .icon-pick .glyphs { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 8px; }
+  .icon-pick .glyphs button { width: 32px; height: 30px; border: 1px solid var(--line); border-radius: 7px; background: transparent; cursor: pointer; font: 16px/1 "Segoe UI Emoji", system-ui, sans-serif; }
+  .icon-pick .glyphs button:hover { background: var(--bg-hover); }
+  .icon-pick .row2 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .icon-pick .row2 .field { width: 90px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 8px; border-radius: 14px; background: var(--bg-sunken); font-size: 12px; max-width: 320px; }
+  .chip span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .chip button { border: 0; background: none; cursor: pointer; color: var(--ink-3); padding: 0 4px; font-size: 14px; line-height: 1; }
+  .sc { display: grid; grid-template-columns: 1fr 260px; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+  .sc input { width: 100%; font: 12px var(--mono); }
+  .sc input.bad { border-color: var(--danger); }
+  .check { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .ok { color: var(--ok); font-weight: 700; }
+  .bad-t { color: var(--danger); font-weight: 700; }
+  dl.kv { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin: 0; }
+  dl.kv dt { color: var(--ink-3); }
+  dl.kv dd { margin: 0; font-family: var(--mono); font-size: 12px; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav id="nav">
+    <div class="brand"><img src="/_shared/logo.png" alt="">Settings</div>
+    <a href="#general">General</a>
+    <a href="#tabs">Tabs and bars</a>
+    <a href="#appearance">Appearance and window</a>
+    <a href="#zoom">Zoom</a>
+    <a href="#workspaces">Workspaces</a>
+    <a href="#extensions-link">Extensions</a>
+    <a href="#passwords-ai">Passwords and AI</a>
+    <a href="#languages">Languages</a>
+    <a href="#sync">Sync</a>
+    <a href="#profiles">Profiles and apps</a>
+    <a href="#privacy">Privacy and security</a>
+    <a href="#filters">My filters</a>
+    <a href="#features">PDF and screenshots</a>
+    <a href="#shortcuts">Shortcuts</a>
+    <a href="#about">About</a>
+  </nav>
+  <div class="page">
+    <div class="card" id="policy-banner" hidden style="border-color:var(--warn)"><b>Some settings are managed by your organisation.</b> <span class="muted">They are greyed out below.</span></div>
+    <section id="general" class="card">
+      <h2>General</h2>
+      <div class="row"><div class="grow">Search engine<div class="hint">Used by the address bar and the new tab page.</div></div><select class="field" data-k="searchEngine">
+        <option value="google">Google</option><option value="duckduckgo">DuckDuckGo</option><option value="brave">Brave Search</option><option value="bing">Bing</option><option value="startpage">Startpage</option></select></div>
+      <div class="row"><div class="grow">Continue where you left off<div class="hint">Reopen your windows and tabs on start-up. Tabs load when you open them.</div></div><label class="switch"><input type="checkbox" data-k="restoreSession"><span></span></label></div>
+      <div class="row"><div class="grow">Theme</div><select class="field" data-k="theme"><option value="system" data-linux="Follow system">Follow Windows</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
+      <div class="row"><div class="grow">Accent colour</div><input type="color" data-k="accent" class="field" style="width:56px;padding:2px"></div>
+      <div class="row"><div class="grow">Default browser<div class="hint" data-linux="Sets Ferna Sundaree as the default web browser and PDF viewer for your account (xdg-settings).">Opens Windows Settings → Default apps, where you can choose Ferna Sundaree.</div></div><button class="btn" id="defbrowser">Make default…</button></div>
+    </section>
+
+    <section id="tabs" class="card">
+      <h2>Tabs and bars</h2>
+      <div class="row"><div class="grow">Tab bar position<div class="hint">Cycle with <kbd>Ctrl+Shift+,</kbd></div></div><select class="field" data-k="tabPosition"><option value="top">Top (horizontal)</option><option value="left">Left (vertical)</option><option value="right">Right (vertical)</option></select></div>
+      <div class="row"><div class="grow">Show tab bar<div class="hint">Toggle with <kbd>Ctrl+Shift+H</kbd>. While hidden, move the pointer to the window edge to see it.</div></div><label class="switch"><input type="checkbox" data-k="tabBarHidden" data-invert="1"><span></span></label></div>
+      <div class="row"><div class="grow">Show bookmarks bar<div class="hint">Toggle with <kbd>Ctrl+Shift+B</kbd></div></div><label class="switch"><input type="checkbox" data-k="bookmarksBarHidden" data-invert="1"><span></span></label></div>
+      <div class="row"><div class="grow">Collapse vertical tab bar to icons<div class="hint"><kbd>Ctrl+Shift+\</kbd></div></div><label class="switch"><input type="checkbox" data-k="verticalCollapsed"><span></span></label></div>
+      <div class="row"><div class="grow">Sleeping tabs<div class="hint">Tabs you have not looked at for a while are unloaded to save memory and battery; they reload when you open them. Tabs playing sound, in Picture-in-Picture or marked "Keep loaded" never sleep. See them in the Task manager (<kbd>Shift+Esc</kbd>).</div></div>
+        <select class="field" data-k="sleepAfterMinutes" data-num="1"><option value="15">after 15 minutes</option><option value="30">after 30 minutes</option><option value="60">after 1 hour</option><option value="120">after 2 hours</option><option value="360">after 6 hours</option></select><label class="switch"><input type="checkbox" data-k="sleepingTabs"><span></span></label></div>
+      <div class="row"><div class="grow">Picture-in-Picture when you switch tabs<div class="hint">A playing video follows you in a floating window when you go to another tab, and comes back when you return.</div></div><label class="switch"><input type="checkbox" data-k="autoPip"><span></span></label></div>
+      <div class="row"><div class="grow">Link preview<div class="hint"><kbd>Shift</kbd>+click a link (or right-click → Preview link) to open it in a floating card over the page; keep it as a tab, or put it in split view.</div></div><label class="switch"><input type="checkbox" data-k="linkPreview"><span></span></label></div>
+      <div class="row"><div class="grow">Vertical tab bar width</div><input type="range" min="160" max="400" step="10" data-k="verticalWidth" data-num="1"><span id="vw" class="muted" style="width:48px"></span></div>
+    </section>
+
+    <section id="appearance" class="card">
+      <h2>Appearance and window</h2>
+      <div class="row"><div class="grow">Theme<div class="hint" id="theme-name">Default</div></div><button class="btn" data-open="ferna://extensions/">Get themes…</button><button class="btn" id="theme-reset">Reset to default</button></div>
+      <div class="row"><div class="grow">Window controls<div class="hint">There is no title bar. Minimise, maximise and close sit on the tab bar when tabs are on top, or on the toolbar when tabs are vertical (one bar). <kbd>Ctrl+Shift+H</kbd> hides them together with the tab bar; rest the pointer on the window edge to bring them back.</div></div></div>
+      <div class="row"><div class="grow">Workspace colours<div class="hint">Each workspace tints the tab bar, toolbar and accent with its own colour (change it under Workspaces), so you see at a glance whether you are in Work, Study or Personal.</div></div><label class="switch"><input type="checkbox" data-k="workspaceThemes"><span></span></label></div>
+      <div class="row"><div class="grow">Adaptive colour<div class="hint">Outside a workspace, the bars take the main colour of the site you are on.</div></div><label class="switch"><input type="checkbox" data-k="adaptiveTheme"><span></span></label></div>
+      <div class="row"><div class="grow">Dark mode on a schedule<div class="hint">Switches to dark and back to light at the times you choose (overrides the theme above).</div></div>
+        <span class="muted">dark from</span><input class="field" type="time" id="sch-dark" style="width:110px"><span class="muted">light from</span><input class="field" type="time" id="sch-light" style="width:110px"><label class="switch"><input type="checkbox" id="sch-on"><span></span></label></div>
+      <div class="row"><div class="grow">High-contrast toolbar buttons<div class="hint">Icons and text always keep at least a 4.5 : 1 contrast with the bar behind them (WCAG AA), whatever the theme; buttons that are on (equalizer, Picture-in-Picture, split view …) get a solid highlight and glow; hover and keyboard focus are outlined.</div></div><label class="switch"><input type="checkbox" data-k="highContrastToolbar"><span></span></label></div>
+      <div class="row"><div class="grow">Show workspace names<div class="hint">Off: workspaces appear as icons only, as in Ferna Tabs. Hover an icon to see its name.</div></div><label class="switch"><input type="checkbox" data-k="wsShowNames"><span></span></label></div>
+      <div class="row"><div class="grow">Tab bar shows only workspaces, favourites and pinned tabs<div class="hint">Same as the filter button on the workspaces bar (<kbd>Alt+Shift+P</kbd>). Other tabs stay open; use Tab Overview or the list at the pointer to reach them.</div></div><label class="switch"><input type="checkbox" data-k="stripFavoritesOnly"><span></span></label></div>
+      <div class="row"><div class="grow">Also hide the toolbar with <kbd>Ctrl+Shift+H</kbd> when tabs are on top<div class="hint">With tabs on the left or right the toolbar always hides with them, because it holds the window controls.</div></div><label class="switch"><input type="checkbox" data-k="hideToolbarWithTabs"><span></span></label></div>
+    </section>
+
+    <section id="zoom" class="card">
+      <h2>Zoom</h2>
+      <p class="muted" style="margin-top:-4px">Full zoom scales everything; text zoom scales only the text. Open the zoom panel with <kbd>Alt+Z</kbd> or the magnifier in the toolbar.</p>
+      <div class="row"><div class="grow">Remember zoom<div class="hint">Per site: every page of a site shares its zoom. Per tab: each tab keeps its own (uses CSS zoom).</div></div><select class="field" data-z="mode"><option value="site">Per site</option><option value="tab">Per tab</option></select></div>
+      <div class="row"><div class="grow">Treat sub-domains as separate sites<div class="hint">Off: mail.example.com and www.example.com share a zoom.</div></div><label class="switch"><input type="checkbox" data-z="subdomainsSeparate"><span></span></label></div>
+      <div class="row"><div class="grow">Default zoom type</div><select class="field" data-z="defaultType"><option value="full">Full</option><option value="text">Text only</option></select></div>
+      <div class="row"><div class="grow">Default full zoom</div><input class="field" type="number" min="25" max="500" step="1" data-z="defaultFull" style="width:90px"> %</div>
+      <div class="row"><div class="grow">Default text zoom / non-text zoom<div class="hint">In text mode, images and layout use the non-text level.</div></div><input class="field" type="number" min="25" max="500" data-z="defaultText" style="width:80px"> % <input class="field" type="number" min="25" max="500" data-z="defaultNonText" style="width:80px"> %</div>
+      <div class="row"><div class="grow">Zoom levels<div class="hint">Used by zoom in and out, comma separated.</div></div><input class="field" data-z="levels" style="width:340px"></div>
+      <div class="row"><div class="grow">Zoom in and out by</div><select class="field" data-z="stepMode"><option value="levels">Next level in the list</option><option value="fixed">Fixed step</option></select><input class="field" type="number" min="1" max="100" data-z="step" style="width:70px"> %</div>
+      <div class="row"><div class="grow">Minimum font size<div class="hint">Small text is enlarged to at least this size, in full and text zoom.</div></div><select class="field" data-z="minFont" data-num="1"><option value="0">Off</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>16</option><option>18</option><option>20</option></select></div>
+      <div class="row"><div class="grow">Line spacing with text zoom</div><select class="field" data-z="lineSpacing" data-num="1"><option value="1">Normal</option><option value="1.1">1.1×</option><option value="1.2">1.2×</option><option value="1.35">1.35×</option></select></div>
+      <div class="row"><div class="grow">AutoFit range<div class="hint">Fit-to-width never zooms below or above these levels.</div></div><input class="field" type="number" min="25" max="500" data-z="autofitMin" style="width:80px"> – <input class="field" type="number" min="25" max="500" data-z="autofitMax" style="width:80px"> %</div>
+      <div class="row"><div class="grow">AutoFit pages automatically<div class="hint">When a site has no saved zoom (per-site mode).</div></div><label class="switch"><input type="checkbox" data-z="autofitOnLoad"><span></span></label></div>
+      <div class="row"><div class="grow">Saved site zoom<div class="chips" id="zoom-sites"></div></div><button class="btn small danger" id="zoom-clear">Clear all</button></div>
+    </section>
+
+    <section id="workspaces" class="card">
+      <h2>Workspaces and common bar</h2>
+      <p class="muted" style="margin-top:-4px">As in Ferna Tabs: a workspace owns the sites pinned to it plus the host names listed below (sub-domains count). Switching only filters the tab bar; no tab is closed.</p>
+      <div id="wslist"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 18px">
+        <button class="btn" id="ws-add">Add workspace</button>
+        <label class="btn">Import Ferna Tabs file…<input type="file" id="ws-import" accept=".json,application/json" hidden></label>
+        <button class="btn" id="ws-export">Export</button>
+      </div>
+      <h2 style="font-size:14px">Pinned in All tabs</h2>
+      <p class="muted" style="margin-top:-6px">Shown when “All” is selected on the workspaces bar. Pin with the pin on a tab, <kbd>Alt+S</kbd>, or a tab's right-click menu.</p>
+      <div class="chips" id="allpinned" style="margin-bottom:16px"></div>
+      <h2 style="font-size:14px">Common bar <span class="muted" id="common-n"></span></h2>
+      <p class="muted" style="margin-top:-6px">Up to 20 sites shown in every workspace. Add one with the star on a tab, <kbd>Alt+Shift+S</kbd>, or a tab's right-click menu.</p>
+      <div class="chips" id="common"></div>
+    </section>
+
+    <section id="extensions-link" class="card">
+      <h2>Extensions</h2>
+      <div class="row"><div class="grow">Chrome extensions and themes<div class="hint">Install from the Chrome Web Store or from a .crx/.zip file; manage, turn off, pin to the toolbar.</div></div><button class="btn" data-open="ferna://extensions/">Open Extensions</button></div>
+    </section>
+
+    <section id="passwords-ai" class="card">
+      <h2>Passwords and AI assistant</h2>
+      <div class="row"><div class="grow">Parental controls<div class="hint">Block adult sites (optionally gambling and social media) and force SafeSearch, protected by a parent's password.</div></div><button class="btn" id="open-parental">Open</button></div>
+      <div class="row"><div class="grow">Secure exam mode<div class="hint">A locked-down, full-screen window for online exams, ended only by the invigilator's password or the time limit.</div></div><button class="btn" id="open-exam">Open</button></div>
+      <div class="row"><div class="grow">Passwords and autofill<div class="hint">Saved passwords, checkup (weak, reused, leaked), addresses, payment cards and passkeys.</div></div><button class="btn" id="open-passwords">Open</button></div>
+      <div class="row"><div class="grow">AI assistant<div class="hint">Side panel (<kbd>Alt+A</kbd>) that reads the page and your tabs. Use Ollama or LM Studio on this PC (private), or your own Anthropic or OpenAI key.</div></div><button class="btn" id="open-assistant">Open</button></div>
+    </section>
+
+    <section id="languages" class="card">
+      <h2>Languages</h2>
+      <div class="row"><div class="grow">Translate pages into</div><select class="field" data-k="translateTo" id="tr-lang"></select></div>
+      <div class="row"><div class="grow">Translate with<div class="hint">Google Translate sends the page to Google. Your AI assistant keeps it on this PC when it runs locally.</div></div><select class="field" data-k="translateService"><option value="">Ask each time</option><option value="google">Google Translate</option><option value="ai">My AI assistant</option></select></div>
+      <div class="row" style="align-items:flex-start"><div class="grow">Spell-check languages<div class="hint" data-linux="Underlines spelling mistakes in these languages as you type. Dictionaries are downloaded the first time a language is used.">Underlines spelling mistakes in these languages as you type. Windows supplies the dictionaries: add a language in Windows Settings → Time &amp; language to get more.</div><div id="spell" class="chips"></div></div></div>
+      <div class="row"><div class="grow">Reading mode and read aloud<div class="hint">Reading mode (<kbd>F9</kbd>) shows just the article. Read aloud (<kbd>Ctrl+Shift+U</kbd>) uses the voices installed in <span data-linux="your system (speech-dispatcher; for example &lt;code&gt;sudo apt install speech-dispatcher espeak-ng&lt;/code&gt;)">Windows (Settings → Time &amp; language → Speech)</span>.</div></div></div>
+    </section>
+
+    <section id="sync" class="card">
+      <h2>Sync between your PCs</h2>
+      <p class="hint" style="margin-top:0">No account needed. Ferna writes one encrypted file into a folder that OneDrive, Google Drive, Dropbox (or a USB stick) already keeps in step between your PCs. Only your passphrase opens it: neither Ferna nor the storage service can read it. Use the same folder and passphrase on each PC.</p>
+      <div id="sync-off">
+        <div class="row"><div class="grow">Folder<div class="hint" id="sync-folder-t">Not chosen</div></div><button class="btn" id="sync-choose">Choose…</button></div>
+        <div class="row"><div class="grow">Passphrase<div class="hint">At least 10 characters. There is no way to recover it: write it down.</div></div><input class="field" type="password" id="sync-pass" autocomplete="new-password" style="width:240px"></div>
+        <div class="row"><label class="check"><input type="checkbox" id="sync-pw" checked> Passwords, addresses and cards</label><label class="check"><input type="checkbox" id="sync-hist"> History</label><span class="grow"></span><button class="btn primary" id="sync-start">Turn on sync</button></div>
+      </div>
+      <div id="sync-on" hidden>
+        <div class="row"><div class="grow">Syncing through<div class="hint" id="sync-where"></div></div><button class="btn" id="sync-now">Sync now</button><button class="btn danger" id="sync-stop">Turn off</button></div>
+        <div class="row"><label class="check"><input type="checkbox" id="sync-pw2"> Passwords, addresses and cards</label><label class="check"><input type="checkbox" id="sync-hist2"> History</label></div>
+      </div>
+      <div class="hint" id="sync-status"></div>
+    </section>
+
+    <section id="profiles" class="card">
+      <h2>Profiles, workspace logins and apps</h2>
+      <p class="hint" style="margin-top:0">A profile is a whole separate browser (its own bookmarks, passwords, extensions and sign-ins) with its own desktop shortcut. For lighter separation, give a workspace its own logins: its tabs keep their own cookies, so two accounts of the same site can be open side by side.</p>
+      <h2 style="font-size:14px">Profiles</h2>
+      <div id="profiles-list"></div>
+      <div class="row"><input class="field" id="profile-name" placeholder="New profile name" style="flex:1"><label class="check"><input type="checkbox" id="profile-sc" checked> Desktop shortcut</label><button class="btn" id="profile-add">Create and open</button></div>
+      <h2 style="font-size:14px">Workspaces with separate logins</h2>
+      <div id="ws-logins"></div>
+      <h2 style="font-size:14px">Installed apps</h2>
+      <div id="apps-list"></div>
+      <p class="hint" data-linux="Install a site from the menu → Install this site as an app. It gets its own window, dock icon and an entry in your applications menu.">Install a site from the menu → Install this site as an app. It gets its own window, taskbar button and Start-menu entry.</p>
+    </section>
+
+    <section id="privacy" class="card">
+      <h2>Privacy and security</h2>
+      <div class="row"><div class="grow">HTTPS-first<div class="hint">Upgrades http:// to https:// and warns before loading an insecure page. Local addresses are left alone.</div></div><label class="switch"><input type="checkbox" data-k="httpsFirst"><span></span></label></div>
+      <div class="row"><div class="grow">Sites allowed over HTTP<div class="chips" id="https-ex"></div></div></div>
+      <div class="row"><div class="grow">Secure DNS (DNS over HTTPS)<div class="hint">“Strict” never falls back to your network's DNS. Use “Automatic” if your network blocks it.</div></div>
+        <select class="field" data-k="dohMode"><option value="secure">Strict</option><option value="automatic">Automatic</option><option value="off">Off</option></select>
+        <select class="field" data-k="dohProvider"><option value="cloudflare">Cloudflare + Quad9</option><option value="quad9">Quad9</option><option value="google">Google</option></select></div>
+      <div class="row"><div class="grow">Warn about look-alike addresses<div class="hint">Before opening a site you have never visited whose name imitates a well-known site or one of your bookmarks (paypa1.com, rnicrosoft.com, combank.lk.verify.top).</div></div><label class="switch"><input type="checkbox" data-k="lookalikeWarnings"><span></span></label></div>
+      <div class="row"><div class="grow">Warn before typing a password on a risky page<div class="hint">A note above the password field on pages that are not encrypted, or on a site you are visiting for the first time.</div></div><label class="switch"><input type="checkbox" data-k="passwordWarnings"><span></span></label></div>
+      <div class="row"><div class="grow">Block third-party cookies<div class="hint">Stops ad and tracking companies following you from site to site. Done by Chromium itself, so cookies set from inside embedded frames are covered too. If a site's sign-in breaks, turn this off. <b>Takes effect after a restart.</b></div></div><label class="switch"><input type="checkbox" data-k="blockThirdPartyCookies"><span></span></label></div>
+      <div class="row"><div class="grow">Remove tracking tags from links<div class="hint">utm_…, fbclid, gclid, msclkid and similar are removed from addresses before the page loads.</div></div><label class="switch"><input type="checkbox" data-k="stripTracking"><span></span></label></div>
+      <div class="row"><div class="grow">Send Global Privacy Control<div class="hint">Tells every site you do not want your data sold or shared (Sec-GPC header and navigator.globalPrivacyControl). Legally binding in some places.</div></div><label class="switch"><input type="checkbox" data-k="gpc"><span></span></label></div>
+      <div class="row"><div class="grow">Fingerprinting protection<div class="hint">Canvas, audio and graphics-card readings get small per-site differences, and CPU/memory are reported in coarse buckets, so sites cannot recognise your PC without cookies.</div></div><label class="switch"><input type="checkbox" data-k="fingerprintProtection"><span></span></label></div>
+      <div class="row"><div class="grow">Hide your local IP address from WebRTC<div class="hint">Video-call features may use only your public connection, so sites cannot read your local or VPN-hidden addresses.</div></div><label class="switch"><input type="checkbox" data-k="webrtcProtection"><span></span></label></div>
+      <div class="row"><div class="grow">Scan downloads for viruses<div class="hint">Each finished download is scanned with Microsoft Defender (Windows) or ClamAV (Linux: <code>sudo apt install clamav clamav-daemon</code>); a threat is removed and you are told.</div></div><label class="switch"><input type="checkbox" data-k="defenderScan"><span></span></label></div>
+      <div class="row"><div class="grow">Pause extensions whose update asks for more access<div class="hint">The extension stays off until you approve the new access.</div></div><label class="switch"><input type="checkbox" data-k="extensionGuard"><span></span></label></div>
+      <div class="row"><div class="grow">Enhanced security mode<div class="hint">Runs JavaScript without the optimising compiler (JIT), which removes the code most browser attacks target. Pages run slower and WebAssembly apps (some games, editors) will not work. <b>Takes effect after a restart.</b></div></div><label class="switch"><input type="checkbox" data-k="enhancedSecurity"><span></span></label></div>
+      <div class="row"><div class="grow">Safe browsing: warn before phishing and malware sites<div class="hint" id="safety-status">Checked on this PC against lists updated twice a day (PhishTank, OpenPhish, abuse.ch URLhaus). No address is sent anywhere. Downloads from listed sites are blocked.</div></div><button class="btn small" id="safety-refresh">Update</button><label class="switch"><input type="checkbox" data-k="safeBrowsing"><span></span></label></div>
+      <div class="row"><div class="grow">Block trackers, ads and malware domains<div class="hint" id="blocker-status"></div></div><button class="btn small" id="blocker-refresh">Update lists</button><label class="switch"><input type="checkbox" data-k="blocker"><span></span></label></div>
+      <div class="row"><div class="grow">Hide ad spaces and banners<div class="hint">Cosmetic filtering: the element-hiding rules of EasyList and uBlock Origin, inserted by the browser into each page.</div></div><label class="switch"><input type="checkbox" data-k="cosmeticFiltering"><span></span></label></div>
+      <div class="row"><div class="grow">Block YouTube ads<div class="hint">Removes the ad schedule from YouTube's player data before the video starts, hides ad slots, and skips any ad that still plays. YouTube changes often; filter-list updates follow.</div></div><label class="switch"><input type="checkbox" data-k="youtubeAds"><span></span></label></div>
+      <div class="row"><div class="grow">Block pop-ups a page opens by itself<div class="hint">Windows a page opens more than 5 seconds after your last click or key press are blocked (Chrome's rule); the shield button lists them so you can open one.</div></div><label class="switch"><input type="checkbox" data-k="popupBlocker"><span></span></label></div>
+      <div class="row"><div class="grow">Sites with blocking turned off<div class="chips" id="blocker-allow"></div></div></div>
+      <div class="row"><div class="grow">Site permissions<div class="hint">Camera, microphone, location and notifications you allowed or blocked.</div><div class="chips" id="perms"></div></div></div>
+      <div class="row"><div class="grow">Keep history for<div class="hint">Older entries are deleted automatically.</div></div><select class="field" data-k="historyDays" data-num="1"><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></div>
+      <div class="row" style="align-items:flex-start"><div class="grow">Clear browsing data
+        <div class="check"><input type="checkbox" id="c-history" checked><label for="c-history">History</label></div>
+        <div class="check"><input type="checkbox" id="c-cookies"><label for="c-cookies">Cookies and site data (signs you out of sites)</label></div>
+        <div class="check"><input type="checkbox" id="c-cache" checked><label for="c-cache">Cached images and files</label></div>
+        <div class="check"><input type="checkbox" id="c-downloads"><label for="c-downloads">Download list</label></div></div>
+        <select class="field" id="c-range"><option value="3600000">Last hour</option><option value="86400000">Last 24 hours</option><option value="604800000">Last 7 days</option><option value="0" selected>All time</option></select>
+        <button class="btn danger" id="clear">Clear data</button></div>
+    </section>
+
+    <section id="filters" class="card">
+      <h2>My filters</h2>
+      <p class="muted" style="margin-top:-4px">Your own blocking and hiding rules, in uBlock Origin / Adblock Plus syntax. They apply at once, and your exceptions (<code>@@</code>) win over the lists. Rules made with <b>Hide this element…</b> (right-click on a page, or the shield button) are added here.</p>
+      <textarea class="field" id="my-filters" spellcheck="false" style="width:100%;height:200px;font:12px/1.5 var(--mono)" placeholder="! Examples&#10;||ads.example.com^&#10;example.com##.sponsored-banner&#10;@@||example.org^$document"></textarea>
+      <div style="display:flex;gap:8px;align-items:center;margin:8px 0 18px"><button class="btn primary" id="my-filters-save">Save</button><span class="muted" id="my-filters-n"></span></div>
+      <h2 style="font-size:14px">Extra filter lists</h2>
+      <p class="muted" style="margin-top:-6px">Subscribe to more lists by address (https only), for example a regional list such as EasyList for your language. They are added to the built-in lists and updated with them.</p>
+      <div id="lists"></div>
+      <div style="display:flex;gap:8px;margin-top:8px"><input class="field" id="list-url" placeholder="https://…/filters.txt" style="flex:1" aria-label="Filter list address"><button class="btn" id="list-add">Add list</button></div>
+      <p class="muted" id="lists-status" style="margin-top:8px"></p>
+    </section>
+
+    <section id="features" class="card">
+      <h2>Built-in Ferna PDF Reader and Ferna Screenshots</h2>
+      <div class="row"><div class="grow">Text selection menu<div class="hint">Select text on a page to get Copy, Search and (for an address) Open, as in SelectON.</div></div><label class="switch"><input type="checkbox" data-k="selectionMenu"><span></span></label></div>
+      <div class="row"><div class="grow">Picture-in-Picture<div class="hint">Pop the largest video into a floating, always-on-top window: <kbd>Alt+P</kbd>, the toolbar button, or right-click a video.</div></div></div>
+      <div class="row"><div class="grow">Equalizer and Auto-EQ<div class="hint">10 bands, genre presets, and Auto-EQ that reads the page and listens to the sound to pick a preset: <kbd>Alt+Q</kbd> or the toolbar button while media plays.</div></div></div>
+      <div class="row"><div class="grow">Open PDFs in Ferna PDF Reader<div class="hint">Annotations, stylus, OCR, bookmarks, merge and the AI assistant. Save overwrites local files directly; no save helper needed.</div></div><label class="switch"><input type="checkbox" data-k="pdfDefault"><span></span></label></div>
+      <div class="row"><div class="grow">PDF Reader settings and manual</div><button class="btn" data-open="ferna://pdf/viewer/viewer.html">Open PDF Reader</button><button class="btn" data-open="ferna://pdf/Ferna-PDF-Reader-Manual.pdf">Manual</button></div>
+      <div class="row"><div class="grow">Screenshots: stamp, file names, format, “save immediately”<div class="hint">Capture with <kbd>Alt+Shift+V</kbd> visible, <kbd>Alt+Shift+F</kbd> entire page, <kbd>Alt+Shift+R</kbd> region, <kbd>Alt+Shift+E</kbd> element.</div></div><button class="btn" data-open="ferna://shots/options.html">Screenshot settings</button><button class="btn" data-open="ferna://shots/history.html">History</button></div>
+    </section>
+
+    <section id="shortcuts" class="card">
+      <h2>Keyboard shortcuts</h2>
+      <p class="muted" style="margin-top:-4px">Type a combination such as <kbd>Ctrl+Shift+H</kbd>; separate alternatives with a comma. A combination already in use is refused.</p>
+      <div id="sclist"></div>
+      <button class="btn" id="sc-reset" style="margin-top:12px">Reset all to defaults</button>
+    </section>
+
+    <section id="about" class="card">
+      <h2>About Ferna Sundaree</h2>
+      <div class="row"><div class="grow">Update automatically<div class="hint" id="upd-status">Checks every 6 hours, on GitHub and on Ferna's update mirror. An update is installed only if it is signed with Ferna's own key and its checksum matches.</div></div>
+        <button class="btn small" id="upd-check">Check now</button><button class="btn small primary" id="upd-install" hidden>Restart to update</button><label class="switch"><input type="checkbox" data-k="autoUpdate"><span></span></label></div>
+      <div id="about-body"></div>
+    </section>
+  </div>
+</div>
+<script src="/_shared/kit.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>

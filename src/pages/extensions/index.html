@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Extensions</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<style>
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; }
+  .ext { background: var(--bg-raised); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow); }
+  .ext.off { opacity: .7; }
+  .ext .head { display: flex; gap: 12px; align-items: flex-start; }
+  .ext .ic { width: 40px; height: 40px; border-radius: 10px; background: var(--bg-sunken); display: grid; place-items: center; flex: none; overflow: hidden; }
+  .ext .ic img { width: 32px; height: 32px; object-fit: contain; }
+  .ext .name { font-weight: 650; font-size: 14px; }
+  .ext .meta { color: var(--ink-3); font-size: 12px; }
+  .ext .desc { color: var(--ink-2); font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ext details { font-size: 12px; color: var(--ink-2); }
+  .ext details ul { margin: 6px 0 0; padding-left: 18px; }
+  .ext .err { color: var(--danger); font-size: 12px; }
+  .ext .broad { color: var(--warn); font-size: 12px; margin-top: 4px; }
+  .ext .acts { display: flex; align-items: center; gap: 8px; margin-top: auto; }
+  .ext .acts .grow { flex: 1; }
+  .tag { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 8px; background: var(--bg-sunken); color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
+  .theme { display: flex; align-items: center; gap: 12px; }
+  .note { background: var(--accent-soft); border-radius: 10px; padding: 10px 14px; color: var(--ink-2); font-size: 12.5px; margin-bottom: 18px; }
+</style>
+</head>
+<body>
+  <div class="page" style="max-width:1100px">
+    <h1>Extensions</h1>
+    <p class="lead">Install Chrome extensions and themes from the Chrome Web Store, or from a .crx or .zip file.</p>
+    <div class="bar">
+      <button class="btn primary" id="store">Chrome Web Store</button>
+      <button class="btn" id="themes">Get themes</button>
+      <button class="btn" id="file">Install from file (.crx, .zip)…</button>
+      <button class="btn" id="folder">Load unpacked (developer)…</button>
+    </div>
+    <div class="note">Ferna Sundaree shows every extension's permissions before it is added. Extensions run inside the pages they can access, so add only ones you trust. Private windows run without extensions.</div>
+    <div class="card"><h2>Theme</h2><div class="theme" id="theme"></div></div>
+    <div class="grid" id="list"></div>
+  </div>
+  <script src="/_shared/kit.js"></script>
+  <script src="extensions.js"></script>
+</body>
+</html>

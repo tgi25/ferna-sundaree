@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Fingerprint test</title></head><body>
+<canvas id="c" width="220" height="60"></canvas>
+<input type="password" id="pw" placeholder="Password">
+<iframe id="f" width="300" height="60"></iframe>
+<script>
+  const c = document.getElementById('c'), x = c.getContext('2d');
+  x.fillStyle = '#f60'; x.fillRect(10, 10, 100, 30); x.fillStyle = '#069'; x.font = '18px Arial'; x.fillText('Ferna fingerprint', 4, 40);
+  window.__canvas = c.toDataURL();
+  window.__img = Array.from(x.getImageData(0, 0, 220, 60).data).reduce((a, b) => (a * 31 + b) >>> 0, 7);
+  window.__cores = navigator.hardwareConcurrency; window.__mem = navigator.deviceMemory; window.__gpc = navigator.globalPrivacyControl;
+  window.__frame = null;
+  addEventListener('message', e => { window.__frame = e.data; });
+  const other = location.hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1';
+  document.getElementById('f').src = `http://${other}:${location.port}/frame3p.html`;
+</script></body></html>

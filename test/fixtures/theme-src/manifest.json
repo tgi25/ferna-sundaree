@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Ferna Test Theme",
+  "version": "1.0",
+  "theme": {
+    "colors": {
+      "frame": [20, 70, 45], "toolbar": [228, 244, 234], "tab_text": [12, 45, 25], "tab_background_text": [215, 240, 222],
+      "bookmark_text": [12, 45, 25], "toolbar_button_icon": [20, 70, 45], "omnibox_background": [255, 255, 255],
+      "ntp_background": [20, 70, 45], "ntp_text": [240, 250, 240]
+    }
+  }
+}

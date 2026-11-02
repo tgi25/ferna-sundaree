@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "Ferna API probe",
+  "version": "1.0.0",
+  "permissions": ["alarms", "offscreen", "storage", "idle", "privacy", "tabs"],
+  "optional_permissions": ["clipboardWrite"],
+  "background": { "service_worker": "sw.js" }
+}

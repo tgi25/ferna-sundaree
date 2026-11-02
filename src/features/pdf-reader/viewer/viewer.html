@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ferna PDF Reader</title>
+<link rel="icon" href="../icons/icon32.png">
+<link rel="stylesheet" href="viewer.css">
+<script src="../ferna-shim.js"></script>
+<script src="../lib/pdf-lib.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+<!-- Icon sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3M7 21v-7h10v7"/></symbol>
+    <symbol id="i-saveas" viewBox="0 0 24 24"><path d="M13 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l3 3v5"/><path d="M7 3v5h8V3M7 21v-7h5"/><path d="M15.5 21.5v-3l5-5 3 3-5 5z" stroke-width="1.6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.7-1.5"/><circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-hlock" viewBox="0 0 24 24"><path d="M2 8h20M2 8l3-3M2 8l3 3M22 8l-3-3M22 8l-3 3"/><rect x="8" y="15" width="8" height="6.5" rx="1.3"/><path d="M10 15v-1.5a2 2 0 0 1 4 0V15"/></symbol>
+    <symbol id="i-areahl" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="1" fill="currentColor" fill-opacity=".28" stroke-dasharray="3 2"/><path d="M8 12h8" opacity=".5"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+    <symbol id="i-bmark" viewBox="0 0 24 24"><path d="M6 3h9a1 1 0 0 1 1 1v17l-5.5-4L5 21V4a1 1 0 0 1 1-1z"/><path d="M19 3l.7 1.8L21.5 5.5l-1.8.7L19 8l-.7-1.8-1.8-.7 1.8-.7z"/></symbol>
+    <symbol id="i-arrowright" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z"/><path d="M11.5 13.5L20 4"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-outdent" viewBox="0 0 24 24"><path d="M21 6H11M21 12H11M21 18H11M7 9l-3 3 3 3"/></symbol>
+    <symbol id="i-indent" viewBox="0 0 24 24"><path d="M21 6H11M21 12H11M21 18H11M4 9l3 3-3 3"/></symbol>
+    <symbol id="i-print" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/><path d="M6 14h12v7H6z"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-fitw" viewBox="0 0 24 24"><path d="M3 5v14M21 5v14M7 12h10M7 12l3-3M7 12l3 3M17 12l-3-3M17 12l-3 3"/></symbol>
+    <symbol id="i-fitp" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 8h6M9 12h6M9 16h4"/></symbol>
+    <symbol id="i-rotl" viewBox="0 0 24 24"><path d="M4 4v5h5"/><path d="M4.6 9A8 8 0 1 1 6 16.5"/></symbol>
+    <symbol id="i-rotr" viewBox="0 0 24 24"><path d="M20 4v5h-5"/><path d="M19.4 9A8 8 0 1 0 18 16.5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></symbol>
+    <symbol id="i-annot" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-cursor" viewBox="0 0 24 24"><path d="M5 3l6 17 2.5-7L21 10.5z"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4a1.5 1.5 0 0 1 3 0v6M14 10V5.5a1.5 1.5 0 0 1 3 0V12M17 9.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-4.6-2.2L4.3 14.5a1.5 1.5 0 0 1 2.3-1.9L8 14"/></symbol>
+    <symbol id="i-highlight" viewBox="0 0 24 24"><path d="M9 15l-2 2v3h3l2-2"/><path d="M9 15l7-11 4 4-11 7z"/><path d="M4 21h16" stroke-width="3" opacity=".45"/></symbol>
+    <symbol id="i-underline" viewBox="0 0 24 24"><path d="M7 4v6a5 5 0 0 0 10 0V4M5 20h14"/></symbol>
+    <symbol id="i-strike" viewBox="0 0 24 24"><path d="M16 6.5A4 3 0 0 0 12 4c-2.5 0-4 1.3-4 3 0 3.5 8 2.5 8 7 0 2-1.8 3.5-4.2 3.5A5 5 0 0 1 7.5 15M4 12h16"/></symbol>
+    <symbol id="i-squiggly" viewBox="0 0 24 24"><path d="M7 4v5a5 5 0 0 0 10 0V4"/><path d="M3 19l2.25-2 2.25 2 2.25-2 2.25 2 2.25-2 2.25 2 2.25-2 2.25 2"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M3 21c3-1 4-4 6-6l8.5-8.5a2.1 2.1 0 0 0-3-3L6 12c-2 2-5 3-6 6"/><path d="M13 5l3 3"/></symbol>
+    <symbol id="i-marker" viewBox="0 0 24 24"><path d="M14 4l6 6-8 8H8v-4z"/><path d="M4 21h8" stroke-width="3" opacity=".45"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M8 20l-4.3-4.3a1.5 1.5 0 0 1 0-2.1L13.6 3.7a1.5 1.5 0 0 1 2.1 0l4.6 4.6a1.5 1.5 0 0 1 0 2.1L10 20z"/><path d="M8 20h12M9 9l6 6"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 4h14a1 1 0 0 1 1 1v10l-5 5H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M15 20v-5h5M8 9h8M8 13h5"/></symbol>
+    <symbol id="i-rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"/></symbol>
+    <symbol id="i-ellipse" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8.5" ry="6.5"/></symbol>
+    <symbol id="i-line" viewBox="0 0 24 24"><path d="M5 19L19 5"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 19L19 5M10 5h9v9"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-comment" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-stylus" viewBox="0 0 24 24"><path d="M15 4l5 5-10 10-6 1 1-6z"/><path d="M13 6l5 5"/><circle cx="18.5" cy="18.5" r="2" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+    <symbol id="i-merge" viewBox="0 0 24 24"><path d="M6 3v6a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6v0"/><path d="M18 3v6a6 6 0 0 1-3 5.2"/><path d="M3 6l3-3 3 3"/><path d="M15 6l3-3 3 3"/></symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 9h8M8 12h8M8 15h5"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3-1-6z"/><path d="M12 13v7"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.7 1.5-1.5 0-.5-.2-.8-.5-1.1-.3-.3-.5-.7-.5-1.1 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.4-4-7.8-9-7.8z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></symbol>
+  </defs>
+</svg>
+
+<div id="app">
+  <!-- ===== Top toolbar ===== -->
+  <header id="toolbar">
+    <div class="tb-group">
+      <button class="tb" id="btnSidebar" title="Thumbnails, outline &amp; annotations (F4)"><svg><use href="#i-menu"/></svg></button>
+      <button class="tb" id="btnOpen" title="Open PDF (Ctrl+O)"><svg><use href="#i-open"/></svg></button>
+      <button class="tb" id="btnSave" title="Save — overwrite this file (Ctrl+S)"><svg><use href="#i-save"/></svg><span class="dirty-dot"></span></button>
+      <button class="tb" id="btnSaveAs" title="Save As — save a copy with a new name or location (Ctrl+Shift+S)"><svg><use href="#i-saveas"/></svg></button>
+      <button class="tb" id="btnPassword" title="Add a password to this PDF"><svg><use href="#i-unlock"/></svg></button>
+      <span id="docTitle" class="doc-title"></span>
+    </div>
+
+    <div class="tb-group tb-center">
+      <button class="tb" id="btnPrev" title="Previous page"><svg><use href="#i-up"/></svg></button>
+      <input id="pageInput" type="text" inputmode="numeric" value="1" aria-label="Page number">
+      <span id="pageCount" class="muted">/ 0</span>
+      <button class="tb" id="btnNext" title="Next page"><svg><use href="#i-down"/></svg></button>
+      <span class="sep"></span>
+      <button class="tb" id="btnZoomOut" title="Zoom out (Ctrl + -)"><svg><use href="#i-minus"/></svg></button>
+      <div class="zoom-box">
+        <input id="zoomInput" type="text" value="Fit width" aria-label="Zoom" title="Type a percentage and press Enter">
+        <button class="tb small" id="btnZoomMenu" title="Zoom options"><svg><use href="#i-down"/></svg></button>
+      </div>
+      <button class="tb" id="btnZoomIn" title="Zoom in (Ctrl + +)"><svg><use href="#i-plus"/></svg></button>
+      <button class="tb toggle" id="btnFitWidth" title="Fit every page to the window width (W)"><svg><use href="#i-fitw"/></svg></button>
+      <button class="tb toggle" id="btnFitPage" title="Fit whole page (P)"><svg><use href="#i-fitp"/></svg></button>
+      <button class="tb toggle" id="btnHLock" title="Lock horizontal movement when zoomed in (L)"><svg><use href="#i-hlock"/></svg></button>
+      <span class="sep"></span>
+      <button class="tb" id="btnRotL" title="Rotate current page left (Shift+R)"><svg><use href="#i-rotl"/></svg></button>
+      <button class="tb" id="btnRotR" title="Rotate current page right (R)"><svg><use href="#i-rotr"/></svg></button>
+    </div>
+
+    <div class="tb-group tb-right">
+      <button class="tb" id="btnUndo" title="Undo (Ctrl+Z)"><svg><use href="#i-undo"/></svg></button>
+      <button class="tb" id="btnRedo" title="Redo (Ctrl+Y)"><svg><use href="#i-redo"/></svg></button>
+      <button class="tb" id="btnSearch" title="Find (Ctrl+F)"><svg><use href="#i-search"/></svg></button>
+      <button class="tb" id="btnAutoBookmark" title="Auto-Bookmark: generate bookmarks for this document"><svg><use href="#i-bmark"/></svg></button>
+      <button class="tb toggle ai" id="btnAI" title="AI assistant: summary, questions and answers, quiz (I)"><svg><use href="#i-sparkle"/></svg><span class="lbl">AI</span></button>
+      <button class="tb toggle" id="btnStylus" title="Stylus always draws (Xodo mode)"><svg><use href="#i-stylus"/></svg></button>
+      <button class="tb accent" id="btnAnnotate" title="Annotation tools (A)"><svg><use href="#i-annot"/></svg><span class="lbl">Annotate</span></button>
+      <button class="tb" id="btnMore" title="More"><svg><use href="#i-more"/></svg></button>
+    </div>
+  </header>
+
+  <!-- ===== Find bar ===== -->
+  <div id="findbar" hidden>
+    <svg class="fi"><use href="#i-search"/></svg>
+    <input id="findInput" type="text" placeholder="Find in document" spellcheck="false">
+    <span id="findCount" class="muted"></span>
+    <button class="tb small" id="findPrev" title="Previous (Shift+Enter)"><svg><use href="#i-up"/></svg></button>
+    <button class="tb small" id="findNext" title="Next (Enter)"><svg><use href="#i-down"/></svg></button>
+    <label class="chk"><input type="checkbox" id="findCase"> Match case</label>
+    <button class="tb small" id="findClose" title="Close (Esc)"><svg><use href="#i-close"/></svg></button>
+  </div>
+
+  <div id="main">
+    <!-- ===== Sidebar ===== -->
+    <aside id="sidebar" hidden>
+      <div class="sb-tabs">
+        <button class="sb-tab active" data-tab="thumbs">Pages</button>
+        <button class="sb-tab" data-tab="outline">Outline</button>
+        <button class="sb-tab" data-tab="annots">Annotations</button>
+      </div>
+      <div class="sb-body">
+        <div class="sb-panel" id="thumbs"></div>
+        <div class="sb-panel" id="outline" hidden></div>
+        <div class="sb-panel" id="annotList" hidden></div>
+      </div>
+    </aside>
+
+    <!-- ===== Document area ===== -->
+    <div id="viewerContainer" tabindex="0">
+      <div id="viewer"></div>
+      <div id="welcome" hidden>
+        <div class="welcome-card">
+          <img src="../icons/icon128.png" alt="" width="72" height="72">
+          <h1>Ferna PDF Reader</h1>
+          <p>Drop a PDF here, or</p>
+          <button class="btn primary" id="welcomeOpen">Open a PDF…</button>
+          <p class="muted small">Tip: PDFs you open in Chrome are shown here automatically.<br>
+          For local files, enable <b>Allow access to file URLs</b> for this extension in <code>chrome://extensions</code>.</p>
+        </div>
+      </div>
+    </div>
+    <!-- ===== AI panel ===== -->
+    <aside id="aiPanel" hidden></aside>
+  </div>
+
+  <!-- ===== Annotation palette (hides as soon as a tool is chosen) ===== -->
+  <div id="palette" class="palette" hidden>
+    <div class="pal-head">
+      <span>Annotate</span>
+      <button class="tb small" id="palClose" title="Close"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="pal-tools">
+      <button class="tool" data-tool="select" title="Select text / annotations (V)"><svg><use href="#i-cursor"/></svg><span>Select</span></button>
+      <button class="tool" data-tool="hand" title="Hand – drag to scroll (H)"><svg><use href="#i-hand"/></svg><span>Hand</span></button>
+      <button class="tool" data-tool="highlight" title="Highlight text (1)"><svg><use href="#i-highlight"/></svg><span>Highlight</span></button>
+      <button class="tool" data-tool="underline" title="Underline text (2)"><svg><use href="#i-underline"/></svg><span>Underline</span></button>
+      <button class="tool" data-tool="strikeout" title="Strike out text (3)"><svg><use href="#i-strike"/></svg><span>Strike</span></button>
+      <button class="tool" data-tool="squiggly" title="Squiggly underline (4)"><svg><use href="#i-squiggly"/></svg><span>Squiggly</span></button>
+      <button class="tool" data-tool="pen" title="Pen (5)"><svg><use href="#i-pen"/></svg><span>Pen</span></button>
+      <button class="tool" data-tool="marker" title="Free-hand highlighter (6)"><svg><use href="#i-marker"/></svg><span>Marker</span></button>
+      <button class="tool" data-tool="areahl" title="Area highlight — drag a rectangle (7)"><svg><use href="#i-areahl"/></svg><span>Area HL</span></button>
+      <button class="tool" data-tool="eraser" title="Eraser – removes whole strokes/annotations (E)"><svg><use href="#i-eraser"/></svg><span>Eraser</span></button>
+      <button class="tool" data-tool="freetext" title="Text box (T)"><svg><use href="#i-text"/></svg><span>Text</span></button>
+      <button class="tool" data-tool="note" title="Sticky note (N)"><svg><use href="#i-note"/></svg><span>Note</span></button>
+      <button class="tool" data-tool="rect" title="Rectangle"><svg><use href="#i-rect"/></svg><span>Rectangle</span></button>
+      <button class="tool" data-tool="ellipse" title="Ellipse"><svg><use href="#i-ellipse"/></svg><span>Ellipse</span></button>
+      <button class="tool" data-tool="line" title="Line"><svg><use href="#i-line"/></svg><span>Line</span></button>
+      <button class="tool" data-tool="arrow" title="Arrow"><svg><use href="#i-arrow"/></svg><span>Arrow</span></button>
+    </div>
+    <div class="pal-props" id="palProps">
+      <div class="prop-row"><span class="prop-lbl">Colour</span><div class="swatches" id="palSwatches"></div></div>
+      <div class="prop-row" id="rowWidth"><span class="prop-lbl">Thickness</span><input type="range" id="palWidth" min="0.5" max="24" step="0.5"><span id="palWidthVal" class="val"></span></div>
+      <div class="prop-row" id="rowOpacity"><span class="prop-lbl">Opacity</span><input type="range" id="palOpacity" min="10" max="100" step="5"><span id="palOpacityVal" class="val"></span></div>
+      <div class="prop-row" id="rowFont"><span class="prop-lbl">Font size</span><input type="range" id="palFont" min="6" max="48" step="1"><span id="palFontVal" class="val"></span></div>
+      <div class="prop-row" id="rowFill"><span class="prop-lbl">Fill</span><label class="chk"><input type="checkbox" id="palFill"> Filled shape</label></div>
+    </div>
+    <div class="pal-foot muted small">Choosing a tool hides this panel. Press <kbd>Esc</kbd> to stop annotating.</div>
+  </div>
+
+  <!-- ===== Active tool pill (shown while a tool is in use) ===== -->
+  <div id="toolPill" hidden>
+    <button id="pillTool" title="Show annotation tools"><svg><use href="#i-pen"/></svg><span id="pillName">Pen</span></button>
+    <button id="pillColor" title="Change colour"><span class="swatch" id="pillSwatch"></span></button>
+    <button id="pillDone" title="Done (Esc)"><svg><use href="#i-check"/></svg></button>
+  </div>
+
+  <!-- ===== Floating popover (selection popup, annotation popup, page menu, menus) ===== -->
+  <div id="popover" class="popover" hidden></div>
+
+  <div id="toast" hidden></div>
+  <button id="backChip" hidden title="Back to where you were (Alt+←)"><svg><use href="#i-back"/></svg><span>Back</span></button>
+  <div id="loading" hidden><div class="spinner"></div><span id="loadingText">Loading…</span><div class="bar"><div id="loadingBar"></div></div></div>
+  <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+  <canvas id="inkLive"></canvas>
+  <canvas id="inkPredict"></canvas>
+</div>
+</body>
+</html>

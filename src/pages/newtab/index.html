@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New tab</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<style>
+  body { min-height: 100vh; display: flex; flex-direction: column; align-items: center; background:
+    radial-gradient(1200px 500px at 50% -10%, var(--accent-soft), transparent 70%), var(--bg); }
+  .brand { margin-top: 13vh; display: flex; align-items: center; gap: 12px; }
+  .brand img { width: 56px; height: 56px; border-radius: 14px; box-shadow: var(--shadow); }
+  .brand h1 { font-size: 28px; font-weight: 650; margin: 0; letter-spacing: -.02em; }
+  .brand .ws { font-size: 13px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  .brand .ws .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+  form { margin-top: 28px; width: min(640px, 90vw); display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 18px; border-radius: 25px; background: var(--bg-raised); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  form:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft), var(--shadow); }
+  form input { flex: 1; border: 0; outline: none; background: transparent; font-size: 16px; }
+  .tiles { margin-top: 34px; width: min(760px, 92vw); display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
+  .tile { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 8px 10px; border-radius: 12px; text-decoration: none; color: var(--ink); background: transparent; border: 0; cursor: pointer; }
+  .tile:hover { background: var(--bg-hover); }
+  .tile .ic { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: var(--bg-raised); box-shadow: var(--shadow); }
+  .tile .ic .favicon, .tile .ic .letter { width: 24px; height: 24px; font-size: 13px; border-radius: 6px; }
+  .tile span.t { font-size: 12px; max-width: 96px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  h3 { width: min(760px, 92vw); margin: 30px 0 0; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .recent { width: min(760px, 92vw); margin-top: 8px; }
+  .recent button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 8px 10px; border: 0; background: transparent; border-radius: 8px; cursor: pointer; text-align: left; }
+  .recent button:hover { background: var(--bg-hover); }
+  .recent .t { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .recent .h { color: var(--ink-3); font-size: 12px; }
+  .private-note { margin-top: 24px; max-width: 560px; text-align: center; color: var(--ink-2); line-height: 1.6; }
+  footer { margin-top: auto; padding: 24px; color: var(--ink-3); font-size: 12px; display: flex; gap: 18px; }
+  footer button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0; }
+  footer button:hover { color: var(--accent); }
+  body.themed h3, body.themed .recent .h, body.themed footer { opacity: .8; }
+  body.themed .tile .t { color: var(--ink); }
+</style>
+</head>
+<body>
+  <div class="brand"><img src="/_shared/logo.png" alt=""><div><h1>Ferna Sundaree</h1><div class="ws" id="ws"></div></div></div>
+  <form id="f"><span id="sicon"></span><input id="q" autocomplete="off" spellcheck="false" aria-label="Search or enter address" autofocus></form>
+  <div id="extra"></div>
+  <footer>
+    <button data-run="tabOverview">Tab Overview <kbd>Ctrl+Shift+A</kbd></button>
+    <button data-run="tabsAtPointer">Tabs at pointer <kbd>Alt+Shift+L</kbd></button>
+    <button data-run="toggleTabBar">Hide tab bar <kbd>Ctrl+Shift+H</kbd></button>
+    <button data-run="settings">Settings</button>
+  </footer>
+  <script src="/_shared/kit.js"></script>
+  <script src="newtab.js"></script>
+</body>
+</html>

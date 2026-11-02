@@ -1,0 +1,222 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+  # Called by the weekly Chromium security update (chromium-patches.yml) with a prepared commit.
+  workflow_call:
+    inputs:
+      ref: { description: 'Commit to build', type: string, required: true }
+      version: { description: 'App version (without v)', type: string, required: true }
+      notes: { description: 'Release notes', type: string, required: false, default: '' }
+      environment: { description: 'Deployment environment that gates publishing', type: string, required: false, default: 'release-approval' }
+
+permissions:
+  contents: write
+
+jobs:
+  # A tag whose release is already published (for example one uploaded by hand) is left alone,
+  # so re-running or pushing the tag never replaces signed files people may have downloaded.
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.g.outputs.skip }}
+    steps:
+      - id: g
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.version && format('v{0}', inputs.version) || github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx 'update.json'; then
+            echo "Release $TAG is already published with a signed manifest; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ inputs.ref || github.ref }}' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Known vulnerabilities in shipped dependencies (fails on high or critical)
+        run: node tools/audit.js
+      - run: npm test
+      - name: End-to-end tests (Xvfb, Chromium sandbox on)
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb imagemagick
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: e2e-screenshots, path: test/e2e/out }
+
+  build-windows:
+    needs: test
+    runs-on: windows-latest
+    env:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ inputs.ref || github.ref }}' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Update mirrors known to the installed browser
+        run: node tools/set-mirrors.js "${{ vars.UPDATE_MIRROR_URLS }}"
+      - name: Build Setup exe, MSI and portable exe (with ASAR integrity check on)
+        # The app refuses to start if its app.asar was altered after the build.
+        run: npx electron-builder --win nsis msi portable --x64 --publish never -c.electronFuses.enableEmbeddedAsarIntegrityValidation=true
+      - name: Build MSIX (for the Microsoft Store; unsigned until submitted)
+        continue-on-error: true
+        run: npm run dist:msix
+        # To sign, add the certificate as secrets CSC_LINK / CSC_KEY_PASSWORD (electron-builder picks them up).
+      # Free code signing for open-source projects through the SignPath Foundation
+      # (https://signpath.org). Skipped until the SIGNPATH_* secrets exist. Must run before the
+      # update manifest is signed, because signing changes the files' checksums.
+      - name: Collect installers for code signing
+        id: unsigned
+        if: env.SIGNPATH_API_TOKEN != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned
+          path: |
+            dist/FernaSundaree-Setup-*.exe
+            dist/FernaSundaree-Portable-*.exe
+            dist/FernaSundaree-*.msi
+      - name: Code-sign with SignPath
+        if: env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug: 'ferna-sundaree'
+          signing-policy-slug: 'release-signing'
+          github-artifact-id: '${{ steps.unsigned.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: 'dist'
+      - name: Smoke test (starts and exits)
+        shell: pwsh
+        run: |
+          $env:FERNA_SUNDAREE_DATA = "$env:RUNNER_TEMP\ferna-smoke"
+          $p = Start-Process -FilePath "dist\win-unpacked\Ferna Sundaree.exe" -PassThru
+          Start-Sleep -Seconds 15
+          if ($p.HasExited) { throw "Ferna Sundaree exited early with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/FernaSundaree-Setup-*.exe
+            dist/FernaSundaree-Portable-*.exe
+            dist/FernaSundaree-*.msi
+            dist/FernaSundaree-*.appx
+            dist/latest.yml
+
+  build-linux:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ inputs.ref || github.ref }}' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Packaging tools (rpmbuild for .rpm)
+        run: sudo apt-get update && sudo apt-get install -y rpm xvfb
+      - name: Update mirrors known to the installed browser
+        run: node tools/set-mirrors.js "${{ vars.UPDATE_MIRROR_URLS }}"
+      - name: Build AppImage, .deb, .rpm and .tar.gz for x64 and ARM64
+        run: npx electron-builder --linux --x64 --arm64 --publish never -c.electronFuses.enableEmbeddedAsarIntegrityValidation=true
+      - name: Normalise file names (FernaSundaree-<version>-<x64|arm64>.<ext>)
+        run: node tools/linux-names.js
+      - name: Smoke test (starts and exits)
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          export FERNA_SUNDAREE_DATA="$RUNNER_TEMP/ferna-smoke"
+          xvfb-run -a dist/linux-unpacked/ferna-sundaree & PID=$!
+          sleep 15
+          kill -0 $PID || { echo "Ferna Sundaree exited early"; exit 1; }
+          kill $PID
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/FernaSundaree-*.AppImage
+            dist/FernaSundaree-*.deb
+            dist/FernaSundaree-*.rpm
+            dist/FernaSundaree-*.tar.gz
+            dist/latest-linux*.yml
+
+  release:
+    needs: [build-windows, build-linux]
+    if: startsWith(github.ref, 'refs/tags/') || inputs.ref != ''
+    runs-on: ubuntu-latest
+    # Tag pushes publish straight away. The weekly security update publishes through the
+    # environment it is given: "release-approval" waits for your one-click approval (set a
+    # required reviewer in Settings → Environments); "auto-release" publishes without waiting.
+    environment: ${{ inputs.environment || 'manual-release' }}
+    env:
+      MIRROR_S3_BUCKET: ${{ secrets.MIRROR_S3_BUCKET }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ inputs.ref || github.ref }}' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - name: Sign the update manifest (Ferna's own key; no certificate needed)
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          RELEASE_NOTES: ${{ inputs.notes }}
+        run: node tools/sign-update.js
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum FernaSundaree-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version && format('v{0}', inputs.version) || '' }}
+          target_commitish: ${{ inputs.ref || '' }}
+          name: ${{ inputs.version && format('Ferna Sundaree {0}', inputs.version) || '' }}
+          body: ${{ inputs.notes || '' }}
+          make_latest: true
+          files: |
+            dist/FernaSundaree-*
+            dist/latest*.yml
+            dist/update.json
+            dist/update.json.sig
+            dist/SHA256SUMS.txt
+      # Copy the release to an S3-compatible bucket (Cloudflare R2, Backblaze B2, Wasabi …) so
+      # installed copies can update without GitHub. Skipped until the MIRROR_S3_* secrets exist.
+      # Installers go up first and the signed manifest last, so a client never sees a manifest
+      # whose files are missing. The newest three versions are kept.
+      - name: Upload to the update mirror
+        if: env.MIRROR_S3_BUCKET != ''
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.MIRROR_S3_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.MIRROR_S3_SECRET }}
+          AWS_ENDPOINT_URL: ${{ secrets.MIRROR_S3_ENDPOINT }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          B="s3://$MIRROR_S3_BUCKET/ferna-sundaree"
+          cd dist
+          for d in "v$VERSION" latest; do
+            for f in FernaSundaree-* SHA256SUMS.txt; do aws s3 cp "$f" "$B/$d/$f" --only-show-errors; done
+            aws s3 cp update.json.sig "$B/$d/update.json.sig" --only-show-errors --cache-control no-cache
+            aws s3 cp update.json "$B/$d/update.json" --only-show-errors --cache-control no-cache
+          done
+          # Remove installers of older versions from latest/, and version folders beyond the newest three.
+          aws s3 ls "$B/latest/" | awk '{print $4}' | grep '^FernaSundaree-' | grep -v -- "$VERSION" | while read -r f; do aws s3 rm "$B/latest/$f" --only-show-errors; done || true
+          aws s3 ls "$B/" | awk '$1=="PRE"{print $2}' | grep '^v' | sed 's#/$##' | sort -V | head -n -3 | while read -r d; do aws s3 rm "$B/$d/" --recursive --only-show-errors; done || true

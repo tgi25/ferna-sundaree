@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Sign in test</title></head>
+<body style="font:16px system-ui;padding:30px">
+<h1>Sign in</h1>
+<form id="f" action="/login-done.html" method="get">
+  <p><label>Email <input id="u" name="email" type="email" autocomplete="username" style="font-size:18px"></label></p>
+  <p><label>Password <input id="p" name="pw" type="password" autocomplete="current-password" style="font-size:18px"></label></p>
+  <p><button id="go" type="submit">Sign in</button></p>
+</form>
+<h2>Create account</h2>
+<form id="f2" action="/login-done.html" method="get">
+  <p><input id="nu" name="user" autocomplete="username"></p>
+  <p><input id="np1" type="password" autocomplete="new-password"> <input id="np2" type="password" autocomplete="new-password"></p>
+</form>
+<h2>Delivery address</h2>
+<form id="addr"><input id="fn" autocomplete="given-name"> <input id="city" autocomplete="address-level2"> <input id="zip" name="postcode"></form>
+</body></html>

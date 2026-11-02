@@ -1,0 +1,6 @@
+node_modules/
+dist/
+test/e2e/out/
+*.log
+update-signing-key.pem
+*.pem.private

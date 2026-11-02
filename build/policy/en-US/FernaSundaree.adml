@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>Ferna Sundaree</displayName><description>Ferna Sundaree browser policies</description>
+  <resources><stringTable>
+    <string id="FernaSundaree">Ferna Sundaree</string>
+    <string id="SUPPORTED_FS05">Ferna Sundaree 0.5 or later</string>
+    <string id="HttpsFirst">HTTPS-first mode</string>
+    <string id="HttpsFirst_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. Upgrade addresses to HTTPS and warn before insecure pages.</string>
+    <string id="AdBlocker">Block trackers, ads and malware domains</string>
+    <string id="AdBlocker_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="SafeBrowsing">Safe browsing (phishing and malware lists)</string>
+    <string id="SafeBrowsing_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="BlockThirdPartyCookies">Block third-party cookies</string>
+    <string id="BlockThirdPartyCookies_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. Takes effect after a restart.</string>
+    <string id="EnhancedSecurity">Enhanced security mode (no JIT)</string>
+    <string id="EnhancedSecurity_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. Takes effect after a restart.</string>
+    <string id="AutoUpdate">Automatic updates</string>
+    <string id="AutoUpdate_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="PasswordManager">Built-in password manager</string>
+    <string id="PasswordManager_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="AutofillAddresses">Fill addresses</string>
+    <string id="AutofillAddresses_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="AutofillCards">Fill payment cards</string>
+    <string id="AutofillCards_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="LookalikeWarnings">Warn about look-alike addresses</string>
+    <string id="LookalikeWarnings_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="DefenderScan">Scan downloads with Microsoft Defender</string>
+    <string id="DefenderScan_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="ExtensionGuard">Pause extensions whose update asks for more access</string>
+    <string id="ExtensionGuard_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="FingerprintProtection">Fingerprinting protection</string>
+    <string id="FingerprintProtection_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="GlobalPrivacyControl">Send Global Privacy Control</string>
+    <string id="GlobalPrivacyControl_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="PopupBlocker">Block pop-ups</string>
+    <string id="PopupBlocker_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="SleepingTabs">Sleeping tabs</string>
+    <string id="SleepingTabs_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="AssistantAllowed">Allow the AI assistant</string>
+    <string id="AssistantAllowed_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="SyncAllowed">Allow sync through a folder</string>
+    <string id="SyncAllowed_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="PrivateWindowsAllowed">Allow private windows</string>
+    <string id="PrivateWindowsAllowed_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="TorWindowsAllowed">Allow private windows with Tor</string>
+    <string id="TorWindowsAllowed_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="DeveloperToolsAllowed">Allow developer tools</string>
+    <string id="DeveloperToolsAllowed_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="WebAppsAllowed">Allow installing sites as apps</string>
+    <string id="WebAppsAllowed_Explain">Enabled: on and locked. Disabled: off and locked. Not configured: the user decides. </string>
+    <string id="UpdateMirror">Update server</string><string id="UpdateMirror_Explain">Address (https://…/) of a folder on your own server holding update.json, update.json.sig and the installers, copied from a Ferna Sundaree release. When set, Ferna Sundaree takes updates only from this folder. Updates are still installed only if they are signed with the Ferna key.</string>
+    <string id="SearchEngine">Search engine</string><string id="SearchEngine_Explain">One of: google, bing, duckduckgo, brave, startpage.</string>
+    <string id="HistoryDays">Keep history for (days)</string><string id="HistoryDays_Explain">1 to 3650.</string>
+  </stringTable><presentationTable>
+    <presentation id="SearchEngine"><textBox refId="SearchEngine"><label>Search engine</label></textBox></presentation>
+    <presentation id="UpdateMirror"><textBox refId="UpdateMirror"><label>Folder address</label></textBox></presentation>
+    <presentation id="HistoryDays"><decimalTextBox refId="HistoryDays">Days</decimalTextBox></presentation>
+  </presentationTable></resources>
+</policyDefinitionResources>

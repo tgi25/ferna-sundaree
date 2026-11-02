@@ -1,0 +1,3 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Opener page</title></head><body>
+<button id="b" onclick="window.__child = window.open('/long.html', '_blank')">open</button>
+<script>window.addEventListener('message', e => { document.title = 'got:' + e.data; });</script></body></html>

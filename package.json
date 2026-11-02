@@ -1,0 +1,244 @@
+{
+  "name": "ferna-sundaree",
+  "version": "0.6.2",
+  "description": "Ferna Sundaree: a security-hardened browser for Windows and Linux with Ferna Tabs, Ferna PDF Reader and Ferna Screenshots built in.",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/unit/*.test.js",
+    "test:e2e": "node test/e2e/run.js",
+    "icons": "electron tools/make-icons.js && python3 tools/make-ico.py",
+    "dist": "electron-builder --win nsis msi portable --x64 --publish never",
+    "dist:msix": "electron-builder --win appx --x64 --publish never",
+    "dist:msi-linux": "node tools/make-msi.js"
+  },
+  "author": "TGI Fernando (Ferna Software Solutions)",
+  "license": "MIT",
+  "devDependencies": {
+    "@electron/fuses": "^2.1.3",
+    "electron": "45.2.1",
+    "electron-builder": "^26.18.0",
+    "playwright": "^1.64.1"
+  },
+  "dependencies": {
+    "@ghostery/adblocker-electron": "^2.20.3",
+    "@mozilla/readability": "^0.6.0",
+    "adm-zip": "^0.5.16",
+    "electron-chrome-extensions": "^4.10.0",
+    "electron-chrome-web-store": "^0.13.0"
+  },
+  "productName": "Ferna Sundaree",
+  "homepage": "https://github.com/tgi25/ferna-sundaree",
+  "build": {
+    "appId": "com.fernasolutions.sundaree",
+    "productName": "Ferna Sundaree",
+    "copyright": "Copyright © 2026 TGI Fernando, Ferna Software Solutions",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "build/icon.png",
+      "package.json",
+      "!**/*.map",
+      "!src/features/pdf-reader/README.md",
+      "!test/**",
+      "!tools/**"
+    ],
+    "asar": true,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": false,
+      "onlyLoadAppFromAsar": true,
+      "loadBrowserProcessSpecificV8Snapshot": false,
+      "grantFileProtocolExtraPrivileges": false
+    },
+    "protocols": [
+      {
+        "name": "Web page",
+        "schemes": [
+          "http",
+          "https"
+        ]
+      }
+    ],
+    "fileAssociations": [
+      {
+        "ext": "pdf",
+        "name": "PDF document",
+        "description": "PDF document",
+        "role": "Viewer"
+      },
+      {
+        "ext": [
+          "html",
+          "htm"
+        ],
+        "name": "HTML document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "fernaexam",
+        "name": "Ferna exam",
+        "description": "Ferna Sundaree secure exam",
+        "role": "Viewer"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "msi",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Ferna Sundaree",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "FernaSundaree-Setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh"
+    },
+    "portable": {
+      "artifactName": "FernaSundaree-Portable-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "tgi25",
+        "repo": "ferna-sundaree",
+        "releaseType": "release"
+      }
+    ],
+    "msi": {
+      "oneClick": false,
+      "perMachine": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Ferna Sundaree",
+      "artifactName": "FernaSundaree-${version}-x64.${ext}",
+      "upgradeCode": "6f1e6b8e-4c1a-4b55-9b9e-5a0f2c3d8e71",
+      "runAfterFinish": false,
+      "menuCategory": "Ferna Software Solutions"
+    },
+    "appx": {
+      "identityName": "FernaSoftwareSolutions.FernaSundaree",
+      "publisher": "CN=Ferna Software Solutions",
+      "publisherDisplayName": "Ferna Software Solutions",
+      "displayName": "Ferna Sundaree",
+      "applicationId": "FernaSundaree",
+      "backgroundColor": "#2563eb",
+      "languages": [
+        "en-US"
+      ],
+      "artifactName": "FernaSundaree-${version}-x64.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "rpm",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icons",
+      "category": "Network;WebBrowser",
+      "executableName": "ferna-sundaree",
+      "artifactName": "FernaSundaree-${version}-${arch}.${ext}",
+      "maintainer": "TGI Fernando <tgi.fernando@gmail.com>",
+      "vendor": "Ferna Software Solutions",
+      "synopsis": "Secure web browser with Ferna Tabs, PDF Reader and Screenshots",
+      "mimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf",
+        "application/x-fernaexam"
+      ],
+      "desktop": {
+        "entry": {
+          "Name": "Ferna Sundaree",
+          "GenericName": "Web Browser",
+          "StartupWMClass": "ferna-sundaree",
+          "Keywords": "browser;web;internet;pdf;"
+        }
+      },
+      "extraResources": [
+        {
+          "from": "build/policy/linux",
+          "to": "policy"
+        }
+      ],
+      "syncDesktopName": true,
+      "description": "Secure web browser with Ferna Tabs, PDF Reader and Screenshots"
+    },
+    "deb": {
+      "packageName": "ferna-sundaree",
+      "priority": "optional",
+      "recommends": [
+        "pkexec | policykit-1"
+      ]
+    },
+    "rpm": {
+      "packageName": "ferna-sundaree",
+      "fpm": [
+        "--rpm-rpmbuild-define=_build_id_links none"
+      ]
+    },
+    "appImage": {
+      "artifactName": "FernaSundaree-${version}-${arch}.${ext}"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tgi25/ferna-sundaree.git"
+  },
+  "desktopName": "ferna-sundaree.desktop"
+}

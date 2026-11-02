@@ -1,0 +1,14 @@
+# Weekly pull requests for security and version updates: Electron (Chromium fixes), the ad-block
+# engine, the extension libraries, and the GitHub Actions used to build releases.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 10
+    groups:
+      electron:
+        patterns: ['electron', '@electron/*']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }

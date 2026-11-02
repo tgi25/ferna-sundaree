@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<style>
+  .bar { display: flex; gap: 10px; margin-bottom: 18px; }
+  .bar .field { flex: 1; }
+  .day { font-size: 12px; font-weight: 700; color: var(--ink-3); margin: 18px 0 6px; text-transform: uppercase; letter-spacing: .05em; }
+  .item { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: 8px; }
+  .item:hover { background: var(--bg-hover); }
+  .item time { color: var(--ink-3); font-size: 12px; width: 48px; flex: none; font-variant-numeric: tabular-nums; }
+  .item a { flex: 1; min-width: 0; color: var(--ink); text-decoration: none; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+  .item a:hover { text-decoration: underline; }
+  .item .h { color: var(--ink-3); font-size: 12px; max-width: 30%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .item .del { opacity: 0; }
+  .item:hover .del { opacity: 1; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>History</h1>
+    <p class="lead" data-linux="Kept on this computer only, encrypted with your login keyring (GNOME Keyring or KWallet) when one is available. Private windows are never recorded.">Kept on this PC only, encrypted with your Windows account. Private windows are never recorded.</p>
+    <div class="bar"><input class="field" id="q" placeholder="Search history" autofocus aria-label="Search history"><button class="btn danger" id="clear">Clear browsing data…</button></div>
+    <div id="list"></div>
+  </div>
+  <script src="/_shared/kit.js"></script>
+  <script src="history.js"></script>
+</body>
+</html>

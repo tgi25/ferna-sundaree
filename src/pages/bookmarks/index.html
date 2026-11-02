@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bookmarks</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<link rel="stylesheet" href="bookmarks.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Bookmarks</h1>
+    <div class="search"><span id="q-icon"></span><input id="q" placeholder="Search titles, addresses and tags" aria-label="Search bookmarks" autocomplete="off"></div>
+    <button class="btn" id="b-new-folder" title="New folder in the selected folder">New folder</button>
+    <label class="btn" title="HTML from Chrome, Edge, Firefox, Safari, Brave; Chrome's Bookmarks file; Firefox .json backup; Ferna .json">Import…<input type="file" id="imp" accept=".html,.htm,.json,application/json,text/html" hidden></label>
+    <button class="btn" id="b-export-all">Export all…</button>
+    <button class="btn" id="b-check">Check links</button>
+    <button class="btn" id="b-backups">Backups</button>
+  </header>
+
+  <div class="mgr">
+    <aside id="side" aria-label="Folders and filters">
+      <div class="sec">Folders</div>
+      <div id="folders" role="tree"></div>
+      <div class="sec">Smart filters</div>
+      <div id="smart"></div>
+      <div class="sec">Tags</div>
+      <div id="tags" class="tagcloud"></div>
+      <div class="sec">Refine</div>
+      <div class="refine">
+        <label>Site<input id="f-domain" list="domains" placeholder="any site"></label>
+        <datalist id="domains"></datalist>
+        <label>Added from<input type="date" id="f-from"></label>
+        <label>Added until<input type="date" id="f-to"></label>
+        <label>Read status<select id="f-read"><option value="">Any</option><option value="unread">Unread (never opened)</option><option value="read">Read</option></select></label>
+        <button class="btn small" id="f-clear">Clear filters</button>
+      </div>
+    </aside>
+
+    <main>
+      <div class="selbar" id="selbar">
+        <label class="chk" title="Select all shown (Ctrl+A)"><input type="checkbox" id="sel-all"><span id="sel-count">Select all</span></label>
+        <div class="acts" id="acts">
+          <button class="btn small danger" id="a-delete">Delete</button>
+          <select id="a-move" class="btn small" title="Move selected to a folder"><option value="">Move to…</option></select>
+          <button class="btn small" id="a-tag">Tags…</button>
+          <button class="btn small" id="a-read">Mark read</button>
+          <button class="btn small" id="a-unread">Mark unread</button>
+          <button class="btn small" id="a-check">Check links</button>
+          <select id="a-export" class="btn small" title="Export selected"><option value="">Export…</option><option value="json">Selected as JSON</option><option value="html">Selected as HTML</option></select>
+          <button class="btn small" id="a-clear" title="Clear selection (Esc)">Clear</button>
+        </div>
+        <span class="grow"></span>
+        <span class="muted" id="shown"></span>
+      </div>
+      <div id="banner" hidden></div>
+      <div class="thead"><span></span><span>Title</span><span>Folder</span><span>Tags</span><span>Added</span><span>Status</span></div>
+      <div id="list" role="listbox" aria-multiselectable="true" tabindex="0"></div>
+    </main>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <div id="modal-back" hidden><div id="modal" role="dialog" aria-modal="true"></div></div>
+
+  <script src="/_shared/kit.js"></script>
+  <script src="bookmarks.js"></script>
+</body>
+</html>

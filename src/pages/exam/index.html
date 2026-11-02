@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Secure exam mode</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<style>
+  .page { max-width: 760px; }
+  label.f { display: grid; gap: 4px; margin: 12px 0; font-size: 12px; color: var(--ink-2); }
+  label.f input, label.f textarea { padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg); font: inherit; }
+  textarea { min-height: 76px; font-family: var(--mono) !important; font-size: 12px !important; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .msg { color: var(--danger); min-height: 20px; margin-top: 8px; }
+  ul.how { color: var(--ink-2); padding-left: 1.2em; }
+  ul.how li { margin: 4px 0; }
+  .check { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; } td, th { border-bottom: 1px solid var(--line); padding: 6px; text-align: left; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>Secure exam mode</h1>
+    <p class="lead">A locked-down window for online exams. Set it up here and start it on this PC, or save an exam file to give to students (it holds only a scrambled form of the password).</p>
+    <div class="card">
+      <h2>Exam</h2>
+      <label class="f">Title<input id="title" placeholder="DSA 552 Machine Learning II — mid-semester quiz"></label>
+      <label class="f">Exam address<input id="url" placeholder="https://lms.sjp.ac.lk/mod/quiz/view.php?id=…" spellcheck="false"></label>
+      <label class="f">Other sites allowed (one per line; *.example.com allows sub-domains; the exam's own site is always allowed)<textarea id="allowed" spellcheck="false" placeholder="*.sjp.ac.lk&#10;accounts.google.com"></textarea></label>
+      <div class="grid2">
+        <label class="f">Time limit in minutes (0 = none; the exam ends by itself)<input id="minutes" type="number" min="0" max="600" value="0"></label>
+        <div><label class="check" style="margin-top:28px"><input type="checkbox" id="copy"> Allow copy and paste</label><label class="check"><input type="checkbox" id="spell"> Allow spell check</label></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Invigilator password</h2>
+      <p class="hint">Needed to end the exam early and unlock the PC. Keep it from the students.</p>
+      <div class="grid2"><label class="f">Password<input id="pw" type="password" autocomplete="new-password"></label><label class="f">Again<input id="pw2" type="password" autocomplete="new-password"></label></div>
+      <div class="btns"><button class="btn primary" id="start">Start exam on this PC</button><button class="btn" id="save">Save exam file…</button><button class="btn" id="open">Open an exam file…</button></div>
+      <div class="msg" id="msg"></div>
+    </div>
+    <div class="card">
+      <h2>What the student gets</h2>
+      <ul class="how">
+        <li>A full-screen window that stays on top and cannot be closed or minimised; other browser windows are hidden.</li>
+        <li>No tabs, address bar, menu, new windows, developer tools, downloads, printing, or browser shortcuts. Only the exam and the sites you allow open; anything else is blocked and logged.</li>
+        <li data-linux="On Windows, screenshots and screen sharing see a black window. Linux cannot hide a window from capture tools, so disable screenshot and screen-sharing apps on exam computers.">Screenshots and screen-sharing apps see a black window.</li>
+        <li data-linux="Switching to another app (Alt+Tab, Super key) brings the exam straight back and is logged. The desktop keeps a few system shortcuts (such as switching virtual terminals with Ctrl+Alt+F1–F6, or locking the screen); no app can block those, so watch for them.">Switching to another app (Alt+Tab, Windows key) brings the exam straight back and is logged. Windows itself keeps Ctrl+Alt+Del and Win+L; no app can block those.</li>
+        <li>The exam ends when time runs out, or when you press <b>End exam</b> (or <kbd>Ctrl+Alt+Shift+E</kbd>) and enter the password. A log is saved and shown.</li>
+        <li>Students can start an exam file by double-clicking it, or from Menu → Secure exam mode → Open an exam file.</li>
+      </ul>
+    </div>
+    <div class="card"><h2>Recent exam logs</h2><div id="logs" class="muted">None yet.</div></div>
+  </div>
+  <script src="/_shared/kit.js"></script>
+  <script src="exam.js"></script>
+</body>
+</html>

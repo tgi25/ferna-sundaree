@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Assistant</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<link rel="stylesheet" href="assistant.css">
+</head>
+<body>
+  <div id="resize" title="Drag to resize"></div>
+  <header>
+    <span class="logo" id="logo"></span><b>Assistant</b><span class="model" id="model"></span>
+    <span class="grow"></span>
+    <button class="ib" id="b-new" title="New chat"></button>
+    <button class="ib" id="b-set" title="Settings"></button>
+    <button class="ib" id="b-close" title="Close (Alt+A)"></button>
+  </header>
+  <main id="chat">
+    <div id="msgs" aria-live="polite"></div>
+    <div id="empty">
+      <p class="hello">Ask about this page, compare tabs, or start with a skill.</p>
+      <div class="quick" id="quick"></div>
+      <p class="muted small" id="privacy"></p>
+    </div>
+  </main>
+  <footer id="composer">
+    <div class="chips" id="chips"></div>
+    <div class="menu" id="menu" hidden></div>
+    <div class="inrow">
+      <textarea id="input" rows="1" placeholder="Ask anything · / skills · @ tabs" aria-label="Message"></textarea>
+      <button class="send" id="send" title="Send (Enter)"></button>
+    </div>
+  </footer>
+  <section id="settings" hidden>
+    <h2>Assistant settings</h2>
+    <label>Model provider<select id="s-provider"></select></label>
+    <label id="l-endpoint">Server address<input id="s-endpoint" spellcheck="false"></label>
+    <label id="l-key">API key<input id="s-key" type="password" placeholder="Stored encrypted on this PC" autocomplete="off" spellcheck="false"></label>
+    <label>Model<span class="row2"><input id="s-model" list="s-models" spellcheck="false" placeholder="e.g. llama3.2"><button class="btn small" id="s-load">Load list</button></span></label>
+    <datalist id="s-models"></datalist>
+    <div class="muted small" id="s-status"></div>
+    <div class="help" id="s-help"></div>
+    <h3>Translation</h3>
+    <label>Translate into<select id="s-lang"></select></label>
+    <label>Translate with<select id="s-tsvc"><option value="">Ask each time</option><option value="google">Google Translate</option><option value="ai">This assistant (private when it runs on this PC)</option></select></label>
+    <h3>Skills <span class="muted small">— start a message with /name; {{page}} and {{selection}} are filled in</span></h3>
+    <div id="s-skills"></div>
+    <button class="btn small" id="s-addskill">Add skill</button>
+    <div class="btns"><button class="btn" id="s-cancel">Cancel</button><button class="btn primary" id="s-save">Save</button></div>
+  </section>
+  <script src="/_shared/kit.js"></script>
+  <script src="assistant.js"></script>
+</body>
+</html>

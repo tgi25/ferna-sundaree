@@ -1,0 +1,117 @@
+{
+  "manifest_version": 3,
+  "name": "Ferna Tabs",
+  "version": "1.15.0",
+  "description": "Pop up your open tabs at the mouse pointer. Workspaces, a common-site bar, pinned sites, search, switch, close and pin.",
+  "author": "TGI Fernando",
+  "minimum_chrome_version": "128",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "tabs",
+    "bookmarks",
+    "contextMenus",
+    "search",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "sw.js"
+  },
+  "action": {
+    "default_title": "Ferna Tabs",
+    "default_popup": "list.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "commands": {
+    "show-tab-list": {
+      "suggested_key": {
+        "default": "Alt+Shift+L"
+      },
+      "description": "Show the tab list at the mouse pointer"
+    },
+    "workspace-next": {
+      "suggested_key": {
+        "default": "Alt+Shift+Period"
+      },
+      "description": "Next workspace"
+    },
+    "workspace-prev": {
+      "suggested_key": {
+        "default": "Alt+Shift+Comma"
+      },
+      "description": "Previous workspace"
+    },
+    "workspace-0": {
+      "description": "Show all tabs (no workspace)"
+    },
+    "workspace-1": {
+      "description": "Workspace 1"
+    },
+    "workspace-2": {
+      "description": "Workspace 2"
+    },
+    "workspace-3": {
+      "description": "Workspace 3"
+    },
+    "workspace-4": {
+      "description": "Workspace 4"
+    },
+    "workspace-5": {
+      "description": "Workspace 5"
+    },
+    "workspace-6": {
+      "description": "Workspace 6"
+    },
+    "workspace-7": {
+      "description": "Workspace 7"
+    },
+    "workspace-8": {
+      "description": "Workspace 8"
+    },
+    "workspace-9": {
+      "description": "Workspace 9"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "compat.js",
+        "pointer.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "compat.js",
+        "common.js",
+        "workspaces.js",
+        "ui.js",
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  }
+}

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ferna Screenshots — Editor</title>
+<link rel="icon" href="icons/icon32.png">
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="editor.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="icons/icon32.png" alt=""><span>Ferna Screenshots</span></div>
+
+  <div class="group tools" id="tools">
+    <button class="tool" data-tool="select" title="Select / move (V)"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-3 6z"/></svg></button>
+    <button class="tool" data-tool="crop" title="Crop (C)"><svg viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14"/></svg></button>
+    <span class="sep"></span>
+    <button class="tool" data-tool="rect" title="Rectangle (R)"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg></button>
+    <button class="tool" data-tool="ellipse" title="Ellipse (O)"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8.5" ry="6.5"/></svg></button>
+    <button class="tool" data-tool="arrow" title="Arrow (A)"><svg viewBox="0 0 24 24"><path d="M5 19L19 5M10 5h9v9"/></svg></button>
+    <button class="tool" data-tool="line" title="Line (L)"><svg viewBox="0 0 24 24"><path d="M5 19L19 5"/></svg></button>
+    <button class="tool" data-tool="pen" title="Pen (P)"><svg viewBox="0 0 24 24"><path d="M3 21c3-1 4-4 6-6l8-8a2.1 2.1 0 0 0-3-3l-8 8c-2 2-5 3-6 6z"/></svg></button>
+    <button class="tool" data-tool="marker" title="Highlighter (H)"><svg viewBox="0 0 24 24"><path d="M9 11l-6 6v3h9l3-3M22 12l-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
+    <button class="tool" data-tool="text" title="Text (T)"><svg viewBox="0 0 24 24"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg></button>
+    <button class="tool" data-tool="step" title="Numbered step (N)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M11 9l2-1v8"/></svg></button>
+    <button class="tool" data-tool="blur" title="Blur / pixelate sensitive details (B)"><svg viewBox="0 0 24 24"><path d="M4 4h4v4H4zM12 4h4v4h-4zM8 8h4v4H8zM16 8h4v4h-4zM4 12h4v4H4zM12 12h4v4h-4zM8 16h4v4H8zM16 16h4v4h-4z"/></svg></button>
+  </div>
+
+  <div class="group" id="colors">
+    <button class="sw" data-c="#e11d48" style="--c:#e11d48" title="Red"></button>
+    <button class="sw" data-c="#f97316" style="--c:#f97316" title="Orange"></button>
+    <button class="sw" data-c="#facc15" style="--c:#facc15" title="Yellow"></button>
+    <button class="sw" data-c="#16a34a" style="--c:#16a34a" title="Green"></button>
+    <button class="sw" data-c="#2563eb" style="--c:#2563eb" title="Blue"></button>
+    <button class="sw" data-c="#111827" style="--c:#111827" title="Black"></button>
+    <button class="sw" data-c="#ffffff" style="--c:#ffffff" title="White"></button>
+    <label class="sw custom" title="Custom colour"><input type="color" id="customColor" value="#9333ea"></label>
+  </div>
+
+  <div class="group sizeg" title="Line width / text size">
+    <svg viewBox="0 0 24 24" class="tiny"><path d="M4 18h16" stroke-width="1"/><path d="M4 12h16" stroke-width="2.5"/><path d="M4 6h16" stroke-width="4"/></svg>
+    <input type="range" id="size" min="1" max="10" step="1" value="3">
+    <label class="check fillc" title="Fill rectangles with a translucent colour"><input type="checkbox" id="fill">Fill</label>
+  </div>
+
+  <div class="group">
+    <button class="tool" id="undo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+    <button class="tool" id="redo" title="Redo (Ctrl+Y)"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+    <button class="tool" id="del" title="Delete selected (Del)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg></button>
+  </div>
+
+  <div class="group zoom">
+    <button class="tool" id="zout" title="Zoom out (Ctrl −)"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="zpct" id="zpct" title="Click for actual size">100%</button>
+    <button class="tool" id="zin" title="Zoom in (Ctrl +)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="tool" id="zfit" title="Fit width (0)"><svg viewBox="0 0 24 24"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg></button>
+  </div>
+
+  <div class="grow"></div>
+
+  <div class="group out">
+    <button class="btn" id="copy" title="Copy image (Ctrl+C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>Copy</button>
+    <button class="btn primary" id="savePng" title="Save PNG (Ctrl+S)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>PNG</button>
+    <button class="btn" id="saveJpg">JPG</button>
+    <button class="btn" id="savePdf">PDF</button>
+  </div>
+</header>
+
+<main>
+  <div id="viewport" tabindex="0"><div id="spacer"><canvas id="view"></canvas></div></div>
+
+  <aside id="side">
+    <section>
+      <h3>Page stamp</h3>
+      <label class="check"><input type="checkbox" id="stEnabled"> Show the stamp</label>
+      <div class="field"><span>Position</span>
+        <select id="stPlace">
+          <option value="corner:auto">Best corner (automatic)</option>
+          <option value="corner:tl">Top-left</option>
+          <option value="corner:tr">Top-right</option>
+          <option value="corner:bl">Bottom-left</option>
+          <option value="corner:br">Bottom-right</option>
+          <option value="footer">Strip below picture</option>
+          <option value="header">Strip above picture</option>
+        </select>
+      </div>
+      <div class="chips">
+        <label class="check"><input type="checkbox" id="stTitle"> Page title</label>
+        <label class="check"><input type="checkbox" id="stUrl"> Page address</label>
+        <label class="check"><input type="checkbox" id="stTime"> Date &amp; time</label>
+        <label class="check"><input type="checkbox" id="stDetails"> Capture type &amp; size</label>
+      </div>
+      <div class="field"><span>Time format</span>
+        <select id="stTimeFmt"><option value="local">Local with UTC offset</option><option value="iso">ISO 8601</option><option value="utc">UTC</option></select></div>
+      <div class="field"><span>Style</span>
+        <select id="stTheme"><option value="dark">Dark</option><option value="light">Light</option></select></div>
+      <div class="field"><span>Size</span><input type="range" id="stSize" min="0.7" max="1.8" step="0.05"></div>
+      <div class="field col"><span>Note (optional)</span><input type="text" id="stNote" maxlength="160" placeholder="e.g. Evidence for ticket #4512"></div>
+      <p class="muted small" id="stInfo"></p>
+    </section>
+    <section>
+      <h3>Capture</h3>
+      <dl id="info"></dl>
+      <button class="btn small" id="openPage">Open the page</button>
+      <button class="btn small" id="toHistory">History</button>
+    </section>
+    <section class="help">
+      <h3>Keys</h3>
+      <p><kbd>V</kbd> select · <kbd>C</kbd> crop · <kbd>R</kbd> rectangle · <kbd>O</kbd> ellipse · <kbd>A</kbd> arrow · <kbd>L</kbd> line ·
+        <kbd>P</kbd> pen · <kbd>H</kbd> highlighter · <kbd>T</kbd> text · <kbd>N</kbd> step · <kbd>B</kbd> blur</p>
+      <p><kbd>Shift</kbd> straight lines / squares · <kbd>Ctrl</kbd>+wheel zoom · <kbd>Space</kbd>+drag pan · <kbd>Esc</kbd> cancel</p>
+    </section>
+  </aside>
+</main>
+<div class="toast" id="toast"></div>
+<script src="ferna-shim.js"></script>
+<script type="module" src="editor.js"></script>
+</body>
+</html>

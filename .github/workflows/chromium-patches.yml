@@ -1,0 +1,158 @@
+name: Weekly Chromium security update
+
+# Every week: if Electron has published a new patch of the version Ferna Sundaree uses (they
+# carry Chrome's security fixes), pin it, bump the app's patch version, run every test, build
+# all packages, sign the update manifest and publish. Installed copies then update themselves.
+#
+# Repository variable PATCH_RELEASE_MODE (Settings → Secrets and variables → Actions → Variables):
+#   approve (default)  publishing waits for one click: GitHub e-mails the reviewers of the
+#                      "release-approval" environment, who press "Approve and deploy".
+#                      Refuses to run if that environment has no required reviewer, so nothing
+#                      is ever published unreviewed by mistake.
+#   auto               publishes as soon as all tests pass (environment "auto-release").
+# A new Electron major version (about every 8 weeks) is never adopted automatically: an issue
+# asks for a reviewed upgrade instead.
+
+on:
+  schedule:
+    - cron: '17 3 * * 4'   # Thursdays 03:17 UTC (08:47 in Sri Lanka), after Chrome's Tuesday updates reach Electron
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Build and publish a patch release even if Electron has no new patch'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: chromium-patches
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      update: ${{ steps.go.outputs.update }}
+      version: ${{ steps.check.outputs.app_version }}
+      electron: ${{ steps.check.outputs.latest }}
+      notes: ${{ steps.check.outputs.notes }}
+      sha: ${{ steps.commit.outputs.sha }}
+      environment: ${{ steps.mode.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+
+      - name: Look for a new Electron patch
+        id: check
+        run: node tools/electron-patch.js ${{ inputs.force && '--force' || '' }}
+
+      - name: Ask for a reviewed upgrade when a new Electron major version exists
+        if: steps.check.outputs.major_supported == 'false' || steps.check.outputs.newest_major != steps.check.outputs.major
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUPPORTED: ${{ steps.check.outputs.major_supported }}
+          NEWEST: ${{ steps.check.outputs.newest_major }}
+          MAJOR: ${{ steps.check.outputs.major }}
+        run: |
+          if [ "$SUPPORTED" = "false" ]; then
+            TITLE="Electron $MAJOR no longer receives security fixes: upgrade to Electron $NEWEST"
+            BODY="Electron supports only its three newest major versions. Ferna Sundaree is on $MAJOR, which no longer gets Chromium security fixes, so the weekly update cannot help until the app moves to Electron $NEWEST. Upgrade, run the tests and release."
+          else
+            TITLE="Electron $NEWEST is available (Ferna Sundaree uses $MAJOR)"
+            BODY="Weekly security patches continue for Electron $MAJOR while it is one of the three newest majors. Plan a reviewed upgrade to Electron $NEWEST before $MAJOR drops out of support."
+          fi
+          if ! gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[].number' | grep -q .; then
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi
+
+      - name: Decide
+        id: go
+        run: echo "update=${{ steps.check.outputs.update == 'true' || inputs.force == true }}" >> "$GITHUB_OUTPUT"
+
+      - name: Release mode and its safety check
+        id: mode
+        if: steps.go.outputs.update == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ vars.PATCH_RELEASE_MODE || 'approve' }}
+        run: |
+          if [ "$MODE" = "auto" ]; then
+            echo "environment=auto-release" >> "$GITHUB_OUTPUT"
+            echo "Publishing automatically once the tests pass."
+          else
+            REVIEWERS=$(gh api "repos/${{ github.repository }}/environments/release-approval" --jq '[.protection_rules[]? | select(.type=="required_reviewers")] | length' 2>/dev/null) || REVIEWERS=0
+            if [ "${REVIEWERS:-0}" = "0" ]; then
+              echo "::error::Approval mode, but the environment 'release-approval' has no required reviewer. Add yourself under Settings → Environments → release-approval → Required reviewers (or set PATCH_RELEASE_MODE=auto)."
+              exit 1
+            fi
+            echo "environment=release-approval" >> "$GITHUB_OUTPUT"
+            echo "Publishing waits for a reviewer's approval."
+          fi
+
+      - name: Pin the new Electron patch and bump the app version
+        id: commit
+        if: steps.go.outputs.update == 'true'
+        run: |
+          node tools/electron-patch.js --apply ${{ inputs.force && '--force' || '' }}
+          ELECTRON=$(node -p "require('./package.json').devDependencies.electron")
+          VERSION=$(node -p "require('./package.json').version")
+          ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install --save-dev --save-exact "electron@$ELECTRON" --no-audit --no-fund
+          git config user.name "ferna-release-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          BRANCH="auto/security-$VERSION"
+          git checkout -b "$BRANCH"
+          git commit -am "Security update $VERSION: Electron $ELECTRON (Chromium fixes)"
+          git push origin "$BRANCH"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: check
+    if: needs.check.outputs.update == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      ref: ${{ needs.check.outputs.sha }}
+      version: ${{ needs.check.outputs.version }}
+      notes: ${{ needs.check.outputs.notes }}
+      environment: ${{ needs.check.outputs.environment }}
+    secrets: inherit
+
+  merge:
+    needs: [check, release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Move the default branch to the released commit (or open a pull request)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.check.outputs.sha }}
+          VERSION: ${{ needs.check.outputs.version }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: |
+          if git push origin "$SHA:refs/heads/$DEFAULT"; then
+            git push origin --delete "auto/security-$VERSION" || true
+          else
+            gh pr create --base "$DEFAULT" --head "auto/security-$VERSION" \
+              --title "Security update $VERSION (already released)" \
+              --body "Released as v$VERSION. $DEFAULT moved on meanwhile, so merge this to keep the Electron pin and version."
+          fi
+
+  report-failure:
+    needs: [check, release, merge]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create --repo "${{ github.repository }}" \
+            --title "Weekly security update failed ($(date -u +%Y-%m-%d))" \
+            --body "Nothing was published. See the run: $RUN. Fix the cause and run the workflow again from the Actions tab (Run workflow)."

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Parental controls</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<style>
+  .page { max-width: 760px; }
+  label.f { display: grid; gap: 4px; margin: 10px 0; font-size: 12px; color: var(--ink-2); }
+  label.f input, label.f textarea { padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg); font: inherit; }
+  textarea { min-height: 70px; font-family: var(--mono) !important; font-size: 12px !important; }
+  .check { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .msg { color: var(--danger); min-height: 20px; margin-top: 8px; }
+  .msg.ok { color: var(--ok); }
+  .state { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 650; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--ink-3); }
+  .dot.on { background: var(--ok); box-shadow: 0 0 0 4px rgba(22, 163, 74, .2); }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>Parental controls</h1>
+    <p class="lead">Blocks adult sites and turns on SafeSearch, protected by a parent's password. Applies to every window and every profile on this Windows account.</p>
+    <section id="setup" class="card" hidden>
+      <h2>Set up</h2>
+      <label class="f">Parent password (at least 6 characters)<input id="s-pw" type="password" autocomplete="new-password"></label>
+      <label class="f">Again<input id="s-pw2" type="password" autocomplete="new-password"></label>
+      <label class="check"><input type="checkbox" checked disabled> Block adult and explicit sites</label>
+      <label class="check"><input type="checkbox" id="s-gambling"> Also block gambling sites</label>
+      <label class="check"><input type="checkbox" id="s-social"> Also block social media</label>
+      <label class="check"><input type="checkbox" id="s-safe" checked> Force SafeSearch (Google, Bing, DuckDuckGo, Yahoo, Brave Search, Startpage) and YouTube Restricted Mode</label>
+      <button class="btn primary" id="s-go">Turn on parental controls</button>
+      <div class="msg" id="s-msg"></div>
+    </section>
+    <section id="manage" class="card" hidden>
+      <div class="state"><span class="dot" id="dot"></span><span id="state"></span></div>
+      <p class="hint" id="info"></p>
+      <label class="f">Parent password (needed to change anything)<input id="m-pw" type="password" autocomplete="off"></label>
+      <label class="check"><input type="checkbox" id="m-on"> Parental controls on</label>
+      <label class="check"><input type="checkbox" checked disabled> Block adult and explicit sites</label>
+      <label class="check"><input type="checkbox" id="m-gambling"> Block gambling sites</label>
+      <label class="check"><input type="checkbox" id="m-social"> Block social media</label>
+      <label class="check"><input type="checkbox" id="m-safe"> Force SafeSearch and YouTube Restricted Mode</label>
+      <label class="f">Always allow these sites (one per line)<textarea id="m-allow" spellcheck="false"></textarea></label>
+      <label class="f">Also block these sites (one per line)<textarea id="m-block" spellcheck="false"></textarea></label>
+      <label class="f">New password (optional)<input id="m-new" type="password" autocomplete="new-password"></label>
+      <button class="btn primary" id="m-save">Save</button> <button class="btn" id="m-refresh">Update lists now</button>
+      <div class="msg" id="m-msg"></div>
+    </section>
+    <div class="card">
+      <h2>While parental controls are on</h2>
+      <ul class="hint" style="padding-left:1.2em">
+        <li>Blocked sites show a page with "Ask a parent": the parent's password allows that site once or always.</li>
+        <li>Private windows, Tor windows, developer tools and adding extensions ask for the parent's password.</li>
+        <li>Lists: StevenBlack's hosts lists (adult, gambling, social), updated weekly, plus name patterns for new adult sites.</li>
+        <li data-linux="No filter catches everything, and anyone with administrator (sudo) rights can remove any browser filter. For stronger protection give the child a standard (non-sudo) account, and consider Malcontent parental controls (GNOME) or DNS filtering on your router.">No filter catches everything, and someone with Windows administrator rights can remove any browser filter. For stronger protection also use Microsoft Family Safety on a child's own Windows account.</li>
+      </ul>
+    </div>
+  </div>
+  <script src="/_shared/kit.js"></script>
+  <script src="parental.js"></script>
+</body>
+</html>

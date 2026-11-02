@@ -1,0 +1,49 @@
+name: Streaming edition (Widevine)
+
+# Builds "Ferna Sundaree Streaming", the same browser on castLabs' Electron for Content Security,
+# which adds Google's Widevine so Netflix, Disney+, Prime Video and Spotify play.
+# castLabs' builds trail the newest Electron by one version, so the regular edition gets
+# Chromium security fixes first; install this edition only if you need those services.
+# Needs a free castLabs EVS account (https://github.com/castlabs/electron-releases/wiki/EVS)
+# stored as the secrets EVS_ACCOUNT_NAME and EVS_PASSWD: Widevine's licence servers only accept
+# browsers whose files carry castLabs' VMP signature.
+
+on:
+  workflow_dispatch:
+    inputs:
+      castlabs_version:
+        description: castLabs release tag
+        default: v44.9.3+wvcus
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: npm ci
+      - name: Use castLabs Electron (Widevine)
+        run: npm install --no-save "electron@https://github.com/castlabs/electron-releases#${{ inputs.castlabs_version }}"
+      - name: Package (unpacked)
+        run: npx electron-builder --win --x64 --dir --publish never -c.productName="Ferna Sundaree Streaming" -c.appId=com.fernasolutions.sundaree.streaming -c.electronDist=node_modules/electron/dist -c.electronVersion=${{ inputs.castlabs_version }}
+      - name: VMP-sign with castLabs EVS
+        env:
+          EVS_ACCOUNT_NAME: ${{ secrets.EVS_ACCOUNT_NAME }}
+          EVS_PASSWD: ${{ secrets.EVS_PASSWD }}
+        run: |
+          python -m pip install --upgrade castlabs-evs
+          python -m castlabs_evs.account reauth -A $env:EVS_ACCOUNT_NAME -P $env:EVS_PASSWD
+          python -m castlabs_evs.vmp sign-pkg dist/win-unpacked
+      - name: Installers from the signed files
+        run: npx electron-builder --win nsis portable --x64 --prepackaged dist/win-unpacked --publish never -c.productName="Ferna Sundaree Streaming" -c.appId=com.fernasolutions.sundaree.streaming -c.nsis.artifactName="FernaSundaree-Streaming-Setup-${version}.${ext}" -c.portable.artifactName="FernaSundaree-Streaming-Portable-${version}.${ext}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: streaming-edition
+          path: |
+            dist/FernaSundaree-Streaming-*.exe

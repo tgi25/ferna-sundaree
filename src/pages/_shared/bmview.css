@@ -1,0 +1,51 @@
+/* Bookmarks browser (popup, Ferna Tabs list, manager page) */
+.bmv { display: flex; flex-direction: column; min-height: 0; }
+.bmv-head { display: flex; align-items: center; gap: 4px; padding: 8px 8px 4px; }
+.bmv-search { flex: 1; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 9px; background: var(--bg-sunken, var(--bg-hover)); }
+.bmv-search .icon { width: 14px; height: 14px; color: var(--ink-3); }
+.bmv-search input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; color: var(--ink); min-width: 0; }
+.bmv-tool { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); cursor: pointer; }
+.bmv-tool:hover { background: var(--bg-hover); color: var(--accent); }
+.bmv-tool .icon { width: 16px; height: 16px; }
+.bmv-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 0; padding: 2px 8px 4px; font-size: 12px; }
+.bmv-crumbs .crumb { border: 0; background: transparent; padding: 3px 5px; border-radius: 5px; cursor: pointer; color: var(--ink-3); font: inherit; }
+.bmv-crumbs .crumb:hover:not(:disabled) { background: var(--bg-hover); color: var(--ink); }
+.bmv-crumbs .crumb.cur { color: var(--ink); font-weight: 600; }
+.bmv-crumbs .sep .icon { width: 11px; height: 11px; color: var(--ink-3); vertical-align: -1px; }
+.bmv-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 6px; outline: 0; }
+.bmv-row { position: relative; display: flex; align-items: center; gap: 9px; min-height: 32px; padding: 3px 8px; border-radius: 8px; cursor: pointer; }
+.bmv-row:hover { background: var(--bg-hover); }
+.bmv-row.sel { background: var(--accent-soft); }
+.bmv-row .fi { width: 16px; height: 16px; display: grid; place-items: center; flex: none; }
+.bmv-row .fi .icon { width: 16px; height: 16px; }
+.bmv-row.folder .fi { color: #d97706; }
+.bmv-row.web .fi { color: var(--accent); }
+.bmv-row .favicon, .bmv-row .letter { width: 16px; height: 16px; font-size: 9px; border-radius: 4px; }
+.bmv-row .t { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bmv-row .s { font-size: 11px; color: var(--ink-3); max-width: 45%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex: none; }
+.bmv-row > .icon { width: 13px; height: 13px; color: var(--ink-3); flex: none; }
+.bmv-row.up { color: var(--ink-2); }
+.bmv-row.up > .icon:first-child { width: 15px; height: 15px; }
+.bmv-row .acts { display: none; gap: 1px; flex: none; }
+.bmv-row:hover .acts, .bmv-row.sel .acts { display: flex; }
+.bmv-row:hover .s, .bmv-row.sel .s { display: none; }
+.bmv-act { width: 24px; height: 24px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--ink-3); cursor: pointer; }
+.bmv-act:hover { background: var(--bg-active, var(--bg-hover)); color: var(--accent); }
+.bmv-act .icon { width: 13px; height: 13px; }
+.bmv-row.editing, .bmv-row.confirm { cursor: default; background: var(--bg-hover); flex-wrap: wrap; }
+.bmv-edit { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bmv-edit input { border: 1px solid var(--line-strong, var(--line)); border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 12.5px; background: var(--bg-raised); color: var(--ink); outline: 0; min-width: 0; }
+.bmv-edit input:focus { border-color: var(--accent); }
+.bmv-btn { border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; background: var(--bg-raised); color: var(--ink); cursor: pointer; font: inherit; font-size: 12px; }
+.bmv-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.bmv-btn.danger { background: #dc2626; border-color: #dc2626; color: #fff; }
+.bmv-row.dragging { opacity: .4; }
+.bmv-row.drop-into { box-shadow: inset 0 0 0 2px var(--accent); }
+.bmv-row.drop-before::before, .bmv-row.drop-after::after { content: ""; position: absolute; left: 8px; right: 8px; height: 2px; background: var(--accent); border-radius: 2px; }
+.bmv-row.drop-before::before { top: -1px; }
+.bmv-row.drop-after::after { bottom: -1px; }
+.bmv-empty { padding: 16px; color: var(--ink-3); text-align: center; font-size: 12.5px; }
+.bmv-undo { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 8px 6px; padding: 6px 10px; border-radius: 8px; background: var(--ink); color: var(--bg-raised); font-size: 12px; }
+.bmv-undo .bmv-btn { background: transparent; color: inherit; border-color: currentColor; }
+.bmv-foot { display: flex; justify-content: center; white-space: nowrap; overflow: hidden; gap: 8px; padding: 6px 10px; border-top: 1px solid var(--line); font-size: 11px; color: var(--ink-3); }
+.bmv-foot kbd { font-size: 10.5px; }

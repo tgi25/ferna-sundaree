@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Hostile test page</title></head><body>
+<h1>Hostile page</h1><a id="lnk" href="ferna://settings/">settings link</a>
+<script>
+window.__probe = async () => {
+  const r = {};
+  r.require = typeof require; r.process = typeof process; r.module = typeof module;
+  r.fernaApi = typeof window.ferna; r.ipcRenderer = typeof window.ipcRenderer;
+  r.electron = (() => { try { return typeof require('electron'); } catch (e) { return 'threw'; } })();
+  try { await fetch('ferna://ui/'); r.fetchFerna = 'reached'; } catch (e) { r.fetchFerna = 'blocked'; }
+  try { await fetch('ferna://shotimg/x.png'); r.fetchShot = 'reached'; } catch (e) { r.fetchShot = 'blocked'; }
+  const w = window.open('ferna://settings/'); r.openFerna = w ? 'opened' : 'blocked';
+  try { const f = document.createElement('iframe'); f.src = 'ferna://settings/'; document.body.appendChild(f); await new Promise(res => setTimeout(res, 500)); r.iframe = (() => { try { return f.contentWindow.location.href; } catch (e) { return 'cross-origin'; } })(); } catch (e) { r.iframe = 'error'; }
+  return r;
+};
+</script></body></html>

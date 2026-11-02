@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Passwords and autofill</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<style>
+  .page { max-width: 1000px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap: wrap; }
+  .tabs button { border: 0; background: none; padding: 9px 14px; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 600; color: var(--ink-2); }
+  .tabs button.on { color: var(--accent); border-color: var(--accent); }
+  .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .bar .grow { flex: 1; }
+  .bar input[type=search] { flex: 1; min-width: 200px; padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+  th { font-size: 11px; text-transform: uppercase; color: var(--ink-3); letter-spacing: .05em; }
+  .site { display: flex; align-items: center; gap: 8px; }
+  .site .favicon, .site .letter { width: 18px; height: 18px; border-radius: 4px; flex: none; }
+  .site .letter { display: grid; place-items: center; color: #fff; font-size: 10px; font-weight: 700; }
+  .pw { font-family: var(--mono); }
+  .acts { display: flex; gap: 4px; justify-content: flex-end; flex-wrap: wrap; }
+  .flag { font-size: 11px; border-radius: 999px; padding: 1px 8px; margin-right: 4px; display: inline-block; }
+  .flag.bad { background: rgba(220, 38, 38, .12); color: var(--danger); }
+  .flag.warn { background: rgba(217, 119, 6, .14); color: var(--warn); }
+  .flag.ok { background: rgba(22, 163, 74, .12); color: var(--ok); }
+  .sumcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .sumcards .card { margin: 0; }
+  .sumcards b { font-size: 26px; display: block; }
+  dialog { border: 0; border-radius: 14px; box-shadow: var(--shadow-lg); padding: 20px 22px; width: min(480px, calc(100vw - 32px)); background: var(--bg-raised); color: var(--ink); }
+  dialog::backdrop { background: rgba(15, 23, 42, .45); }
+  dialog label { display: grid; gap: 4px; margin: 10px 0; font-size: 12px; color: var(--ink-2); }
+  dialog input { padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--bg); }
+  dialog .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  dialog .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .ccard { display: flex; align-items: center; gap: 14px; }
+  .ccard .chip { width: 46px; height: 30px; border-radius: 6px; background: linear-gradient(135deg, #2563eb, #7c3aed); }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>Passwords and autofill</h1>
+    <p class="lead" id="lead" data-linux="Saved encrypted on this computer with your login keyring (GNOME Keyring or KWallet). Showing, copying or exporting a password asks for your account password first.">Saved encrypted on this PC with Windows' own protection. Showing, copying or exporting a password asks for Windows Hello first.</p>
+    <div class="tabs" role="tablist">
+      <button data-tab="logins" class="on">Passwords</button>
+      <button data-tab="checkup">Checkup</button>
+      <button data-tab="addresses">Addresses</button>
+      <button data-tab="cards">Payment cards</button>
+      <button data-tab="passkeys">Passkeys</button>
+      <button data-tab="options">Options</button>
+    </div>
+    <section id="t-logins"></section>
+    <section id="t-checkup" hidden></section>
+    <section id="t-addresses" hidden></section>
+    <section id="t-cards" hidden></section>
+    <section id="t-passkeys" hidden></section>
+    <section id="t-options" hidden></section>
+  </div>
+  <dialog id="dlg"></dialog>
+  <script src="/_shared/kit.js"></script>
+  <script src="passwords.js"></script>
+</body>
+</html>

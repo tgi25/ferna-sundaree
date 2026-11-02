@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Screenshot history — Ferna Screenshots</title>
+<link rel="icon" href="icons/icon32.png">
+<link rel="stylesheet" href="ui.css">
+<style>
+  body { padding: 24px 28px 40px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  header img { width: 40px; height: 40px; border-radius: 9px; }
+  h1 { margin: 0; font-size: 20px; }
+  header .grow { flex: 1; }
+  #q { width: 260px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+  .thumb { height: 170px; background: var(--panel-2); overflow: hidden; cursor: pointer; border-bottom: 1px solid var(--line); }
+  .thumb img { width: 100%; display: block; object-fit: cover; object-position: top; height: 100%; }
+  .meta { padding: 10px 12px; display: grid; gap: 3px; font-size: 12.5px; flex: 1; }
+  .meta b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta .u { color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .acts { display: flex; gap: 6px; padding: 0 12px 12px; }
+  .acts .btn { padding: 5px 9px; font-size: 12px; }
+  .empty { padding: 60px 0; text-align: center; color: var(--muted); }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 5px; padding: 0 6px; margin-right: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <img src="icons/icon48.png" alt="">
+  <div><h1>Screenshot history</h1><div class="muted" id="count"></div></div>
+  <div class="grow"></div>
+  <input type="text" id="q" placeholder="Search title or address…">
+  <button class="btn danger" id="clear">Delete all</button>
+  <button class="btn" id="settings">Settings</button>
+</header>
+<div class="grid" id="grid"></div>
+<div class="empty" id="empty" hidden>No screenshots yet. Click the Ferna Screenshots button in the toolbar to take one.</div>
+<script src="ferna-shim.js"></script>
+<script type="module" src="history.js"></script>
+</body>
+</html>
