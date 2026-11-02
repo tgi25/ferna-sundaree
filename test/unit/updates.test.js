@@ -116,3 +116,13 @@ test('weekly patch check: newest patch of the same major; unsupported majors fla
   assert.ok(!P.decide('45.10.0', list).update);
   assert.equal(P.bumpPatch('0.6.9'), '0.6.10');
 });
+
+test('updates: nothing published yet gives a plain message, not "HTTP 404"', async () => {
+  const srv = await server({});
+  try {
+    const gh = new U.Updater(ctx(), { publicKey: PUB, currentVersion: '0.6.2', releasesUrl: `${srv.base}/gh/latest`, mirrors: [], allowAnyHost: true });
+    assert.equal((await gh.check()).error, 'no release has been published on GitHub yet');
+    const mi = new U.Updater(ctx(), { publicKey: PUB, currentVersion: '0.6.2', releasesUrl: null, mirrors: [`${srv.base}/m/`] });
+    assert.match((await mi.check()).error, /has no update yet/);
+  } finally { srv.close(); }
+});

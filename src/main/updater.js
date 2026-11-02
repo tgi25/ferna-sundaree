@@ -143,13 +143,21 @@ class Updater {
     if (u.protocol !== 'https:' && !this.allowAnyHost && !this.hostAllowed(url)) throw new Error('updates use https only');
     if (!this.hostAllowed(url)) throw new Error(`unexpected host ${u.hostname}`);
     const r = await fetch(url, { headers: { 'User-Agent': 'FernaSundaree-Updater', Accept: as === 'json' ? 'application/vnd.github+json' : 'application/octet-stream' }, signal: AbortSignal.timeout(as === 'file' ? 30 * 60000 : 30000), redirect: 'follow' });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status });
     if (r.url && !this.hostAllowed(r.url)) throw new Error('redirected to an unexpected host');
     return r;
   }
 
   /** Signed manifest from one source: { m, urlFor } or throws. */
   async fromSource(src) {
+    try { return await this.readSource(src); } catch (e) {
+      // 404 means nothing is published there yet (or the address is wrong) — say so plainly.
+      if (e && e.status === 404) throw new Error(src.kind === 'github' ? 'no release has been published on GitHub yet' : `the update mirror ${new URL(src.base).host} has no update yet`);
+      throw e;
+    }
+  }
+
+  async readSource(src) {
     let bytes, signature, urlFor;
     if (src.kind === 'github') {
       const rel = await (await this.get(src.url)).json();
