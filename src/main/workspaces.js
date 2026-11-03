@@ -61,8 +61,21 @@ function workspaceHosts(ws) {
 function workspaceOfTab(tab, workspaces) {
   if (tab.wsOverride === 'none') return null;
   if (tab.wsOverride && workspaces.some(w => w.id === tab.wsOverride)) return tab.wsOverride;
-  const host = hostOf(pageUrlOf(tab.url));
-  if (!host) return null;
+  const page = pageUrlOf(tab.url);
+  const host = hostOf(page);
+  if (!host) {
+    // A local file belongs to the workspace that pinned it, or pinned a folder it is in
+    // (as in Ferna Tabs: pin C:\\Notes\\ and every PDF opened from it joins the workspace).
+    if (!/^file:/i.test(page)) return null;
+    let best = null, len = -1;
+    for (const ws of workspaces) {
+      for (const p of ws.pinned || []) {
+        const f = p.folder || folderOf(p.url);
+        if (/^file:/i.test(f) && inFolder(f, page) && f.length > len) { best = ws.id; len = f.length; }
+      }
+    }
+    return best;
+  }
   for (const ws of workspaces) {
     if (workspaceHosts(ws).some(r => hostMatches(r, host))) return ws.id;
   }
@@ -119,7 +132,11 @@ function buildStrip(tabs, workspaces, common, currentWs, { allPinned = false, al
   const pinFolders = pinnedOut.map(r => r.pin.folder || folderOf(r.pin.url));
 
   const commonOut = common.map((c, i) => ({ index: i, entry: c, badge: badges[i], tabId: null }));
-  for (const t of tabs) {
+  // Tabs showing exactly a common-bar page are matched first, so an entry shows its own page
+  // rather than another page from the same folder.
+  const exact = new Set(common.map(c => String(c.url).split('#')[0]));
+  const ordered = [...tabs].sort((a, b) => exact.has(pageUrlOf(b.url).split('#')[0]) - exact.has(pageUrlOf(a.url).split('#')[0]));
+  for (const t of ordered) {
     const u = pageUrlOf(t.url);
     const i = bestFolderMatch(common, u);
     if (i < 0 || commonOut[i].tabId !== null) continue;
@@ -130,12 +147,17 @@ function buildStrip(tabs, workspaces, common, currentWs, { allPinned = false, al
   }
   // The most specific pin claims a tab first (a pinned PDF before a pin on its folder).
   const byDepth = [...pinnedOut].sort((a, b) => (b.pin.folder || folderOf(b.pin.url)).length - (a.pin.folder || folderOf(a.pin.url)).length);
+  // A page that is both on the common bar and pinned shows as open in both places: a pin takes
+  // a tab no one else has if there is one, else the tab the common bar shows.
+  const byCommon = new Set(claimed);
+  const byPin = new Set();
   for (const row of byDepth) {
     const folder = row.pin.folder || folderOf(row.pin.url);
-    for (const t of tabs) {
-      if (claimed.has(t.id)) continue;
-      if (inFolder(folder, pageUrlOf(t.url))) { row.tabId = t.id; claimed.add(t.id); break; }
-    }
+    const fits = tabs.filter(t => !byPin.has(t.id) && inFolder(folder, pageUrlOf(t.url)));
+    const same = x => { const u = pageUrlOf(x.url); return u === row.pin.url || u.split('#')[0] === String(row.pin.url).split('#')[0]; };
+    // The pinned page itself first, then a page in its folder no one else shows, then any.
+    const t = fits.find(same) || fits.find(x => !byCommon.has(x.id)) || fits[0];
+    if (t) { row.tabId = t.id; byPin.add(t.id); claimed.add(t.id); }
   }
 
   const listed = [];

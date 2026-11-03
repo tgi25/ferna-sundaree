@@ -119,23 +119,26 @@ function workspaceSubmenu(win, onPick, { includeNone = false, current = null } =
 /** "Pin here", "Pin to ▸" and "Add to common bar" items for a tab (tab menu and page menu). */
 function pinAndCommonItems(win, tab) {
   const ctx = win.ctx;
-  const ok = /^(https?|file):/i.test(tab.url || '');
+  // A PDF in Ferna PDF Reader is pinned by its own address (web or file).
+  const url = require('./workspaces').pageUrlOf(tab.url);
+  tab = { ...tab, url, _real: tab };
+  const ok = /^(https?|file):/i.test(url);
   const here = win.currentWs || '';
   const hereName = here ? `“${(ctx.ws.data.workspaces.find(w => w.id === here) || {}).name || ''}”` : 'All tabs';
   const pinnedHere = ok && ctx.findPin(here, tab.url) >= 0;
   const onCommon = ok && ctx.findCommon(tab.url) >= 0;
   const full = ctx.ws.data.common.length >= 20;
   const pinTo = [
-    { label: 'All tabs', type: 'checkbox', checked: ok && ctx.findPin('', tab.url) >= 0, click: () => win.togglePin(tab, '') },
+    { label: 'All tabs', type: 'checkbox', checked: ok && ctx.findPin('', tab.url) >= 0, click: () => win.togglePin(tab._real, '') },
     ...(ctx.ws.data.workspaces.length ? [{ type: 'separator' }] : []),
-    ...ctx.ws.data.workspaces.map(w => ({ label: w.name, type: 'checkbox', checked: ok && ctx.findPin(w.id, tab.url) >= 0, click: () => win.togglePin(tab, w.id) })),
+    ...ctx.ws.data.workspaces.map(w => ({ label: w.name, type: 'checkbox', checked: ok && ctx.findPin(w.id, tab.url) >= 0, click: () => win.togglePin(tab._real, w.id) })),
     { type: 'separator' },
     { label: 'New workspace…', click: () => win.promptNewWorkspace(id => { ctx.pinSite(id, tab.url, tab.title); win.switchWorkspace(id); }) },
   ];
   return [
-    { label: pinnedHere ? `Unpin from ${hereName}` : `Pin in ${hereName}`, enabled: ok, accelerator: acc(ctx, 'pinTab'), registerAccelerator: false, click: () => win.togglePin(tab) },
+    { label: pinnedHere ? `Unpin from ${hereName}` : `Pin in ${hereName}`, enabled: ok, accelerator: acc(ctx, 'pinTab'), registerAccelerator: false, click: () => win.togglePin(tab._real) },
     { label: 'Pin to', enabled: ok, submenu: pinTo },
-    { label: onCommon ? 'Remove from common bar' : full ? 'Add to common bar (full: 20 of 20)' : 'Add to common bar', enabled: ok && (onCommon || !full), accelerator: acc(ctx, 'addToCommon'), registerAccelerator: false, click: () => win.toggleCommon(tab) },
+    { label: onCommon ? 'Remove from common bar' : full ? 'Add to common bar (full: 20 of 20)' : 'Add to common bar', enabled: ok && (onCommon || !full), accelerator: acc(ctx, 'addToCommon'), registerAccelerator: false, click: () => win.toggleCommon(tab._real) },
   ];
 }
 
@@ -148,7 +151,7 @@ function tabMenu(win, tab) {
     { label: 'New tab to the right', click: () => win.newTab(null, { index: idx + 1 }) },
     { type: 'separator' },
     { label: 'Reload', click: () => tab.view && tab.view.webContents.reload() },
-    { label: 'Duplicate', click: () => win.newTab(tab.url, { index: idx + 1 }) },
+    { label: 'Duplicate', click: () => win.newTab(require('./workspaces').pageUrlOf(tab.url), { index: idx + 1 }) },
     { label: tab.muted ? 'Unmute site' : 'Mute site', enabled: !!tab.view, click: () => win.setMuted(tab, !tab.muted) },
     { label: 'Keep loaded (never sleep)', type: 'checkbox', checked: !!tab.keepLoaded, click: () => { tab.keepLoaded = !tab.keepLoaded; win.pushState(); } },
     { label: 'Sleep now', enabled: !!tab.view && tab.id !== win.activeId && tab.kind === 'web', click: () => win.sleepTab(tab) },
@@ -159,7 +162,7 @@ function tabMenu(win, tab) {
     { type: 'separator' },
     ...pinAndCommonItems(win, tab),
     { label: 'Move to workspace', submenu: workspaceSubmenu(win, id => win.moveTabToWorkspace(tab, id), { includeNone: true, current: tab.wsOverride || wsId }) },
-    { label: 'Copy address', click: () => clipboard.writeText(tab.url || '') },
+    { label: 'Copy address', click: () => clipboard.writeText(require('./workspaces').pageUrlOf(tab.url) || '') },
     { type: 'separator' },
     { label: 'Close', click: () => win.closeTab(tab) },
     { label: 'Close other tabs', enabled: win.tabs.length > 1, click: () => win.tabs.filter(t => t !== tab).forEach(t => win.closeTab(t)) },
@@ -305,6 +308,47 @@ function shotMenu(win) {
   ]);
 }
 
+/**
+ * Right-click menu for text boxes and selected text on Ferna's own pages (the address bar, the
+ * find bar, Settings and the other internal pages). goText: set for the address bar, adds
+ * “Paste and go”. In exam mode, cut/copy/paste follow the exam's copy setting.
+ */
+async function editMenu(win, wc, p, { goText } = {}) {
+  const f = p.editFlags || {};
+  const copyOk = !win.exam || win.exam.allowCopy;
+  const t = [];
+  if (p.isEditable) {
+    t.push({ label: 'Undo', role: 'undo', enabled: !!f.canUndo }, { label: 'Redo', role: 'redo', enabled: !!f.canRedo }, { type: 'separator' });
+    if (copyOk) {
+      t.push({ label: 'Cut', role: 'cut', enabled: !!f.canCut }, { label: 'Copy', role: 'copy', enabled: !!f.canCopy }, { label: 'Paste', role: 'paste', enabled: !!f.canPaste });
+      // The clipboard is asynchronous in this Electron version.
+      let clip = '';
+      if (goText) { try { clip = String(await clipboard.readText() || '').trim(); } catch { clip = ''; } }
+      if (goText && clip) t.push({ label: 'Paste and go', click: () => goText(clip.replace(/\s*[\r\n]+\s*/g, ' ').slice(0, 4000)) });
+    }
+    t.push({ label: 'Delete', role: 'delete', enabled: !!f.canDelete }, { type: 'separator' }, { label: 'Select all', role: 'selectAll', enabled: f.canSelectAll !== false });
+  } else if (p.selectionText && copyOk) {
+    t.push({ label: 'Copy', role: 'copy' });
+  }
+  return t.length ? Menu.buildFromTemplate(t) : null;
+}
+
+/** Right-click inside a PDF open in Ferna PDF Reader: pin it, put it on the common bar, bookmark it. */
+async function pdfMenu(win, tab, p) {
+  if (p.isEditable || p.selectionText) return editMenu(win, tab.view.webContents, p);
+  const wc = tab.view.webContents;
+  const ctx = win.ctx;
+  const url = require('./workspaces').pageUrlOf(tab.url);
+  return Menu.buildFromTemplate([
+    { label: 'Back', enabled: wc.navigationHistory.canGoBack(), click: () => win.run('back') },
+    { label: 'Reload', click: () => win.run('reload') },
+    { type: 'separator' },
+    ...pinAndCommonItems(win, tab),
+    { label: ctx.findBookmark && ctx.findBookmark(url) ? 'Remove bookmark' : 'Bookmark this PDF', click: () => win.run('bookmark') },
+    { label: 'Copy address', click: () => clipboard.writeText(url) },
+  ]);
+}
+
 function pageMenu(win, tab, p) {
   const t = [];
   if (p.linkURL) {
@@ -390,4 +434,4 @@ function pageMenu(win, tab, p) {
   return Menu.buildFromTemplate(t);
 }
 
-module.exports = { splitMenu, appMenu, tabMenu, commonMenu, pinnedMenu, workspaceMenu, bookmarkMenu, shieldMenu, shotMenu, pageMenu, folderOf };
+module.exports = { editMenu, pdfMenu, splitMenu, appMenu, tabMenu, commonMenu, pinnedMenu, workspaceMenu, bookmarkMenu, shieldMenu, shotMenu, pageMenu, folderOf };

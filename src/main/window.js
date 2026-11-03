@@ -137,6 +137,16 @@ class FernaWindow {
     this.ctx.registerContents(wc, this);
     wc.on('before-input-event', (e, input) => this.onKey(e, input, wc));
     wc.setWindowOpenHandler(({ url: u }) => { if (/^(https?|ferna):/.test(u)) this.newTab(u); return { action: 'deny' }; });
+    // Cut, copy, paste… for the address bar and the other text boxes of the browser's own UI.
+    wc.on('context-menu', async (e, params) => {
+      let address = false;
+      if (params.isEditable && /^ferna:\/\/ui\//.test(wc.getURL())) {
+        try { address = await wc.executeJavaScript("document.activeElement && document.activeElement.id === 'address'"); } catch { address = false; }
+      }
+      const go = address ? text => { const u = require('./policy').normalizeInput(text, this.ctx.settings.data.searchEngine); if (u) { if (this.active) this.navigate(this.active, u); else this.newTab(u); } } : null;
+      const m = await menus.editMenu(this, wc, params, { goText: go });
+      if (m) m.popup({ window: this.win });
+    });
     wc.on('destroyed', () => this.internalIds.delete(wc.id));
     wc.loadURL(url);
     return view;
@@ -249,6 +259,11 @@ class FernaWindow {
     wc.on('audio-state-changed', () => { tab.audible = wc.isCurrentlyAudible(); changed(); });
     wc.on('found-in-page', (e, r) => this.sendUi('find-result', { active: r.activeMatchOrdinal, total: r.matches }));
     wc.on('context-menu', (e, params) => {
+      if (kind === 'internal') {
+        Promise.resolve(/^ferna:\/\/pdf\//i.test(tab.url || '') ? menus.pdfMenu(this, tab, params) : menus.editMenu(this, wc, params))
+          .then(m => { if (m && !wc.isDestroyed()) m.popup({ window: this.win }); }).catch(() => {});
+        return;
+      }
       if (kind !== 'web') return;
       if (this.exam) {
         const items = params.isEditable ? [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, ...(this.exam.allowCopy ? [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }] : []), { role: 'selectAll' }]

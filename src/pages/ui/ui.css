@@ -66,9 +66,10 @@ body.private #toolbar::before { content: "Private"; order: 99; font-size: 11px; 
 .tab:hover { background: var(--bg-hover); color: var(--ink); }
 .tab.active { background: var(--tab-active-bg); color: var(--tab-active-ink); box-shadow: var(--shadow); }
 .tab .title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.tab .x { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; flex: none; color: var(--ink-2); }
-/* Tab buttons sit on the left: add to common bar, pin, close. The space is always kept, so
-   titles do not move; the buttons show on hover and on the active tab. */
+.tab .x { opacity: 0; width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; flex: none; color: var(--ink-2); }
+.tab:hover .x, .tab.active .x { opacity: 1; }
+/* Add-to-common-bar and pin sit on the left of a tab, close on the right as in other browsers.
+   The space is always kept, so titles do not move; the buttons show on hover and on the active tab. */
 .tab .lacts { display: flex; align-items: center; gap: 1px; flex: none; margin-left: -4px; opacity: 0; transition: opacity .1s; }
 .tab .lacts:empty { display: none; }
 .tab:hover .lacts, .tab.active .lacts, .tab:focus-within .lacts { opacity: 1; }
@@ -84,8 +85,8 @@ body.private #toolbar::before { content: "Private"; order: 99; font-size: 11px; 
 .tab .act:hover { background: var(--bg-active); color: var(--accent); }
 .tab .act.on { color: var(--accent); }
 @container (max-width: 150px) { .tab .acts { display: none; } }
-.pin-hint { padding: 2px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 4px; }
-.pin-hint .icon { width: 12px; height: 12px; }
+.pin-hint { padding: 2px 10px; font-size: 11.5px; display: block; line-height: 1.45; }
+.pin-hint .icon { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; }
 .tab .snd { color: var(--accent); }
 .tab .snd .icon { width: 14px; height: 14px; }
 .tab.sleeping .favicon, .tab.sleeping .letter { opacity: .5; }
@@ -225,3 +226,11 @@ body.app #omnibox, body.app #btn-bookmarks, body.app #btn-overview, body.app #bt
 #app-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; padding: 0 8px; -webkit-app-region: drag; }
 #omni-container { font-size: 11px; font-weight: 600; color: #fff; background: var(--c); border-radius: 999px; padding: 1px 8px; margin-right: 4px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; flex: none; }
 #tabs.v.collapsed .tab .lacts { display: none; }
+
+/* Dragging a tab: the common bar and the pinned area take it (empty ones show a target). */
+#tabs .dz { display: flex; align-items: center; justify-content: center; font-size: 11.5px; color: var(--muted, #64748b); border: 1.5px dashed var(--border, #cbd5e1); border-radius: 8px; padding: 4px 10px; white-space: nowrap; flex: 0 0 auto; }
+#tabs.v .dz { margin: 4px 8px; min-height: 28px; }
+#tabs.h .dz { margin: 4px 3px; }
+#tabs.tab-dragging [data-dz] { outline: 1.5px dashed transparent; outline-offset: -1px; border-radius: 8px; }
+#tabs.tab-dragging [data-dz]:not(.dz) { outline-color: var(--border, #cbd5e1); }
+#tabs [data-dz].dz-over { outline-color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); border-color: var(--accent); }

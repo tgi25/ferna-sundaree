@@ -84,7 +84,7 @@ module.exports = async function v063({ step, assert, main, win, page, H, base, s
     await main(() => { const c = global.__ferna; c.windows[0].closeOverlay(); c.setSetting('bookmarkFolder', ''); });
   });
 
-  await step('0.6.3 tab buttons on the left: common bar, pin, close before the icon and title', async () => {
+  await step('0.6.3 tab buttons on the left: common bar and pin before the icon and title', async () => {
     await freshTab(`${base}/long.html?left-buttons`);
     const u = await ui();
     // Vertical tabs are wide enough for all three buttons (narrow top tabs keep only ×).
@@ -95,13 +95,14 @@ module.exports = async function v063({ step, assert, main, win, page, H, base, s
       const r = sel => { const e = t.querySelector(sel); return e ? e.getBoundingClientRect().left : null; };
       return { star: r('[data-common-tab]'), pin: r('[data-pin-tab]'), close: r('[data-close]'), title: r('.title'), first: t.firstElementChild.className };
     });
-    assert(pos.first === 'lacts' && pos.star < pos.pin && pos.pin < pos.close && pos.close < pos.title, JSON.stringify(pos));
+    // 0.6.4: × moved back to the right; the common bar and pin buttons stay on the left.
+    assert(pos.first === 'lacts' && pos.star < pos.pin && pos.pin < pos.title && pos.close > pos.title, JSON.stringify(pos));
     await u.hover('#tabs .tab.active');
     await shot('v063-04-tab-buttons');
     await main(() => global.__ferna.setSetting('tabPosition', 'top'));
     await H.sleep(400);
     const top = await u.evaluate(() => { const t = document.querySelector('#tabs .tab.active'); return { close: t.querySelector('[data-close]').getBoundingClientRect().left, title: t.querySelector('.title').getBoundingClientRect().left }; });
-    assert(top.close < top.title, `top tabs: close before title ${JSON.stringify(top)}`);
+    assert(top.close > top.title, `top tabs: close after title ${JSON.stringify(top)}`);
   });
 
   await step('0.6.3 a click on the strip is not lost while it redraws (loading pages)', async () => {

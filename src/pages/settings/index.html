@@ -29,6 +29,8 @@
   .icon-pick .glyphs button:hover { background: var(--bg-hover); }
   .icon-pick .row2 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .icon-pick .row2 .field { width: 90px; }
+  .pin-add { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+  .pin-add .field { flex: 1; min-width: 0; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 8px; border-radius: 14px; background: var(--bg-sunken); font-size: 12px; max-width: 320px; }
   .chip span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -132,7 +134,8 @@
       </div>
       <h2 style="font-size:14px">Pinned in All tabs</h2>
       <p class="muted" style="margin-top:-6px">Shown when “All” is selected on the workspaces bar. Pin with the pin on a tab, <kbd>Alt+S</kbd>, or a tab's right-click menu.</p>
-      <div class="chips" id="allpinned" style="margin-bottom:16px"></div>
+      <div class="chips" id="allpinned" style="margin-bottom:8px"></div>
+      <div class="row2 pin-add" style="margin-bottom:16px"><input class="field" type="text" id="allpin-in" placeholder="Pin a web address, a file or a folder in All tabs" aria-label="Pin in All tabs"><button class="btn small" id="allpin-add">Pin</button></div>
       <h2 style="font-size:14px">Common bar <span class="muted" id="common-n"></span></h2>
       <p class="muted" style="margin-top:-6px">Up to 20 sites shown in every workspace. Add one with the star on a tab, <kbd>Alt+Shift+S</kbd>, or a tab's right-click menu.</p>
       <div class="chips" id="common"></div>

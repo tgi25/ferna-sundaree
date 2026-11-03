@@ -658,7 +658,7 @@ const PERMISSION_LABEL = {
 
 /** Register or remove the privacy preloads (they run in every frame of web pages). */
 function setPrivacyPreloads(ses) {
-  const want = { 'ferna-gpc': ctx.settings.data.gpc !== false ? 'privacy-gpc.js' : null, 'ferna-fp': ctx.settings.data.fingerprintProtection !== false ? 'privacy-fp.js' : null };
+  const want = { 'ferna-gpc': ctx.settings.data.gpc !== false ? 'privacy-gpc.js' : null, 'ferna-fp': ctx.settings.data.fingerprintProtection !== false ? 'privacy-fp.js' : null, 'ferna-scriptlets': 'scriptlets.js' };
   let have = [];
   try { have = ses.getPreloadScripts().map(p => p.id); } catch { /* older Electron */ }
   for (const [id, file] of Object.entries(want)) {
@@ -893,6 +893,18 @@ function registerCommands() {
   const UI = ['ui', 'overlay'];
 
   C('ui:ready', [], ['ui'], c => senderWindow(c).state());
+  // Asked synchronously by src/preload/scriptlets.js in web page frames as they start. Only
+  // answers frames of web tabs (Ferna's own pages and other webContents get nothing).
+  require('electron').ipcMain.on('ferna-scriptlets', e => {
+    let out = [];
+    try {
+      const frame = e.senderFrame;
+      const url = frame && frame.url;
+      const isTab = ctx.windows.some(w => w.tabs.some(t => t.kind === 'web' && t.view && t.view.webContents === e.sender));
+      if (isTab && /^https?:/i.test(url || '') && ctx.pageFx) out = ctx.pageFx.scriptletsFor(url);
+    } catch { out = []; }
+    e.returnValue = out;
+  });
   C('run', ['string'], ['ui', 'overlay', 'newtab', 'settings'], (c, cmd) => {
     const w = senderWindow(c);
     if (!RUNNABLE.has(cmd)) return false;
@@ -942,6 +954,14 @@ function registerCommands() {
   C('common:menu', ['int'], ['ui'], (c, i) => { const w = senderWindow(c); const m = require('./menus').commonMenu(w, i); if (m) m.popup({ window: w.win }); });
   C('tab:common', ['int'], ['ui', 'overlay'], (c, id) => { const w = senderWindow(c); const t = tabById(w, id); if (t) w.toggleCommon(t); });
   C('tab:pin', ['int'], ['ui', 'overlay'], (c, id) => { const w = senderWindow(c); const t = tabById(w, id); if (t) w.togglePin(t); });
+  // A tab dropped on the common bar or the pinned area: add it there (never takes it off).
+  C('tab:to', ['int', 'string'], ['ui'], (c, id, where) => {
+    const w = senderWindow(c); const t = tabById(w, id);
+    if (!t) return;
+    const url = require('./workspaces').pageUrlOf(t.url);
+    if (where === 'common') { if (ctx.findCommon(url) >= 0) w.sendUi('toast', { text: 'Already on the common bar.' }); else w.toggleCommon(t); }
+    else if (where === 'pin') { if (ctx.findPin(w.currentWs || '', url) >= 0) w.sendUi('toast', { text: 'Already pinned here.' }); else w.togglePin(t); }
+  });
   C('pinned:unpin', ['string', 'int'], ['ui', 'overlay', 'settings'], (c, id, i) => ctx.unpinSite(id, i));
   C('pinned:open', ['string', 'int'], UI, (c, id, i) => { const w = senderWindow(c); w.closeOverlay(); w.openPinned(id, i); });
   C('pinned:menu', ['string', 'int'], ['ui'], (c, id, i) => { const w = senderWindow(c); const m = require('./menus').pinnedMenu(w, id, i); if (m) m.popup({ window: w.win }); });

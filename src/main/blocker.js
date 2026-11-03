@@ -42,7 +42,8 @@ class Blocker {
       this.engine = this.lib.ElectronBlocker.deserialize(new Uint8Array(fs.readFileSync(this.file)));
       this.updated = st.mtime;
       this.status = 'ready';
-      if (Date.now() - st.mtimeMs > MAX_AGE) this.refresh().catch(() => {});
+      // Stale: refresh later, so parsing the lists does not hold up the first pages you open.
+      if (Date.now() - st.mtimeMs > MAX_AGE) { const t = setTimeout(() => this.refresh().catch(() => {}), Number(process.env.FERNA_LIST_REFRESH_DELAY || 90000)); if (t.unref) t.unref(); }
     } catch {
       await this.refresh().catch(() => { this.status = this.engine ? 'ready' : 'lists unavailable'; });
     }

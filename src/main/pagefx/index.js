@@ -55,16 +55,43 @@ function create(ctx) {
       const dom = await wc.executeJavaScriptInIsolatedWorld(COSMETIC_WORLD, [{ code: DOM_TOKENS }]);
       const ask = engine => engine.getCosmeticsFilters({
         url, hostname, domain, classes: dom.classes, ids: dom.ids, hrefs: dom.hrefs,
-        getBaseRules: true, getInjectionRules: true, getExtendedRules: false, getRulesFromDOM: true, getRulesFromHostname: true,
+        getBaseRules: true, getInjectionRules: false, getExtendedRules: false, getRulesFromDOM: true, getRulesFromHostname: true,
       });
       const parts = [lists ? ask(b.engine) : null, mine ? ask(b.custom) : null].filter(Boolean);
       if (wc.isDestroyed() || tab.url !== url) return;
       const styles = parts.map(r => r.styles || '').join('\n').trim();
       if (tab.cosmeticKey) { wc.removeInsertedCSS(tab.cosmeticKey).catch(() => {}); tab.cosmeticKey = null; }
       if (styles) tab.cosmeticKey = await wc.insertCSS(styles, { cssOrigin: 'user' });
-      // Scriptlets (uBlock-style +js rules) run in the page itself, as they must to work.
-      for (const r of parts) for (const sc of (r.scripts || []).slice(0, 40)) wc.mainFrame.executeJavaScript(sc).catch(() => {});
+      // Scriptlets (uBlock-style +js rules) are not run here: they run once, when each page
+      // starts, from src/preload/scriptlets.js (see scriptletsFor). Running them late, after the
+      // page's own code, broke pages such as Facebook on their first load.
     } catch { /* page navigated away or engine without cosmetic filters */ }
+  }
+
+  /**
+   * Scriptlets for a frame that is starting (asked by src/preload/scriptlets.js, before any of
+   * the page's own code runs). Same rules as cosmetics(): list rules need ad blocking and
+   * cosmetic filtering on; your own rules apply unless blocking is off for the site.
+   */
+  function scriptletsFor(url) {
+    const b = ctx.blocker;
+    if (!b || !/^https?:/i.test(url || '')) return [];
+    const hostname = host(url);
+    const allowed = S().blockerAllow.includes(hostname);
+    const lists = !!b.engine && !!S().blocker && !allowed && S().cosmeticFiltering !== false;
+    const mine = !!b.custom && !allowed;
+    if (!lists && !mine) return [];
+    let domain = hostname;
+    try { domain = require('tldts-experimental').getDomain(hostname) || hostname; } catch { /* keep host */ }
+    const out = [];
+    for (const engine of [lists ? b.engine : null, mine ? b.custom : null]) {
+      if (!engine) continue;
+      try {
+        const r = engine.getCosmeticsFilters({ url, hostname, domain, getBaseRules: false, getInjectionRules: true, getExtendedRules: false, getRulesFromDOM: false, getRulesFromHostname: true });
+        for (const sc of r.scripts || []) if (typeof sc === 'string' && out.length < 40) out.push(sc);
+      } catch { /* engine without cosmetic filters */ }
+    }
+    return out;
   }
 
   /** Element picker: choose something on the page to hide on this site from now on. */
@@ -99,7 +126,7 @@ function create(ctx) {
     if (eqCfg().enabled) eq.apply(wc, eqCfg()).catch(() => {});
     if (ctx.passwords && !win.private) ctx.passwords.attach(win, tab);
     cosmetics(win, tab, wc);
-    // A second pass once late content (ads load late) is in.
+    // A second pass (styles only) once late content (ads load late) is in.
     setTimeout(() => { if (live(tab) === wc && !wc.isDestroyed()) cosmetics(win, tab, wc); }, 2500);
   }
 
@@ -192,7 +219,7 @@ function create(ctx) {
     try { return await wc.executeJavaScriptInIsolatedWorld(reader.WORLD + 10, [{ code: reader.EXTRACT() }]); } catch { return null; }
   }
 
-  return { domReady, mediaStarted, pip: togglePip, eqCfg, setEq, eqDisplay, eqStatus, cosmetics, pickElement, EQ: eq, reader: openReader, readAloud, extract };
+  return { domReady, mediaStarted, pip: togglePip, eqCfg, setEq, eqDisplay, eqStatus, cosmetics, scriptletsFor, pickElement, EQ: eq, reader: openReader, readAloud, extract };
 }
 
 /** Register or remove the YouTube document-start preload on a session. */

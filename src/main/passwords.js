@@ -243,7 +243,8 @@ Write-Output "result:$r"`;
   }
   function copySecret(text) {
     clipboard.writeText(text);
-    setTimeout(() => { if (clipboard.readText() === text) clipboard.writeText(''); }, 30000);
+    // Clear it after 30 s if it still holds the password (the clipboard is asynchronous here).
+    setTimeout(() => { Promise.resolve(clipboard.readText()).then(v => { if (v === text) clipboard.writeText(''); }).catch(() => {}); }, 30000);
   }
 
   function register(C) {

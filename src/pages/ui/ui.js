@@ -417,7 +417,7 @@ function tabHtml(t, extra = '', { closable = true, label = '', acts = '' } = {})
   const title = t.title || (t.url ? t.url.replace(/^https?:\/\//, '') : 'New tab');
   const tip = `${title}${t.url && !/^ferna:/.test(t.url) ? `\n${t.url}` : ''}${t.sleeping ? '\n(sleeping: loads when opened)' : ''}`;
   return `<div class="tab${active}${t.sleeping ? ' sleeping' : ''} ${extra}" role="tab" aria-selected="${!!active}" tabindex="-1" draggable="true" data-id="${t.id}" title="${esc(tip)}">
-    <span class="lacts">${acts}${closable ? `<span class="x" data-close="${t.id}" title="Close tab (Ctrl+W)">${icon('close')}</span>` : ''}</span>${lead}<span class="title">${esc(label || title)}</span>${snd}</div>`;
+    ${acts ? `<span class="lacts">${acts}</span>` : ''}${lead}<span class="title">${esc(label || title)}</span>${snd}${closable ? `<span class="x" data-close="${t.id}" title="Close tab (Ctrl+W)">${icon('close')}</span>` : ''}</div>`;
 }
 
 const keyOf = cmd => (S.shortcutKeys && S.shortcutKeys[cmd]) ? ` (${S.shortcutKeys[cmd]})` : '';
@@ -457,7 +457,7 @@ function commonHtml() {
   return S.strip.common.map(c => {
     const t = c.tabId ? tabById(c.tabId) : null;
     const cls = t ? (t.id === S.activeId ? 'open current' : 'open') : 'closed';
-    return `<button class="icon-btn ${cls}" data-common="${c.index}" title="${esc(c.entry.title || c.entry.url)}${t ? '' : ' (not open)'}">
+    return `<button class="icon-btn ${cls}" data-common="${c.index}"${t ? ` draggable="true" data-drag-tab="${t.id}"` : ''} title="${esc(c.entry.title || c.entry.url)}${t ? '' : ' (not open)'}">
       ${faviconHtml(c.entry.url, t ? t.favicon : '')}${c.badge ? `<span class="badge">${esc(c.badge)}</span>` : ''}</button>`;
   }).join('');
 }
@@ -465,7 +465,7 @@ function commonHtml() {
 // A click is lost if the strip is redrawn between mouse-down and mouse-up (a loading page
 // redraws it many times a second), which made some buttons need a second click. While a
 // button is held, redraws wait until it is released.
-let stripPress = 0, stripPending = false;
+let stripPress = 0, stripPending = false, stripDragging = false;
 function stripRelease() {
   if (!stripPress) return;
   stripPress = 0;
@@ -476,6 +476,7 @@ for (const ev of ['pointerup', 'pointercancel', 'dragend', 'drop', 'blur']) wind
 
 function renderTabs() {
   if (stripPress && Date.now() - stripPress < 2000) { stripPending = true; return; }
+  if (stripDragging) { stripPending = true; return; } // redrawing would cancel the drag
   stripPress = 0;
   const L = S.layout;
   const node = el.tabs;
@@ -514,8 +515,8 @@ function renderTabs() {
     }).join('');
     node.innerHTML = `
       <div class="group wsg">${wsChips(true)}</div>
-      ${S.strip.common.length ? `<div class="group common">${commonHtml()}</div>` : ''}
-      ${pinnedIcons ? `<div class="group pinned">${pinnedIcons}</div>` : ''}
+      ${S.strip.common.length ? `<div class="group common" data-dz="common">${commonHtml()}</div>` : ''}
+      ${pinnedIcons ? `<div class="group pinned" data-dz="pin">${pinnedIcons}</div>` : ''}
       ${favOnly ? `<div class="fav-space"></div>` : `<div class="tablist">${listed.map(t => tabHtml(t, '', { acts: listActs(t) })).join('')}</div>`}
       <button class="icon-btn new-tab" data-new="1" title="New tab (Ctrl+T)">${icon('plus')}</button>
       ${favOnly ? '' : noWsHtml}
@@ -528,9 +529,9 @@ function renderTabs() {
 
   node.innerHTML = `
     <div class="ws-bar">${wsChips(collapsed)}</div>
-    ${S.strip.common.length ? `<div class="common">${commonHtml()}</div>` : ''}
+    ${S.strip.common.length ? `<div class="common" data-dz="common">${commonHtml()}</div>` : ''}
     <div class="scroll">
-      <div class="section"><div class="sect-label">${ws ? `Pinned in ${esc(ws.name)}` : favOnly ? 'Pinned' : 'Pinned in All tabs'}</div>${pinnedRows || `<div class="muted pin-hint">Point at a tab and click ${icon('pin')} to pin it here</div>`}</div>
+      <div class="section" data-dz="pin"><div class="sect-label">${ws ? `Pinned in ${esc(ws.name)}` : favOnly ? 'Pinned' : 'Pinned in All tabs'}</div>${pinnedRows || `<div class="muted pin-hint">Drag a tab here, or point at it and click ${icon('pin')}, to pin it</div>`}</div>
       ${favOnly ? '' : `<div class="section"><div class="sect-label">${ws ? 'Tabs' : 'All tabs'}</div>${listed.map(t => tabHtml(t, '', { acts: listActs(t) })).join('')}</div>`}
     </div>
     <div class="footer">
@@ -586,17 +587,50 @@ el.tabs.addEventListener('contextmenu', e => {
 });
 
 // Drag to reorder; drop on a workspace chip to move the tab there.
+// Drop zones: drag a tab onto the common bar to add it there, or onto the pinned area to pin it
+// where you are. Empty areas get a temporary target while a tab is dragged.
+function addDropZones() {
+  stripDragging = true;
+  el.tabs.classList.add('tab-dragging');
+  const vertical = S.layout.position !== 'top';
+  const mk = (kind, text) => { const d = document.createElement('div'); d.className = `dz dz-${kind}`; d.dataset.dz = kind; d.dataset.temp = '1'; d.textContent = text; return d; };
+  const after = el.tabs.querySelector(vertical ? '.ws-bar' : '.group.wsg');
+  if (!el.tabs.querySelector('[data-dz="common"]') && after) after.after(mk('common', '☆ Drop here: common bar'));
+  if (!el.tabs.querySelector('[data-dz="pin"]')) {
+    const ref = el.tabs.querySelector('[data-dz="common"]') || after;
+    if (ref) ref.after(mk('pin', `Drop here: pin in ${S.currentWs ? (S.workspaces.find(w => w.id === S.currentWs) || {}).name || 'workspace' : 'All tabs'}`));
+  }
+}
+function removeDropZones() {
+  el.tabs.classList.remove('tab-dragging');
+  el.tabs.querySelectorAll('[data-temp]').forEach(n => n.remove());
+  el.tabs.querySelectorAll('.dz-over').forEach(n => n.classList.remove('dz-over'));
+  stripDragging = false;
+  stripPress = 0; // a drag ends without a pointerup
+  if (stripPending) { stripPending = false; setTimeout(renderTabs, 0); }
+}
 el.tabs.addEventListener('dragstart', e => {
-  const tab = e.target.closest('.tab[data-id]');
+  // A tab, or an open page on the common bar (drag it to the pinned area to pin it too).
+  const tab = e.target.closest('.tab[data-id], [data-drag-tab]');
   if (!tab) return;
-  dragId = Number(tab.dataset.id);
+  dragId = Number(tab.dataset.id || tab.dataset.dragTab);
   tab.classList.add('dragging');
+  addDropZones();
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', String(dragId));
 });
-el.tabs.addEventListener('dragend', () => { dragId = null; el.tabs.querySelectorAll('.dragging,.drop-before').forEach(n => n.classList.remove('dragging', 'drop-before')); });
+el.tabs.addEventListener('dragend', () => { dragId = null; el.tabs.querySelectorAll('.dragging,.drop-before').forEach(n => n.classList.remove('dragging', 'drop-before')); removeDropZones(); });
 el.tabs.addEventListener('dragover', e => {
   if (dragId === null) return;
+  const zone = e.target.closest('[data-dz]');
+  el.tabs.querySelectorAll('.dz-over').forEach(n => { if (n !== zone) n.classList.remove('dz-over'); });
+  // Over a zone (but not over a tab row inside the pinned list, which reorders as before).
+  if (zone && !(zone.dataset.dz === 'pin' && e.target.closest('.tab[data-id]:not(.pinned)'))) {
+    e.preventDefault();
+    zone.classList.add('dz-over');
+    el.tabs.querySelectorAll('.drop-before').forEach(n => n.classList.remove('drop-before'));
+    return;
+  }
   const target = e.target.closest('.tab[data-id], [data-ws]');
   if (!target) return;
   e.preventDefault();
@@ -606,6 +640,12 @@ el.tabs.addEventListener('dragover', e => {
 el.tabs.addEventListener('drop', e => {
   if (dragId === null) return;
   e.preventDefault();
+  const zone = e.target.closest('[data-dz]');
+  if (zone && !(zone.dataset.dz === 'pin' && e.target.closest('.tab[data-id]:not(.pinned)'))) {
+    api.cmd('tab:to', dragId, zone.dataset.dz);
+    removeDropZones();
+    return;
+  }
   const chip = e.target.closest('[data-ws]');
   if (chip) { api.cmd('tab:ws', dragId, chip.dataset.ws || 'none'); return; }
   const target = e.target.closest('.tab[data-id]');

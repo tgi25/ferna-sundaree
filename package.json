@@ -1,6 +1,6 @@
 {
   "name": "ferna-sundaree",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Ferna Sundaree: a security-hardened browser for Windows and Linux with Ferna Tabs, Ferna PDF Reader and Ferna Screenshots built in.",
   "main": "src/main/main.js",
   "scripts": {

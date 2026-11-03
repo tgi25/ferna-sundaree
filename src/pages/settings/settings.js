@@ -128,6 +128,7 @@ function renderWs() {
         <input class="field" type="text" value="${esc(w.name)}" data-f="name" maxlength="40" aria-label="Workspace name">
         <button class="btn small" data-a="up" ${i ? '' : 'disabled'}>Up</button><button class="btn small danger" data-a="del">Delete</button></div>
       <div class="chips">${w.pinned.map((p, k) => `<span class="chip">${faviconHtml(p.url, '')}<span title="${esc(p.url)}">${esc(p.title || p.url)}</span><button data-unpin="${k}" title="Unpin">×</button></span>`).join('') || '<span class="muted" style="font-size:12px">No pinned sites. Point at a tab and click the pin, or right-click a tab → Pin to.</span>'}</div>
+      <div class="row2 pin-add"><input class="field" type="text" data-pinadd placeholder="Pin a web address, a file or a folder (C:\\Notes\\week7.pdf, C:\\Notes\\ or /home/you/Notes/)" aria-label="Pin a web address, file or folder"><button class="btn small" data-a="pinadd">Pin</button></div>
       <div class="icon-pick">
         <div class="muted" style="font-size:12px">Pick an icon, type one or two characters (an emoji or letters), or upload a small picture.</div>
         <div class="glyphs">${GLYPHS.map(g => `<button data-glyph="${g}" title="Use ${g}">${g}</button>`).join('')}</div>
@@ -162,7 +163,15 @@ function renderWs() {
       if (a === 'del' && confirm(`Delete the workspace “${w.name}”? Its tabs stay open.`)) { WS.workspaces.splice(i, 1); saveWs(); }
       if (a === 'up') { WS.workspaces.splice(i - 1, 0, WS.workspaces.splice(i, 1)[0]); saveWs(); }
       if (e.target.dataset.unpin !== undefined) { w.pinned.splice(Number(e.target.dataset.unpin), 1); saveWs(); }
+      if (a === 'pinadd') {
+        const input = d.querySelector('[data-pinadd]');
+        const p = toPin(input.value);
+        if (!p) { alert('Type a web address (https://…), a file (C:\\Notes\\week7.pdf) or a folder ending in \\ or /.'); return; }
+        if (!w.pinned.some(x => x.url === p.url)) w.pinned.push(p);
+        saveWs();
+      }
     });
+    d.querySelector('[data-pinadd]').addEventListener('keydown', e => { if (e.key === 'Enter') d.querySelector('[data-a="pinadd"]').click(); });
     box.append(d);
   });
   const ap = $('#allpinned');
@@ -188,6 +197,37 @@ function renderWs() {
 }
 
 let picking = null; // workspace whose icon picker is open
+$('#allpin-add').onclick = () => {
+  const p = toPin($('#allpin-in').value);
+  if (!p) { alert('Type a web address (https://…), a file (C:\\Notes\\week7.pdf) or a folder ending in \\ or /.'); return; }
+  WS.allPinned = WS.allPinned || [];
+  if (!WS.allPinned.some(x => x.url === p.url)) WS.allPinned.push(p);
+  $('#allpin-in').value = '';
+  saveWs();
+};
+$('#allpin-in').addEventListener('keydown', e => { if (e.key === 'Enter') $('#allpin-add').click(); });
+
+/**
+ * What the user typed into "Pin …" → a pinned entry, as in Ferna Tabs: a web address, a local
+ * file (a PDF, say) or a folder (ending in \ or /: every file opened from it joins the workspace).
+ */
+function toPin(text) {
+  let t = String(text || '').trim().replace(/^"(.*)"$/, '$1');
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t)) { try { const u = new URL(t); return { url: u.href, title: u.hostname + (u.pathname.length > 1 ? decodeURIComponent(u.pathname) : '') }; } catch { return null; } }
+  let fileUrl = null;
+  if (/^file:\/\//i.test(t)) fileUrl = t;
+  else if (/^[a-z]:[\\/]/i.test(t)) fileUrl = 'file:///' + t.replace(/\\/g, '/');
+  else if (/^\\\\[^\\]+\\/.test(t)) fileUrl = 'file:' + t.replace(/\\/g, '/');
+  else if (t.startsWith('/')) fileUrl = 'file://' + t;
+  if (!fileUrl) return null;
+  const folder = /[\\/]$/.test(t);
+  let plain = fileUrl;
+  try { plain = decodeURI(fileUrl); } catch { /* a stray % in the name: keep it as typed */ }
+  const url = encodeURI(plain).replace(/#/g, '%23');
+  const name = decodeURI(url).replace(/\/$/, '').split('/').pop() || url;
+  return { url, title: folder ? `${name} (folder)` : name, folder: url };
+}
 
 /** Scale an uploaded picture to a 32 × 32 PNG (aspect kept, centred), as Ferna Tabs does. */
 function shrinkIcon(file) {
