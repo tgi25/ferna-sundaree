@@ -34,7 +34,10 @@ const WATCH = String.raw`(() => {
   function tick() {
     const player = document.querySelector('.html5-video-player');
     const video = player && player.querySelector('video');
-    if (player && video && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'))) {
+    // An ad is playing only when the player says so AND shows ad controls; YouTube can leave
+    // "ad-showing" on for a moment as the real video starts, and that video must not be skipped.
+    const adUi = player && player.querySelector('.ytp-ad-player-overlay, .ytp-ad-player-overlay-layout, .ytp-ad-preview-container, .ytp-ad-text, .ytp-ad-badge, .ytp-ad-simple-ad-badge, .ytp-ad-duration-remaining, ' + SKIP);
+    if (player && video && adUi && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'))) {
       if (mutedByUs === null) { mutedByUs = video.muted; video.muted = true; }
       const b = document.querySelector(SKIP);
       if (b) { b.click(); window.__fernaYT.skipped++; }
@@ -57,34 +60,53 @@ const WATCH = String.raw`(() => {
     }
   }
   // A video that stops by itself just after it starts (YouTube's player does this to some
-  // ad-blocking browsers) is resumed, as other browsers keep playing. A pause you make — click,
-  // tap, key such as Space or K, or a media key — is always kept.
-  let lastInput = 0;
-  for (const t of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(t, () => { lastInput = Date.now(); }, true);
-  const starts = new WeakMap(); // video → { src, at, resumes }
+  // ad-blocking browsers) is started again, as other browsers keep playing. Only a pause you
+  // make on the video itself is kept: a click on the video or the play/pause button, or the
+  // Space, K or media play/pause key. Clicking a video, Next or Previous starts a new video
+  // and is not a pause.
+  let userPauseAt = 0;
+  const PAUSE_KEYS = new Set([' ', 'k', 'K', 'MediaPlayPause', 'MediaPause', 'Pause']);
+  window.addEventListener('pointerdown', e => {
+    if (!e.isTrusted || e.button !== 0) return;
+    const t = e.target instanceof Element ? e.target : null;
+    if (t && (t.closest('.ytp-play-button') || t.closest('.html5-video-container') || t instanceof HTMLVideoElement)) userPauseAt = Date.now();
+  }, true);
+  window.addEventListener('keydown', e => {
+    if (!e.isTrusted || !PAUSE_KEYS.has(e.key)) return;
+    const t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''))) return; // typing in a box
+    userPauseAt = Date.now();
+  }, true);
+  const userPaused = () => Date.now() - userPauseAt < 1200;
+  const starts = new WeakMap(); // video → { at, resumes }
+  const fresh = v => { const st = { at: Date.now(), resumes: 0 }; starts.set(v, st); return st; };
+  // A new video: a new address loads in the element, or YouTube moved to another video.
+  document.addEventListener('loadstart', e => { if (e.target instanceof HTMLVideoElement) fresh(e.target); }, true);
+  document.addEventListener('yt-navigate-finish', () => { const v = document.querySelector('.html5-video-player video'); if (v) fresh(v); }, true);
   document.addEventListener('playing', e => {
     const v = e.target;
-    if (!(v instanceof HTMLVideoElement)) return;
-    const st = starts.get(v);
-    const src = v.currentSrc || v.src;
-    if (!st || st.src !== src) starts.set(v, { src, at: Date.now(), resumes: 0 });
+    if (v instanceof HTMLVideoElement && !starts.has(v)) { const st = fresh(v); st.at -= (v.currentTime || 0) * 1000; }
   }, true);
+  function resume(v, player) {
+    // Through YouTube's own button, so the player's state stays in step; else the video itself.
+    const btn = player.querySelector('.ytp-play-button');
+    const label = btn ? (btn.getAttribute('data-title-no-tooltip') || btn.getAttribute('aria-label') || btn.getAttribute('title') || '') : '';
+    if (btn && /^play\b/i.test(label)) btn.click();
+    setTimeout(() => { if (v.paused && !v.ended) { const pl = v.play(); if (pl && pl.catch) pl.catch(() => {}); } }, 150);
+  }
   document.addEventListener('pause', e => {
     const v = e.target;
     if (!(v instanceof HTMLVideoElement)) return;
-    let st = starts.get(v);
-    // Started before this script was in (it is added once the page has loaded): judge by how
-    // far the video got.
-    if (!st && v.currentTime < 5) { st = { src: v.currentSrc || v.src, at: Date.now() - v.currentTime * 1000, resumes: 0 }; starts.set(v, st); }
     const player = v.closest('.html5-video-player');
-    if (!st || !player || v.ended || player.classList.contains('ad-showing')) return;
-    const now = Date.now();
-    if (now - st.at > 8000 || now - lastInput < 1500 || st.resumes >= 3 || document.hidden) return;
+    if (!player || v.ended || player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')) return;
+    let st = starts.get(v);
+    if (!st && (v.currentTime || 0) < 5) { st = fresh(v); st.at -= (v.currentTime || 0) * 1000; }
+    if (!st || Date.now() - st.at > 15000 || st.resumes >= 6 || userPaused() || document.hidden) return;
     setTimeout(() => {
-      if (!v.paused || v.ended || Date.now() - lastInput < 1500 || document.hidden) return;
+      if (!v.paused || v.ended || userPaused() || document.hidden) return;
       st.resumes++; window.__fernaYT.resumed = (window.__fernaYT.resumed || 0) + 1;
-      const pl = v.play(); if (pl && pl.catch) pl.catch(() => {});
-    }, 250);
+      resume(v, player);
+    }, 200);
   }, true);
 
   new MutationObserver(tick).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class'], childList: true });

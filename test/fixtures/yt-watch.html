@@ -1,9 +1,21 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Fake YouTube: video that stops itself</title></head><body>
-<div class="html5-video-player" id="player"><video id="v" src="media.webm" autoplay muted loop></video></div>
+<!doctype html><html><head><meta charset="utf-8"><title>Fake YouTube: video that stops itself</title>
+<style>#v{width:320px;height:180px;background:#000}</style></head><body>
+<div class="html5-video-player" id="player">
+  <div class="html5-video-container"><video id="v" src="media.webm?1" autoplay muted loop></video></div>
+  <button class="ytp-play-button" id="pp" data-title-no-tooltip="Pause">Play/Pause</button>
+</div>
+<p><a href="#" id="next">Next video</a> <a href="#" id="adflash">Flash ad-showing</a></p>
 <script>
-  // Like YouTube's player in some ad-blocking browsers: stops the video right after it starts.
-  const v = document.getElementById('v');
+  // Like YouTube's player in some ad-blocking browsers: stops each new video right after it starts.
+  const v = document.getElementById('v'), pp = document.getElementById('pp'), player = document.getElementById('player');
   window.__selfPaused = 0;
-  v.addEventListener('playing', () => { if (!window.__selfPaused) setTimeout(() => { window.__selfPaused++; v.pause(); }, 300); }, { once: true });
+  let armed = true;
+  v.addEventListener('playing', () => { pp.dataset.titleNoTooltip = 'Pause'; if (armed) { armed = false; setTimeout(() => { window.__selfPaused++; v.pause(); }, 300); } });
+  v.addEventListener('pause', () => { pp.dataset.titleNoTooltip = 'Play'; });
+  pp.addEventListener('click', () => { if (v.paused) v.play(); else v.pause(); });
+  let n = 1;
+  document.getElementById('next').addEventListener('click', e => { e.preventDefault(); armed = true; v.src = 'media.webm?' + (++n); v.play().catch(() => {}); });
+  // YouTube can leave "ad-showing" on for a moment as the real video starts.
+  document.getElementById('adflash').addEventListener('click', e => { e.preventDefault(); player.classList.add('ad-showing'); setTimeout(() => player.classList.remove('ad-showing'), 1200); });
 </script>
 </body></html>

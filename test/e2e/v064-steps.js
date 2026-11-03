@@ -153,14 +153,29 @@ module.exports = async function v064({ step, assert, main, win, page, H, base, s
     assert(r.labels.includes('Bookmark this PDF'), JSON.stringify(r.labels));
   });
 
-  await step('0.6.6 YouTube: a video the player stops by itself just after it starts keeps playing; your own pause stays', async () => {
+  await step('0.6.7 YouTube: a video the player stops by itself keeps playing (first load, Next); your own pause stays', async () => {
     const port = new URL(base).port;
     await freshTab(`http://localhost:${port}/yt-watch.html`);
-    await H.until(() => evalActive('window.__selfPaused === 1'), 6000, 'the page paused its video');
-    await H.until(() => evalActive('!document.getElementById("v").paused'), 4000, 'resumed by Ferna');
-    // A pause you make (a key or click just before) is kept.
-    await evalActive(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' })); document.getElementById('v').pause(); true`);
+    const paused = () => evalActive('document.getElementById("v").paused');
+    await H.until(() => evalActive('window.__selfPaused >= 1'), 6000, 'the page paused its video');
+    await H.until(async () => !(await paused()), 4000, 'resumed after the first load');
+    // A real click on "Next" (not on the player), then the page stops the new video.
+    const wc = await main(() => global.__ferna.windows[0].active.view.webContents.id);
+    const box = await evalActive(`(() => { const r = document.getElementById('next').getBoundingClientRect(); return { x: Math.round(r.left + 5), y: Math.round(r.top + 5) }; })()`);
+    const click = (x, y) => main((e, a) => { const w = e.webContents.fromId(a.wc); for (const type of ['mouseDown', 'mouseUp']) w.sendInputEvent({ type, x: a.x, y: a.y, button: 'left', clickCount: 1 }); }, { wc, x, y });
+    await click(box.x, box.y);
+    await H.until(() => evalActive('window.__selfPaused >= 2'), 6000, 'the page paused the next video');
+    await H.until(async () => !(await paused()), 4000, 'resumed after Next');
+    // "ad-showing" for a moment with no ad on screen: the real video is not skipped.
+    const t0 = await evalActive('document.getElementById("v").currentTime');
+    await evalActive(`document.getElementById('adflash').click(); true`);
+    await H.sleep(1500);
+    const after = await evalActive('({ t: document.getElementById("v").currentTime, rate: document.getElementById("v").playbackRate })');
+    assert(after.rate === 1 && after.t < t0 + 3, `not skipped ${JSON.stringify({ t0, after })}`);
+    // Your own pause on the play button is kept.
+    const pb = await evalActive(`(() => { const r = document.getElementById('pp').getBoundingClientRect(); return { x: Math.round(r.left + 5), y: Math.round(r.top + 5) }; })()`);
+    await click(pb.x, pb.y);
     await H.sleep(1200);
-    assert(await evalActive('document.getElementById("v").paused'), 'your pause is kept');
+    assert(await paused(), 'your pause is kept');
   });
 };
