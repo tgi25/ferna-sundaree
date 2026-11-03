@@ -193,7 +193,7 @@ module.exports = async function v064({ step, assert, main, win, page, H, base, s
     // Pin it and put it on the common bar, then close it: both still show the icon.
     await main((_, x) => { const c = global.__ferna; c.pinSite('', x, 'Fav'); c.addCommon(x, 'Fav'); }, url);
     // Close it and the other test page (a pin also shows other open pages of its folder).
-    await main((_, b) => { const w = global.__ferna.windows[0]; for (const t of [...w.tabs]) if ((t.url || '').startsWith(b)) w.closeTab(t); }, base);
+    await main((_, b) => { const w = global.__ferna.windows[0]; for (const t of [...w.tabs]) if (decodeURIComponent(t.url || '').includes(b)) w.closeTab(t); }, base);
     const idx = await main((_, x) => global.__ferna.findCommon(x), url);
     await H.until(() => iconOk(`#tabs [data-common="${idx}"] img.favicon`), 4000, 'common bar icon');
     await H.until(() => u.evaluate(() => [...document.querySelectorAll('#tabs [data-pinned] img.favicon')].some(i => i.complete && i.naturalWidth > 0)), 4000, 'pinned icon');
