@@ -25,9 +25,12 @@ test('local files: the workspace that pinned the folder (deepest one wins) claim
 test('scriptlets: asked per page address; none when blocking is off for the site', () => {
   const asked = [];
   const engine = { getCosmeticsFilters: q => { asked.push(q); return { scripts: ['/*s1*/', 42, '/*s2*/'], styles: 'x' }; } };
-  const settings = { blocker: true, blockerAllow: ['allowed.example'], cosmeticFiltering: true };
+  const settings = { blocker: true, blockerAllow: ['allowed.example'], cosmeticFiltering: true, listScriptlets: false };
   const ctx = { blocker: { engine, custom: null }, settings: { data: settings } };
   const fx = require('../../src/main/pagefx').create(ctx);
+  // Off by default: list scriptlets broke Facebook and YouTube.
+  assert.deepEqual(fx.scriptletsFor('https://www.facebook.com/'), []);
+  settings.listScriptlets = true;
   assert.deepEqual(fx.scriptletsFor('https://www.facebook.com/'), ['/*s1*/', '/*s2*/']);
   assert.equal(asked[0].hostname, 'www.facebook.com');
   assert.equal(asked[0].getInjectionRules, true);

@@ -106,7 +106,11 @@ module.exports = async function v064({ step, assert, main, win, page, H, base, s
   });
 
   await step('0.6.4 ad-blocking scriptlets run once, before the page\'s own code', async () => {
-    const reg = await main(() => global.__ferna.webSession.getPreloadScripts().map(p => p.id));
+    const ids = () => main(() => global.__ferna.webSession.getPreloadScripts().map(p => p.id));
+    const off = await main(() => global.__ferna.settings.data.listScriptlets);
+    assert(off === false && !(await ids()).includes('ferna-scriptlets'), 'list scriptlets are off by default, no preload');
+    await main(() => global.__ferna.setSetting('listScriptlets', true));
+    const reg = await ids();
     assert(reg.includes('ferna-scriptlets'), `preloads: ${reg}`);
     // Stand-in rule: a scriptlet that records when it ran and how many times.
     await main(() => {
@@ -122,7 +126,7 @@ module.exports = async function v064({ step, assert, main, win, page, H, base, s
       const other = await main(() => global.__ferna.pageFx._orig('http://127.0.0.1/'));
       assert(Array.isArray(other), 'real lookup answers');
     } finally {
-      await main(() => { const fx = global.__ferna.pageFx; fx.scriptletsFor = fx._orig; delete fx._orig; });
+      await main(() => { const fx = global.__ferna.pageFx; fx.scriptletsFor = fx._orig; delete fx._orig; global.__ferna.setSetting('listScriptlets', false); });
     }
   });
 

@@ -79,7 +79,7 @@ const DEFAULT_SETTINGS = {
   autoUpdate: true,
   blockThirdPartyCookies: true, enhancedSecurity: false, gpc: true, fingerprintProtection: true, stripTracking: true, webrtcProtection: true,
   lookalikeWarnings: true, passwordWarnings: true, defenderScan: true, extensionGuard: true,
-  selectionMenu: true, popupBlocker: true, popupAllow: [], cosmeticFiltering: true, youtubeAds: true, equalizer: {},
+  selectionMenu: true, popupBlocker: true, popupAllow: [], cosmeticFiltering: true, listScriptlets: false, youtubeAds: true, equalizer: {},
   historyDays: 90, lastWorkspace: null, hints: {},
   // 0.5
   bookmarkBackupDays: 1, bookmarkBackupKeep: 14, bookmarkLastBackup: 0,
@@ -194,7 +194,7 @@ ctx.quit = () => { saveSession(true); app.quit(); };
 
 ctx.setSetting = (key, value) => {
   ctx.settings.set(key, value);
-  if (key === 'gpc' || key === 'fingerprintProtection') for (const ses of ctx.webSessions || []) setPrivacyPreloads(ses);
+  if (['gpc', 'fingerprintProtection', 'listScriptlets', 'customFilters'].includes(key)) for (const ses of ctx.webSessions || []) setPrivacyPreloads(ses);
   if (key === 'webrtcProtection') for (const w of ctx.windows) for (const t of w.tabs) if (t.kind === 'web' && t.view && t.view.webContents && !t.view.webContents.isDestroyed()) privacy.protectContents(t.view.webContents, ctx.settings.data);
   if (key === 'blocker' || key === 'youtubeAds') for (const ses of ctx.webSessions || []) pagefx.setYouTubeShield(ses, !!ctx.settings.data.blocker && ctx.settings.data.youtubeAds !== false);
   if (key === 'selectionMenu' || key === 'searchEngine') for (const w of ctx.windows) for (const t of w.tabs) if (t.kind === 'web') ctx.pageFx.domReady(w, t);
@@ -658,7 +658,10 @@ const PERMISSION_LABEL = {
 
 /** Register or remove the privacy preloads (they run in every frame of web pages). */
 function setPrivacyPreloads(ses) {
-  const want = { 'ferna-gpc': ctx.settings.data.gpc !== false ? 'privacy-gpc.js' : null, 'ferna-fp': ctx.settings.data.fingerprintProtection !== false ? 'privacy-fp.js' : null, 'ferna-scriptlets': 'scriptlets.js' };
+  // The scriptlet preload only while something can use it: the lists' scriptlets (an opt-in
+  // setting) or +js rules of your own.
+  const scriptlets = ctx.settings.data.listScriptlets === true || /\+js\(/.test(String(ctx.settings.data.customFilters || ''));
+  const want = { 'ferna-gpc': ctx.settings.data.gpc !== false ? 'privacy-gpc.js' : null, 'ferna-fp': ctx.settings.data.fingerprintProtection !== false ? 'privacy-fp.js' : null, 'ferna-scriptlets': scriptlets ? 'scriptlets.js' : null };
   let have = [];
   try { have = ses.getPreloadScripts().map(p => p.id); } catch { /* older Electron */ }
   for (const [id, file] of Object.entries(want)) {
@@ -1121,7 +1124,7 @@ function registerCommands() {
     blockThirdPartyCookies: v => typeof v === 'boolean', enhancedSecurity: v => typeof v === 'boolean', gpc: v => typeof v === 'boolean',
     fingerprintProtection: v => typeof v === 'boolean', stripTracking: v => typeof v === 'boolean', webrtcProtection: v => typeof v === 'boolean',
     lookalikeWarnings: v => typeof v === 'boolean', passwordWarnings: v => typeof v === 'boolean', defenderScan: v => typeof v === 'boolean', extensionGuard: v => typeof v === 'boolean',
-    cosmeticFiltering: v => typeof v === 'boolean', youtubeAds: v => typeof v === 'boolean',
+    cosmeticFiltering: v => typeof v === 'boolean', listScriptlets: v => typeof v === 'boolean', youtubeAds: v => typeof v === 'boolean',
     zoomPrefs: v => v && typeof v === 'object' && ['site', 'tab'].includes(v.mode) && ['full', 'text'].includes(v.defaultType) &&
       [v.defaultFull, v.defaultText, v.defaultNonText, v.step, v.autofitMin, v.autofitMax, v.minFont].every(n => Number.isFinite(n)) &&
       Array.isArray(v.levels) && v.levels.length > 1 && v.levels.length <= 40 && v.levels.every(n => Number.isFinite(n) && n >= 25 && n <= 500) &&

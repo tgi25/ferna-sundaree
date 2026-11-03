@@ -78,7 +78,9 @@ function create(ctx) {
     if (!b || !/^https?:/i.test(url || '')) return [];
     const hostname = host(url);
     const allowed = S().blockerAllow.includes(hostname);
-    const lists = !!b.engine && !!S().blocker && !allowed && S().cosmeticFiltering !== false;
+    // The lists' scriptlets are opt-in (Settings → Ad blocking): written for uBlock Origin, a
+    // number of them (Facebook, YouTube) broke those sites here. Your own +js rules always apply.
+    const lists = !!b.engine && !!S().blocker && !allowed && S().cosmeticFiltering !== false && S().listScriptlets === true;
     const mine = !!b.custom && !allowed;
     if (!lists && !mine) return [];
     let domain = hostname;

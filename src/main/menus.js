@@ -275,6 +275,7 @@ function shieldMenu(win, tab) {
     { label: host ? `Block trackers and ads on ${host}` : 'Not a website', type: 'checkbox', checked: !!host && !allowed, enabled: !!host && ctx.settings.data.blocker, click: () => ctx.toggleBlockerAllow(host) },
     { label: 'Blocking on for all sites', type: 'checkbox', checked: !!ctx.settings.data.blocker, click: () => ctx.setSetting('blocker', !ctx.settings.data.blocker) },
     { label: 'Hide ad spaces and banners (cosmetic filtering)', type: 'checkbox', checked: ctx.settings.data.cosmeticFiltering !== false, enabled: !!ctx.settings.data.blocker, click: () => ctx.setSetting('cosmeticFiltering', ctx.settings.data.cosmeticFiltering === false) },
+    { label: 'Advanced ad-blocking scripts (can break some sites)', type: 'checkbox', checked: ctx.settings.data.listScriptlets === true, enabled: !!ctx.settings.data.blocker, click: () => ctx.setSetting('listScriptlets', ctx.settings.data.listScriptlets !== true) },
     { label: 'Block YouTube ads', type: 'checkbox', checked: ctx.settings.data.youtubeAds !== false, enabled: !!ctx.settings.data.blocker, click: () => ctx.setSetting('youtubeAds', ctx.settings.data.youtubeAds === false) },
     { label: 'Block pop-ups the page opens by itself', type: 'checkbox', checked: ctx.settings.data.popupBlocker !== false, click: () => ctx.setSetting('popupBlocker', ctx.settings.data.popupBlocker === false) },
     ...(tab && tab.blockedPopups && tab.blockedPopups.length ? [
