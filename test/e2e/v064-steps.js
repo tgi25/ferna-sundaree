@@ -153,4 +153,14 @@ module.exports = async function v064({ step, assert, main, win, page, H, base, s
     assert(r.labels.includes('Bookmark this PDF'), JSON.stringify(r.labels));
   });
 
+  await step('0.6.6 YouTube: a video the player stops by itself just after it starts keeps playing; your own pause stays', async () => {
+    const port = new URL(base).port;
+    await freshTab(`http://localhost:${port}/yt-watch.html`);
+    await H.until(() => evalActive('window.__selfPaused === 1'), 6000, 'the page paused its video');
+    await H.until(() => evalActive('!document.getElementById("v").paused'), 4000, 'resumed by Ferna');
+    // A pause you make (a key or click just before) is kept.
+    await evalActive(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' })); document.getElementById('v').pause(); true`);
+    await H.sleep(1200);
+    assert(await evalActive('document.getElementById("v").paused'), 'your pause is kept');
+  });
 };

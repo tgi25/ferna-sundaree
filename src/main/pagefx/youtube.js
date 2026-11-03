@@ -56,6 +56,37 @@ const WATCH = String.raw`(() => {
       window.__fernaYT.hidden++;
     }
   }
+  // A video that stops by itself just after it starts (YouTube's player does this to some
+  // ad-blocking browsers) is resumed, as other browsers keep playing. A pause you make — click,
+  // tap, key such as Space or K, or a media key — is always kept.
+  let lastInput = 0;
+  for (const t of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(t, () => { lastInput = Date.now(); }, true);
+  const starts = new WeakMap(); // video → { src, at, resumes }
+  document.addEventListener('playing', e => {
+    const v = e.target;
+    if (!(v instanceof HTMLVideoElement)) return;
+    const st = starts.get(v);
+    const src = v.currentSrc || v.src;
+    if (!st || st.src !== src) starts.set(v, { src, at: Date.now(), resumes: 0 });
+  }, true);
+  document.addEventListener('pause', e => {
+    const v = e.target;
+    if (!(v instanceof HTMLVideoElement)) return;
+    let st = starts.get(v);
+    // Started before this script was in (it is added once the page has loaded): judge by how
+    // far the video got.
+    if (!st && v.currentTime < 5) { st = { src: v.currentSrc || v.src, at: Date.now() - v.currentTime * 1000, resumes: 0 }; starts.set(v, st); }
+    const player = v.closest('.html5-video-player');
+    if (!st || !player || v.ended || player.classList.contains('ad-showing')) return;
+    const now = Date.now();
+    if (now - st.at > 8000 || now - lastInput < 1500 || st.resumes >= 3 || document.hidden) return;
+    setTimeout(() => {
+      if (!v.paused || v.ended || Date.now() - lastInput < 1500 || document.hidden) return;
+      st.resumes++; window.__fernaYT.resumed = (window.__fernaYT.resumed || 0) + 1;
+      const pl = v.play(); if (pl && pl.catch) pl.catch(() => {});
+    }, 250);
+  }, true);
+
   new MutationObserver(tick).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class'], childList: true });
   setInterval(tick, 500);
   tick();
