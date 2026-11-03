@@ -318,7 +318,7 @@ function togglePointerBookmarks() {
     q.placeholder = 'Search bookmarks or the web';
     const host = $('#pt-list');
     host.className = 'pop-list';
-    pt.bmv = BMView.create({ api, host, search: q, embedded: true, engine: data.engine, page: null });
+    pt.bmv = BMView.create({ api, host, search: q, embedded: true, engine: data.engine, page: null, ...(data.bmFolder ? { folder: data.bmFolder } : {}) });
     if (q.value) pt.bmv.setQuery(q.value);
   }
   q.focus();

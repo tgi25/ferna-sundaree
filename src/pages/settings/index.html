@@ -73,6 +73,7 @@
       <div class="row"><div class="grow">Continue where you left off<div class="hint">Reopen your windows and tabs on start-up. Tabs load when you open them.</div></div><label class="switch"><input type="checkbox" data-k="restoreSession"><span></span></label></div>
       <div class="row"><div class="grow">Theme</div><select class="field" data-k="theme"><option value="system" data-linux="Follow system">Follow Windows</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
       <div class="row"><div class="grow">Accent colour</div><input type="color" data-k="accent" class="field" style="width:56px;padding:2px"></div>
+      <div class="row"><div class="grow">Default bookmark folder<div class="hint">New bookmarks (<kbd>Ctrl+D</kbd> and ☆) are saved here, and the bookmarks popup and the bookmarks in the tabs list open in it, as in Ferna Tabs. You can also right-click a folder on the bookmarks bar.</div></div><select class="field" id="bmfolder"></select></div>
       <div class="row"><div class="grow">Default browser<div class="hint" data-linux="Sets Ferna Sundaree as the default web browser and PDF viewer for your account (xdg-settings).">Opens Windows Settings → Default apps, where you can choose Ferna Sundaree.</div></div><button class="btn" id="defbrowser">Make default…</button></div>
     </section>
 
@@ -190,8 +191,8 @@
       <h2>Privacy and security</h2>
       <div class="row"><div class="grow">HTTPS-first<div class="hint">Upgrades http:// to https:// and warns before loading an insecure page. Local addresses are left alone.</div></div><label class="switch"><input type="checkbox" data-k="httpsFirst"><span></span></label></div>
       <div class="row"><div class="grow">Sites allowed over HTTP<div class="chips" id="https-ex"></div></div></div>
-      <div class="row"><div class="grow">Secure DNS (DNS over HTTPS)<div class="hint">“Strict” never falls back to your network's DNS. Use “Automatic” if your network blocks it.</div></div>
-        <select class="field" data-k="dohMode"><option value="secure">Strict</option><option value="automatic">Automatic</option><option value="off">Off</option></select>
+      <div class="row"><div class="grow">Secure DNS (DNS over HTTPS)<div class="hint">“Automatic” encrypts your DNS look-ups and falls back to your network's DNS only when the provider does not answer, so sites load reliably. “Strict” never falls back; on some networks pages then fail on the first try.</div></div>
+        <select class="field" data-k="dohMode"><option value="automatic">Automatic (recommended)</option><option value="secure">Strict</option><option value="off">Off</option></select>
         <select class="field" data-k="dohProvider"><option value="cloudflare">Cloudflare + Quad9</option><option value="quad9">Quad9</option><option value="google">Google</option></select></div>
       <div class="row"><div class="grow">Warn about look-alike addresses<div class="hint">Before opening a site you have never visited whose name imitates a well-known site or one of your bookmarks (paypa1.com, rnicrosoft.com, combank.lk.verify.top).</div></div><label class="switch"><input type="checkbox" data-k="lookalikeWarnings"><span></span></label></div>
       <div class="row"><div class="grow">Warn before typing a password on a risky page<div class="hint">A note above the password field on pages that are not encrypted, or on a site you are visiting for the first time.</div></div><label class="switch"><input type="checkbox" data-k="passwordWarnings"><span></span></label></div>

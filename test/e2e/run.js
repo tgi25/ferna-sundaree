@@ -13,6 +13,8 @@ const results = [];
 let failed = 0;
 
 async function step(name, fn) {
+  // FERNA_E2E_ONLY=<regex> runs only matching steps (for debugging one area).
+  if (process.env.FERNA_E2E_ONLY && !new RegExp(process.env.FERNA_E2E_ONLY).test(name)) return;
   const t = Date.now();
   try {
     await fn();
@@ -584,6 +586,8 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
       await main((_, r) => { const wc = global.__ferna.windows[0].active.view.webContents; wc.sendInputEvent({ type: 'mouseUp', x: r.x - 2, y: r.y - 4, button: 'left', clickCount: 1 }); }, r);
       await H.sleep(200);
     }
+    // The search page may fail to load offline; a failed first try is retried once, so wait for it.
+    await H.until(async () => (await win()).tabs.some(t => /q=Select(\+|%20)this/.test(decodeURIComponent(t.url))), 6000, 'search tab address').catch(() => {});
     const s = await win();
     assert(s.tabs.length === before + 1 && s.tabs.some(t => /q=Select(\+|%20)this/.test(decodeURIComponent(t.url))), `search tab ${s.tabs.length - before} ${s.tabs.map(t => t.url).slice(-2)}`);
   });
@@ -857,6 +861,7 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
 
   await require('./v05-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile });
   await require('./v06-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile });
+  await require('./v063-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile });
 
   // An exam window cannot be closed: end any left over by a failed step.
   await main(() => { const ctx = global.__ferna; if (ctx.examWin) ctx.exam.finish(ctx.examWin, 'test'); }).catch(() => {});

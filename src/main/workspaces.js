@@ -10,6 +10,14 @@ function parse(url) {
   try { return new URL(url); } catch { return null; }
 }
 
+/** The page a tab really shows: a PDF opened in Ferna PDF Reader is its file's own address. */
+function pageUrlOf(url) {
+  const m = /^ferna:\/\/pdf\/viewer\/viewer\.html\?(?:[^#]*&)?file=([^&#]+)/.exec(url || '');
+  if (!m) return url || '';
+  try { const f = decodeURIComponent(m[1]); return /^(https?|file):/i.test(f) ? f : url; } catch { return url; }
+}
+const isPdfUrl = url => /\.pdf([?#]|$)/i.test(url || '');
+
 function hostOf(url) {
   const u = parse(url);
   return u && (u.protocol === 'http:' || u.protocol === 'https:') ? u.hostname.toLowerCase() : '';
@@ -19,6 +27,8 @@ function hostOf(url) {
 function folderOf(url) {
   const u = parse(url);
   if (!u || !/^https?:$/.test(u.protocol)) return url || '';
+  // A PDF stands for itself, not for the folder it is in.
+  if (isPdfUrl(url)) return `${u.protocol}//${u.host.toLowerCase()}${u.pathname}`;
   const p = u.pathname.endsWith('/') ? u.pathname : u.pathname.slice(0, u.pathname.lastIndexOf('/') + 1);
   return `${u.protocol}//${u.host.toLowerCase()}${p || '/'}`;
 }
@@ -51,7 +61,7 @@ function workspaceHosts(ws) {
 function workspaceOfTab(tab, workspaces) {
   if (tab.wsOverride === 'none') return null;
   if (tab.wsOverride && workspaces.some(w => w.id === tab.wsOverride)) return tab.wsOverride;
-  const host = hostOf(tab.url);
+  const host = hostOf(pageUrlOf(tab.url));
   if (!host) return null;
   for (const ws of workspaces) {
     if (workspaceHosts(ws).some(r => hostMatches(r, host))) return ws.id;
@@ -100,26 +110,32 @@ function buildStrip(tabs, workspaces, common, currentWs, { allPinned = false, al
   const claimed = new Set();
   const badges = commonBadges(common);
 
-  const commonOut = common.map((c, i) => ({ index: i, entry: c, badge: badges[i], tabId: null }));
-  for (const t of tabs) {
-    const i = bestFolderMatch(common, t.url);
-    if (i >= 0 && commonOut[i].tabId === null) { commonOut[i].tabId = t.id; claimed.add(t.id); }
-  }
-
   const ws = workspaces.find(w => w.id === currentWs) || null;
   const pinnedOut = [];
   // The current workspace's pinned sites. With "All" selected: the sites pinned in All tabs
   // (wsId ''), then, with allPinned set (favourites-only view), every workspace's pinned sites.
   const sources = ws ? [ws] : [{ id: '', pinned: allTabsPinned || [] }, ...(allPinned ? workspaces : [])];
-  for (const w of sources) {
-    (w.pinned || []).forEach((p, i) => {
-      const row = { index: i, pin: p, tabId: null, wsId: w.id };
-      for (const t of tabs) {
-        if (claimed.has(t.id)) continue;
-        if (inFolder(p.folder || folderOf(p.url), t.url)) { row.tabId = t.id; claimed.add(t.id); break; }
-      }
-      pinnedOut.push(row);
-    });
+  for (const w of sources) (w.pinned || []).forEach((p, i) => pinnedOut.push({ index: i, pin: p, tabId: null, wsId: w.id }));
+  const pinFolders = pinnedOut.map(r => r.pin.folder || folderOf(r.pin.url));
+
+  const commonOut = common.map((c, i) => ({ index: i, entry: c, badge: badges[i], tabId: null }));
+  for (const t of tabs) {
+    const u = pageUrlOf(t.url);
+    const i = bestFolderMatch(common, u);
+    if (i < 0 || commonOut[i].tabId !== null) continue;
+    // A more specific pin (a pinned PDF inside a folder on the common bar) takes the tab instead.
+    const cl = (common[i].folder || folderOf(common[i].url)).length;
+    if (pinFolders.some(f => f.length > cl && inFolder(f, u))) continue;
+    commonOut[i].tabId = t.id; claimed.add(t.id);
+  }
+  // The most specific pin claims a tab first (a pinned PDF before a pin on its folder).
+  const byDepth = [...pinnedOut].sort((a, b) => (b.pin.folder || folderOf(b.pin.url)).length - (a.pin.folder || folderOf(a.pin.url)).length);
+  for (const row of byDepth) {
+    const folder = row.pin.folder || folderOf(row.pin.url);
+    for (const t of tabs) {
+      if (claimed.has(t.id)) continue;
+      if (inFolder(folder, pageUrlOf(t.url))) { row.tabId = t.id; claimed.add(t.id); break; }
+    }
   }
 
   const listed = [];
@@ -197,5 +213,5 @@ function importFernaTabs(obj) {
 
 module.exports = {
   hostOf, folderOf, hostMatches, inFolder, workspaceHosts, workspaceOfTab,
-  commonBadges, bestFolderMatch, buildStrip, newWorkspace, importFernaTabs, cleanIcon, cleanImage,
+  commonBadges, bestFolderMatch, buildStrip, newWorkspace, importFernaTabs, cleanIcon, cleanImage, pageUrlOf, isPdfUrl,
 };

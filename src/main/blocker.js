@@ -83,7 +83,15 @@ class Blocker {
   match(details) {
     if (!this.engine && !this.custom) return { block: false };
     try {
-      const req = this.lib.fromElectronDetails(details);
+      // The library judges first/third party from the referrer; requests sent without one
+      // (no-referrer policies, some fetches and workers) use the frame that made them.
+      let d = details;
+      if (!details.referrer && details.resourceType !== 'mainFrame') {
+        let src = '';
+        try { src = (details.frame && details.frame.url) || ''; } catch { /* frame gone */ }
+        if (src && /^https?:/.test(src)) d = { ...details, referrer: src };
+      }
+      const req = this.lib.fromElectronDetails(d);
       if (this.custom) {
         const c = this.custom.match(req);
         if (c.exception) return { block: false };

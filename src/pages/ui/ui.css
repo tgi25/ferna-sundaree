@@ -32,6 +32,9 @@ body.exam #exam-bar { display: flex; }
 .tb .count.on { display: block; }
 .tb.off-shield { color: var(--ink-3); }
 #omnibox { flex: 1; min-width: 120px; display: flex; align-items: center; gap: 6px; height: 34px; margin: 0 6px; padding: 0 4px 0 10px; border-radius: 17px; background: var(--omni-bg); color: var(--omni-ink); border: 1px solid transparent; }
+#omnibox .omni-act { color: var(--omni-ink); opacity: .7; }
+#omnibox .omni-act:hover { opacity: 1; }
+#omnibox .omni-act .icon { width: 14px; height: 14px; }
 #omnibox:focus-within { background: var(--bg-raised); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 #address { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 14px; height: 100%; user-select: text; color: var(--omni-ink); }
 .omni-icon { color: var(--ink-3); display: grid; place-items: center; }
@@ -63,21 +66,24 @@ body.private #toolbar::before { content: "Private"; order: 99; font-size: 11px; 
 .tab:hover { background: var(--bg-hover); color: var(--ink); }
 .tab.active { background: var(--tab-active-bg); color: var(--tab-active-ink); box-shadow: var(--shadow); }
 .tab .title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.tab .x { opacity: 0; width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; flex: none; color: var(--ink-2); }
+.tab .x { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; flex: none; color: var(--ink-2); }
+/* Tab buttons sit on the left: add to common bar, pin, close. The space is always kept, so
+   titles do not move; the buttons show on hover and on the active tab. */
+.tab .lacts { display: flex; align-items: center; gap: 1px; flex: none; margin-left: -4px; opacity: 0; transition: opacity .1s; }
+.tab .lacts:empty { display: none; }
+.tab:hover .lacts, .tab.active .lacts, .tab:focus-within .lacts { opacity: 1; }
 .tab .x .icon { width: 13px; height: 13px; }
-.tab:hover .x, .tab.active .x { opacity: 1; }
+
 .tab .x:hover { background: var(--bg-active); color: var(--ink); }
 /* Hover buttons: add to common bar, pin / unpin. Hidden until the pointer is on the tab, and on
    tabs too narrow to hold them (container query on the tab). */
 .tab { container-type: inline-size; }
-.tab .acts { display: none; gap: 1px; flex: none; }
-.tab:hover .acts { display: flex; }
+.tab .acts { display: flex; gap: 1px; flex: none; }
 .tab .act { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; color: var(--ink-3); cursor: pointer; }
 .tab .act .icon { width: 13px; height: 13px; }
 .tab .act:hover { background: var(--bg-active); color: var(--accent); }
 .tab .act.on { color: var(--accent); }
-@container (max-width: 160px) { .tab:hover:has(.acts) .title { display: none; } }
-@container (max-width: 104px) { .tab:hover .acts { display: none; } .tab:hover .title { display: block; } }
+@container (max-width: 150px) { .tab .acts { display: none; } }
 .pin-hint { padding: 2px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 4px; }
 .pin-hint .icon { width: 12px; height: 12px; }
 .tab .snd { color: var(--accent); }
@@ -218,3 +224,4 @@ body.blur .winctl button { opacity: .55; }
 body.app #omnibox, body.app #btn-bookmarks, body.app #btn-overview, body.app #btn-split, body.app #btn-assistant, body.app #ext-actions, body.app #btn-puzzle, body.app #btn-shot, body.app #btn-forward { display: none !important; }
 #app-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; padding: 0 8px; -webkit-app-region: drag; }
 #omni-container { font-size: 11px; font-weight: 600; color: #fff; background: var(--c); border-radius: 999px; padding: 1px 8px; margin-right: 4px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; flex: none; }
+#tabs.v.collapsed .tab .lacts { display: none; }

@@ -207,6 +207,23 @@ el.address.addEventListener('keydown', e => {
 });
 api.on('focus-address', () => { el.address.focus(); el.address.select(); });
 
+// Copy and clear buttons inside the address bar.
+$('#btn-copyurl').innerHTML = icon('copy');
+$('#btn-clearurl').innerHTML = icon('close');
+for (const b of ['#btn-copyurl', '#btn-clearurl']) $(b).addEventListener('mousedown', e => e.preventDefault()); // keep the caret where it is
+$('#btn-copyurl').onclick = () => api.cmd('nav:copy');
+$('#btn-clearurl').onclick = () => {
+  el.address.value = '';
+  editing = true;
+  el.address.focus();
+  syncOmniActs();
+};
+function syncOmniActs() {
+  $('#btn-copyurl').hidden = !(S && S.nav && S.nav.url);
+  $('#btn-clearurl').hidden = !el.address.value;
+}
+el.address.addEventListener('input', syncOmniActs);
+
 // ---------- find bar ----------
 const findInput = $('#find-input');
 let findText = '';
@@ -312,6 +329,7 @@ function renderToolbar() {
   reload.innerHTML = icon(n.loading ? 'stop' : 'reload');
   reload.title = n.loading ? 'Stop (Esc)' : 'Reload (F5)';
   if (!editing) el.address.value = n.url;
+  syncOmniActs();
   const oi = $('#omni-icon');
   oi.className = 'omni-icon';
   if (!n.url) oi.innerHTML = icon('search');
@@ -320,7 +338,7 @@ function renderToolbar() {
   else if (/^http:/.test(n.url)) { oi.innerHTML = icon('warn'); oi.classList.add('insecure'); oi.title = 'Not secure: this site does not use HTTPS'; }
   else oi.innerHTML = icon('info');
   const star = $('#btn-star');
-  star.hidden = !n.url || n.internal;
+  star.hidden = !n.url || (n.internal && !n.pdf);
   star.classList.toggle('on', n.bookmarked);
   star.title = n.bookmarked ? 'Remove bookmark (Ctrl+D)' : 'Bookmark this page (Ctrl+D)';
   const zb = $('#btn-zoom');
@@ -399,11 +417,11 @@ function tabHtml(t, extra = '', { closable = true, label = '', acts = '' } = {})
   const title = t.title || (t.url ? t.url.replace(/^https?:\/\//, '') : 'New tab');
   const tip = `${title}${t.url && !/^ferna:/.test(t.url) ? `\n${t.url}` : ''}${t.sleeping ? '\n(sleeping: loads when opened)' : ''}`;
   return `<div class="tab${active}${t.sleeping ? ' sleeping' : ''} ${extra}" role="tab" aria-selected="${!!active}" tabindex="-1" draggable="true" data-id="${t.id}" title="${esc(tip)}">
-    ${lead}<span class="title">${esc(label || title)}</span>${snd}${acts}${closable ? `<span class="x" data-close="${t.id}" title="Close tab (Ctrl+W)">${icon('close')}</span>` : ''}</div>`;
+    <span class="lacts">${acts}${closable ? `<span class="x" data-close="${t.id}" title="Close tab (Ctrl+W)">${icon('close')}</span>` : ''}</span>${lead}<span class="title">${esc(label || title)}</span>${snd}</div>`;
 }
 
 const keyOf = cmd => (S.shortcutKeys && S.shortcutKeys[cmd]) ? ` (${S.shortcutKeys[cmd]})` : '';
-const canKeep = t => /^(https?|file):/i.test(t.url || '');
+const canKeep = t => /^(https?|file):/i.test(t.url || '') || /^ferna:\/\/pdf\/viewer\/viewer\.html\?(?:[^#]*&)?file=(https?|file)/i.test(t.url || '');
 /** Hover buttons on an ordinary tab: add to the common bar, pin where you are. */
 function listActs(t) {
   if (!canKeep(t)) return '';
@@ -444,7 +462,21 @@ function commonHtml() {
   }).join('');
 }
 
+// A click is lost if the strip is redrawn between mouse-down and mouse-up (a loading page
+// redraws it many times a second), which made some buttons need a second click. While a
+// button is held, redraws wait until it is released.
+let stripPress = 0, stripPending = false;
+function stripRelease() {
+  if (!stripPress) return;
+  stripPress = 0;
+  if (stripPending) { stripPending = false; setTimeout(renderTabs, 0); }
+}
+el.tabs.addEventListener('pointerdown', e => { if (e.button === 0 || e.button === 1) stripPress = Date.now(); }, true);
+for (const ev of ['pointerup', 'pointercancel', 'dragend', 'drop', 'blur']) window.addEventListener(ev, stripRelease, true);
+
 function renderTabs() {
+  if (stripPress && Date.now() - stripPress < 2000) { stripPending = true; return; }
+  stripPress = 0;
   const L = S.layout;
   const node = el.tabs;
   if (!L.tabs) { node.innerHTML = ''; return; }
@@ -466,10 +498,9 @@ function renderTabs() {
   }).join('');
   function pinnedRow(p) {
     const t = p.tabId ? tabById(p.tabId) : null;
-    const isPdf = /\.pdf([?#]|$)/i.test(p.pin.url);
-    if (t) return tabHtml(t, 'pinned', { closable: !isPdf, label: p.pin.title || t.title, acts: pinnedActs(p) });
+    if (t) return tabHtml(t, 'pinned', { label: p.pin.title || t.title, acts: pinnedActs(p) });
     return `<div class="tab pinned closed" role="button" tabindex="-1" data-pinned="${p.index}" data-pinned-ws="${esc(p.wsId)}" title="${esc(p.pin.title || p.pin.url)}\nNot open: click to open">
-      ${faviconHtml(p.pin.url, '')}<span class="title">${esc(p.pin.title || p.pin.url)}</span><span class="state">Not open</span>${pinnedActs(p)}</div>`;
+      <span class="lacts">${pinnedActs(p)}</span>${faviconHtml(p.pin.url, '')}<span class="title">${esc(p.pin.title || p.pin.url)}</span><span class="state">Not open</span></div>`;
   }
   const listed = S.strip.tabs.map(id => tabById(id)).filter(Boolean);
   const noWs = S.strip.noWorkspace;

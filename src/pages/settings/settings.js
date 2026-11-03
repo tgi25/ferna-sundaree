@@ -15,6 +15,7 @@ async function loadSettings() {
     else el.value = String(v);
   });
   $('#vw').textContent = `${S.verticalWidth}px`;
+  fillBmFolders();
   chips('#https-ex', S.httpsExceptions, h => set('httpsExceptions', S.httpsExceptions.filter(x => x !== h)));
   chips('#blocker-allow', S.blockerAllow, h => set('blockerAllow', S.blockerAllow.filter(x => x !== h)));
   const perms = await api.cmd('perm:list');
@@ -56,6 +57,24 @@ $$('[data-k]').forEach(el => {
   });
 });
 $('#defbrowser').onclick = () => api.cmd('default-browser');
+
+// ---------- default bookmark folder ----------
+async function fillBmFolders() {
+  const sel = $('#bmfolder');
+  if (!sel) return;
+  let t;
+  try { t = await api.cmd('bm:tree'); } catch { return; }
+  const kids = p => t.items.filter(n => n.type === 'folder' && (n.folder || 'other') === p);
+  const opts = ['<option value="">Bookmarks bar (popup opens at the top)</option>'];
+  const walk = (p, depth) => kids(p).forEach(n => { opts.push(`<option value="${esc(n.id)}">${'\u00a0\u00a0\u00a0'.repeat(depth)}${esc(n.title || 'Folder')}</option>`); walk(n.id, depth + 1); });
+  for (const r of ['bar', 'other']) {
+    if (r !== 'bar') opts.push(`<option value="${r}">${esc(t.roots[r])}</option>`);
+    walk(r, r === 'bar' ? 1 : 1);
+  }
+  sel.innerHTML = opts.join('');
+  sel.value = t.defaultFolder || '';
+}
+$('#bmfolder').addEventListener('change', e => set('bookmarkFolder', e.target.value));
 
 // ---------- appearance ----------
 async function loadTheme() {

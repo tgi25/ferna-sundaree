@@ -70,9 +70,9 @@ const VERSION = require(path.join(ROOT, '..', 'package.json')).version;
 const DEFAULT_SETTINGS = {
   tabPosition: 'top', tabBarHidden: false, bookmarksBarHidden: false, verticalWidth: 240, verticalCollapsed: false,
   searchEngine: 'google', restoreSession: true, theme: 'system', accent: '#2563eb',
-  httpsFirst: true, httpsExceptions: [], dohMode: 'secure', dohProvider: 'cloudflare',
+  httpsFirst: true, httpsExceptions: [], dohMode: 'automatic', dohProvider: 'cloudflare',
   blocker: true, blockerAllow: [], permissions: {}, shortcuts: {},
-  pdfDefault: true,
+  pdfDefault: true, bookmarkFolder: '',
   zoomPrefs: {}, zoomSites: {}, hideToolbarWithTabs: false,
   wsShowNames: false, stripFavoritesOnly: false,
   safeBrowsing: true, customFilters: '', filterLists: [],
@@ -114,6 +114,12 @@ const ctx = {
 function initStores() {
   const P = f => path.join(DATA_DIR, f);
   ctx.settings = new JsonStore(P('settings.json'), DEFAULT_SETTINGS);
+  // 0.6.3: strict secure DNS (no fallback) made the first visit to busy sites fail while the
+  // encrypted lookups warmed up (Facebook: "Something went wrong" until reloaded). Automatic
+  // still encrypts DNS whenever the provider answers, as Chrome does.
+  if (!ctx.settings.data.dns063) {
+    ctx.settings.update(d => { if (d.dohMode === 'secure') d.dohMode = 'automatic'; d.dns063 = true; });
+  }
   ctx.ws = new JsonStore(P('workspaces.json'), { workspaces: [], common: [], allPinned: [] });
   if (!Array.isArray(ctx.ws.data.allPinned)) ctx.ws.data.allPinned = [];
   ctx.bookmarks = new JsonStore(P('bookmarks.enc'), { items: [] }, { encrypt: true });
@@ -276,11 +282,16 @@ const bmId = BM.bmId;
 const bmItems = () => ctx.bookmarks.data.items;
 const bmSaved = () => { ctx.bookmarks.save(); ctx.broadcast(); ctx.broadcastBookmarks(); if (ctx.sync) ctx.sync.soon(); };
 ctx.findBookmark = url => url && bmItems().find(b => b.url === url);
+/** Folder chosen in Settings for new bookmarks and the bookmarks popup ('' = none chosen). */
+ctx.defaultBookmarkFolder = () => {
+  const f = ctx.settings.data.bookmarkFolder || '';
+  return f && (f in BM.ROOTS || bmItems().some(x => x.id === f && x.type === 'folder')) ? f : '';
+};
 ctx.toggleBookmark = (url, title) => {
   const items = bmItems();
   const i = items.findIndex(b => b.url === url);
   if (i >= 0) items.splice(i, 1);
-  else BM.addBookmark(items, { parent: 'bar', url, title });
+  else BM.addBookmark(items, { parent: ctx.defaultBookmarkFolder() || 'bar', url, title });
   bmSaved();
 };
 ctx.updateBookmark = (id, patch) => { const ok = BM.update(bmItems(), id, patch || {}); if (ok) bmSaved(); return ok; };
@@ -739,8 +750,11 @@ function hardenSession(ses, { private: isPrivate = false } = {}) {
       }
     }
     if (s.blocker && /^https?:/.test(url) && ctx.blocker && ctx.blocker.engine) {
+      // The page the request belongs to: its top frame, which is right even during the first
+      // load (webContents.getURL() still shows the previous page then).
       let top = '';
-      try { top = details.webContents ? details.webContents.getURL() : ''; } catch { /* gone */ }
+      try { top = (details.frame && details.frame.top && details.frame.top.url) || ''; } catch { /* frame gone */ }
+      if (!top) { try { top = details.webContents ? details.webContents.getURL() : ''; } catch { /* gone */ } }
       const host = ws.hostOf(resourceType === 'mainFrame' ? url : top);
       if (!host || !s.blockerAllow.includes(host)) {
         const r = ctx.blocker.match(details);
@@ -899,6 +913,15 @@ function registerCommands() {
   });
   C('menu:shot', [], ['ui'], c => { const w = senderWindow(c); require('./menus').shotMenu(w).popup({ window: w.win }); });
 
+  C('nav:copy', [], ['ui'], c => {
+    const w = senderWindow(c);
+    const t = w && w.active;
+    const url = t ? require('./workspaces').pageUrlOf(t.pendingUrl || t.url) : '';
+    if (!url || url === 'ferna://newtab/') return false;
+    clipboard.writeText(url);
+    w.sendUi('toast', { text: 'Address copied.' });
+    return true;
+  });
   C('nav:go', ['string'], ['ui', 'newtab'], (c, text) => {
     const w = senderWindow(c);
     const url = policy.normalizeInput(text, ctx.settings.data.searchEngine);
@@ -1068,6 +1091,7 @@ function registerCommands() {
     blocker: v => typeof v === 'boolean', blockerAllow: v => Array.isArray(v) && v.every(x => typeof x === 'string'),
     historyDays: v => Number.isInteger(v) && v >= 1 && v <= 3650,
     pdfDefault: v => typeof v === 'boolean',
+    bookmarkFolder: v => typeof v === 'string' && v.length <= 80,
     hideToolbarWithTabs: v => typeof v === 'boolean',
     wsShowNames: v => typeof v === 'boolean',
     stripFavoritesOnly: v => typeof v === 'boolean',
@@ -1269,7 +1293,7 @@ function registerCommands() {
     return ctx.bookmarks.data.items;
   });
   // Bookmarks popup (Ease Bookmarks style) and manager: the whole tree and single operations.
-  C('bm:tree', [], ['overlay', 'bookmarks'], () => ({ items: bmItems(), roots: BM.ROOTS }));
+  C('bm:tree', [], ['overlay', 'bookmarks', 'settings'], () => ({ items: bmItems(), roots: BM.ROOTS, defaultFolder: ctx.defaultBookmarkFolder() }));
   C('bm:op', ['string', 'object'], ['overlay', 'bookmarks'], (c, op, a) => ctx.bookmarkOp(op, a));
   C('bm:go', ['string', 'string'], ['overlay', 'bookmarks'], (c, url, how) => {
     if (!BM.okUrl(url)) return false;

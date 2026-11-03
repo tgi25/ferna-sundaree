@@ -244,6 +244,7 @@ function bookmarkMenu(win, id) {
     return Menu.buildFromTemplate([
       { label: `Open all (${urls.length}) in new tabs`, enabled: urls.length > 0, click: () => urls.slice(0, 50).forEach(u => win.newTab(u, { activate: false })) },
       { label: 'Show in bookmarks popup', click: () => win.openBookmarksPanel(null, b.id) },
+      { label: 'Default folder for new bookmarks', type: 'checkbox', checked: ctx.settings.data.bookmarkFolder === b.id, click: () => ctx.setSetting('bookmarkFolder', ctx.settings.data.bookmarkFolder === b.id ? '' : b.id) },
       { type: 'separator' },
       { label: 'Delete folder', click: () => ctx.deleteBookmark(id) },
     ]);

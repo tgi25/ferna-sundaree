@@ -6,7 +6,7 @@
 const path = require('path');
 const { BaseWindow, WebContentsView, screen, dialog, nativeImage } = require('electron');
 const { computeLayout } = require('./layout');
-const { buildStrip, workspaceOfTab, hostOf, folderOf } = require('./workspaces');
+const { buildStrip, workspaceOfTab, hostOf, folderOf, pageUrlOf } = require('./workspaces');
 const { registerInternal } = require('./ipc');
 const menus = require('./menus');
 const capture = require('./capture');
@@ -23,6 +23,10 @@ const CERT_ERRORS = c => c <= -200 && c >= -299;
 
 /** The view's WebContents while it is alive; null once the page has closed or crashed away. */
 const liveWc = v => { const wc = v && v.webContents; return wc && !wc.isDestroyed() ? wc : null; };
+
+// Network errors worth one automatic retry: connection reset/closed/timed out, DNS not
+// resolved yet, empty response.
+const TRANSIENT_NET_ERRORS = new Set([-100, -101, -105, -118, -137, -324]);
 
 class FernaWindow {
   constructor(ctx, opts = {}) {
@@ -206,6 +210,13 @@ class FernaWindow {
     wc.on('did-navigate-in-page', (e, url, isMain) => { if (isMain) { tab.url = url; changed(); } });
     wc.on('did-fail-load', (e, code, desc, url, isMain) => {
       if (!isMain || code === -3 || kind !== 'web') return;
+      // A passing network hiccup on the first try (DNS still warming up, a reset or changed
+      // connection): try once more by itself before showing any error.
+      if (TRANSIENT_NET_ERRORS.has(code) && /^https?:/i.test(url) && !(tab._retried && tab._retried.url === url && Date.now() - tab._retried.at < 30000)) {
+        tab._retried = { url, at: Date.now() };
+        setTimeout(() => { if (liveWc(tab.view) === wc) wc.loadURL(url); }, 700);
+        return;
+      }
       const httpUrl = ctx.upgradedFrom(wc.id, url);
       if (httpUrl && code <= -100 && code !== -105) {
         this.navigate(tab, `ferna://interstitial/?kind=https&url=${encodeURIComponent(httpUrl)}&code=${code}`);
@@ -577,22 +588,24 @@ class FernaWindow {
   /** Add the tab's page to the common bar, or take it off if it is there. */
   toggleCommon(tab) {
     const ctx = this.ctx;
-    if (!tab || !/^(https?|file):/i.test(tab.url || '')) { this.sendUi('toast', { text: 'Only web pages and files can go on the common bar.' }); return; }
-    const i = ctx.findCommon(tab.url);
+    const url = tab ? pageUrlOf(tab.url) : '';
+    if (!tab || !/^(https?|file):/i.test(url)) { this.sendUi('toast', { text: 'Only web pages and files can go on the common bar.' }); return; }
+    const i = ctx.findCommon(url);
     if (i >= 0) { ctx.removeCommon(i); this.sendUi('toast', { text: 'Removed from the common bar.' }); return; }
     if (ctx.ws.data.common.length >= 20) { this.sendUi('toast', { text: 'The common bar is full (20). Remove one first.' }); return; }
-    ctx.addCommon(tab.url, tab.title);
+    ctx.addCommon(url, tab.title);
     this.sendUi('toast', { text: 'Added to the common bar.' });
   }
 
   /** Pin the tab's page where you are (the current workspace, or All tabs), or unpin it. */
   togglePin(tab, wsId = this.currentWs || '') {
     const ctx = this.ctx;
-    if (!tab || !/^(https?|file):/i.test(tab.url || '')) { this.sendUi('toast', { text: 'Only web pages and files can be pinned.' }); return; }
+    const url = tab ? pageUrlOf(tab.url) : '';
+    if (!tab || !/^(https?|file):/i.test(url)) { this.sendUi('toast', { text: 'Only web pages and files can be pinned.' }); return; }
     const where = wsId ? `“${(ctx.ws.data.workspaces.find(w => w.id === wsId) || {}).name || 'workspace'}”` : 'All tabs';
-    const i = ctx.findPin(wsId, tab.url);
+    const i = ctx.findPin(wsId, url);
     if (i >= 0) { ctx.unpinSite(wsId, i); this.sendUi('toast', { text: `Unpinned from ${where}.` }); return; }
-    if (ctx.pinSite(wsId, tab.url, tab.title)) this.sendUi('toast', { text: `Pinned in ${where}.` });
+    if (ctx.pinSite(wsId, url, tab.title)) this.sendUi('toast', { text: `Pinned in ${where}.` });
   }
 
   openCommon(index) {
@@ -653,7 +666,7 @@ class FernaWindow {
   pointerData() {
     const cb = this.win.getContentBounds();
     const p = screen.getCursorScreenPoint();
-    return { x: p.x - cb.x, y: p.y - cb.y, engine: (require('./policy').SEARCH_ENGINES[this.ctx.settings.data.searchEngine] || {}).name || '', ...this.state() };
+    return { x: p.x - cb.x, y: p.y - cb.y, engine: (require('./policy').SEARCH_ENGINES[this.ctx.settings.data.searchEngine] || {}).name || '', bmFolder: this.ctx.defaultBookmarkFolder() || null, ...this.state() };
   }
 
   /** Where a toolbar popup goes when it was opened by a shortcut (no button rectangle). */
@@ -674,7 +687,7 @@ class FernaWindow {
     if (this.overlayMode === 'bookmarks' && !folder) { this.closeOverlay(); return; }
     const t = this.active;
     const page = t && /^(https?|file):/i.test(t.url || '') ? { url: t.url, title: t.title || t.url } : null;
-    this.openOverlay('bookmarks', { anchor: anchor || this.defaultAnchor('bm', 200), folder: folder || null, page, engine: (require('./policy').SEARCH_ENGINES[this.ctx.settings.data.searchEngine] || {}).name || '' });
+    this.openOverlay('bookmarks', { anchor: anchor || this.defaultAnchor('bm', 200), folder: folder || this.ctx.defaultBookmarkFolder() || null, page, engine: (require('./policy').SEARCH_ENGINES[this.ctx.settings.data.searchEngine] || {}).name || '' });
   }
 
   openZoomPanel(anchor) {
@@ -777,16 +790,16 @@ class FernaWindow {
       common: ctx.ws.data.common,
       currentWs: this.currentWs,
       nav: {
-        url: url === NEWTAB ? '' : url,
+        url: url === NEWTAB ? '' : pageUrlOf(url),
         canBack: !!(wc && wc.navigationHistory.canGoBack()),
         canForward: !!(wc && wc.navigationHistory.canGoForward()),
         loading: !!(t && t.loading),
-        secure: /^https:/.test(url),
-        internal: isInternal(url),
+        secure: /^https:/.test(pageUrlOf(url)),
+        internal: isInternal(url), pdf: pageUrlOf(url) !== url,
         zoom: ctx.zoomDisplay(this, t),
         hasVideo: !!(t && t.hasVideo), hasMedia: !!(t && (t.hasMedia || t.hasVideo)), pipOn: !!(t && t.pipOn),
         eq: ctx.pageFx.eqDisplay(t),
-        bookmarked: !!ctx.findBookmark(url),
+        bookmarked: !!ctx.findBookmark(pageUrlOf(url)),
         split: !!(t && this.inSplit(t.id)), reader: !!(t && t.readerOn), speaking: !!(t && t.speaking),
         passwords: t ? (t.pwCount || 0) : 0, container: t ? ctx.containerOf(this, t) : null,
         blocked: t ? t.blocked : 0,
@@ -824,6 +837,8 @@ class FernaWindow {
   // ---------- keyboard & commands ----------
 
   onKey(e, input, wc) {
+    // Letting go of Ctrl ends a Ctrl+Tab walk through recently used tabs.
+    if (input.type === 'keyUp' && (input.key === 'Control' || input.key === 'Meta')) this.mru = null;
     const cmd = this.ctx.shortcuts.commandFor(input);
     if (this.exam && this.ctx.examKey && wc !== this.overlay.webContents && this.ctx.examKey(this, e, input, cmd)) return;
     if (!cmd) return;
@@ -914,6 +929,22 @@ class FernaWindow {
         if (c) this.newTab(c.url, { index: c.index, wsOverride: c.wsOverride });
         break;
       }
+      case 'recentTab': case 'recentTabBack': {
+        // Most recently used order, as in Firefox: Ctrl+Tab goes to the tab you were on before;
+        // pressing Tab again while still holding Ctrl goes one further back.
+        const visible = new Set(this.visibleOrder());
+        if (!this.mru || Date.now() - this.mru.at > 4000) {
+          const order = this.tabs.filter(x => visible.has(x.id)).sort((a, b) => (b.id === this.activeId) - (a.id === this.activeId) || (b.lastActive || 0) - (a.lastActive || 0)).map(x => x.id);
+          this.mru = { order, i: 0, at: Date.now() };
+        }
+        const m = this.mru;
+        if (m.order.length < 2) break;
+        m.i = (m.i + (cmd === 'recentTab' ? 1 : -1) + m.order.length) % m.order.length;
+        m.at = Date.now();
+        const next = this.tabs.find(x => x.id === m.order[m.i]);
+        if (next) this.activate(next);
+        break;
+      }
       case 'nextTab': case 'prevTab': {
         const ids = this.visibleOrder();
         if (!ids.length) break;
@@ -939,7 +970,7 @@ class FernaWindow {
       case 'history': this.openInternal('ferna://history/'); break;
       case 'downloads': this.openInternal('ferna://downloads/'); break;
       case 'bookmarkManager': this.openInternal('ferna://bookmarks/'); break;
-      case 'bookmark': if (t && !isInternal(t.url)) ctx.toggleBookmark(t.url, t.title); break;
+      case 'bookmark': { const pu = t ? pageUrlOf(t.url) : ''; if (t && /^(https?|file):/i.test(pu)) ctx.toggleBookmark(pu, t.title); break; }
       case 'zoomIn': case 'zoomOut': case 'zoomReset': case 'zoomType': case 'zoomAutoFit': case 'fontReset':
         if (t && t.view && t.kind === 'web') ctx.zoomAct(this, t, { zoomIn: 'in', zoomOut: 'out', zoomReset: 'reset', zoomType: 'type', zoomAutoFit: 'autofit', fontReset: 'fontReset' }[cmd]);
         break;

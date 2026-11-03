@@ -1,7 +1,7 @@
 # Ferna Sundaree
 
 A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **Ferna PDF Reader** and
-**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.6.2.
+**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.6.3.
 
 ## What it does
 
@@ -10,7 +10,8 @@ A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **F
 | Hide/unhide the tab bar | `Ctrl+Shift+H`; while hidden, rest the pointer on the window edge to see it |
 | Hide/unhide the bookmarks bar | `Ctrl+Shift+B` |
 | Tab bar horizontal or vertical | Top, left or right (`Ctrl+Shift+,` cycles); vertical bar resizes and collapses to icons (`Ctrl+Shift+\`) |
-| Tabs arranged as in Ferna Tabs | Workspaces, common bar (folder-aware, account badges) and pinned sites drive the tab strip; `Alt+Shift+.` / `,` rotate workspaces. Workspaces show as icons (emoji, letters or an uploaded picture; names optional). The filter button on the workspaces bar (`Alt+Shift+P`) shows only workspaces, favourites (common bar) and pinned tabs. Point at a tab for ☆ (add to common bar, `Alt+Shift+S`) and pin (pin in the current workspace, or in All tabs when “All” is selected, `Alt+S`); also in the tab and page right-click menus |
+| Tabs arranged as in Ferna Tabs | Workspaces, common bar (folder-aware, account badges) and pinned sites drive the tab strip; `Alt+Shift+.` / `,` rotate workspaces. Workspaces show as icons (emoji, letters or an uploaded picture; names optional). The filter button on the workspaces bar (`Alt+Shift+P`) shows only workspaces, favourites (common bar) and pinned tabs. Each tab has ☆ (add to common bar, `Alt+Shift+S`), pin (pin in the current workspace, or in All tabs when “All” is selected, `Alt+S`) and × at its left; also in the tab and page right-click menus. PDFs (web or local) can be pinned and put on the common bar |
+| Recently used tab | `Ctrl+Tab` goes back to the tab you used before; keep holding `Ctrl` and press `Tab` again to go further back (`Ctrl+PageDown`/`PageUp` keep strip order) |
 | See every open page | Tab Overview `Ctrl+Shift+A` (live thumbnails, grouped by workspace); Ferna Tabs list at the pointer `Alt+Shift+L`; command palette `Ctrl+K` |
 | Ferna PDF Reader | Opens every PDF (any address); Save overwrites local files directly — the browser plays the save helper |
 | Ferna Screenshots | `Alt+Shift+V` visible, `F` entire page (one capture, no stitching), `R` region across the whole page, `E` element; opens in the Screenshots editor |
@@ -20,7 +21,7 @@ A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **F
 | Standard Windows package | `FernaSundaree-x.y.z-x64.msi` (Windows Installer: Program Files, Start menu, Apps & features, browser registration, in-place upgrades), plus Setup exe, portable exe and MSIX for the Store |
 | Picture-in-Picture | As Google's PiP extension: `Alt+P`, the toolbar button or right-click a video pops the largest video into Chromium's floating, always-on-top window with its own controls; works on players that set disablePictureInPicture and in embedded frames |
 | Text selection menu | As SelectON: select text and a small bar offers Copy, Search (your search engine, new tab) and, for an address, Open. Isolated from the page; Settings → Features |
-| Bookmarks popup | As Ease Bookmarks: toolbar button / `Ctrl+Shift+Y`, and inside the Ferna Tabs list (`Alt+B`). Folders with breadcrumb, search with folder path, open (new tab / this tab / background), add this page, new folder, rename, delete with undo, drag to reorder or into folders. Bookmarks now have real folders; imports keep them |
+| Bookmarks popup | As Ease Bookmarks: toolbar button / `Ctrl+Shift+Y`, and inside the Ferna Tabs list (`Alt+B`). Folders with breadcrumb, search with folder path, open (new tab / this tab / background), add this page, new folder, rename, delete with undo, drag to reorder or into folders. Bookmarks now have real folders; imports keep them. A default folder (Settings → General, or right-click a bar folder) receives new bookmarks and is where the popup opens, as in Ferna Tabs |
 | Equalizer + Auto-EQ | 10 bands (31 Hz–16 kHz), presets (Pop, Rock, Classical, Jazz, Electronic, Hip-hop, Acoustic, Speech, Bass/Treble Boost, Vocal), manual sliders, limiter. Auto-EQ blends page metadata with live spectral features (band shares, centroid, flatness, onset rate, low-energy-frame ratio) in a rule-based classifier with hysteresis; `Alt+Q` |
 | Ad blocking | EasyList + uBlock Origin lists: network blocking, cosmetic hiding (CSS inserted by the browser), scriptlets; YouTube: ad schedule pruned from player data at document start, ad slots hidden, leftover ads muted and skipped; pop-ups opened without a click in the last 5 s are blocked (listed under the shield) |
 | Safe browsing | Red "Deceptive site ahead" / "Dangerous site ahead" warning before phishing (PhishTank, OpenPhish via the Phishing URL Blocklist) and malware (abuse.ch URLhaus) sites; downloads and page resources from them blocked. Lists fetched every 12 h, checked on this PC — no address is sent anywhere. "Visit anyway" lasts until restart |
@@ -29,6 +30,7 @@ A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **F
 | Privacy | Third-party cookies blocked by Chromium itself (headers and document.cookie in frames), tracking tags stripped from links, Global Privacy Control, fingerprinting noise (canvas, audio, WebGL, hardware buckets), WebRTC limited to the public interface |
 | Anti-phishing | Look-alike address warning ("Did you mean paypal.com?") for imitations of popular sites, Sri Lankan banks and your bookmarks; password-field warning on unencrypted or first-visit pages |
 | Hardening | Microsoft Defender scan of finished downloads; extensions paused when an update asks for more access; optional enhanced security mode (no JIT); strict ZIP reader for all extension packages; ASAR integrity check in release builds; dependency audit and Dependabot in CI |
+| Address bar | Copy and clear buttons in the address box; a PDF tab shows the PDF's own address |
 | Ferna Tabs search fallback | Tabs first, then bookmarks; an address offers "Go to", other text "Search with <engine>" (top when nothing matched) — Enter new tab, Shift+Enter this tab |
 | Bookmark manager | Multi-select across folders (checkboxes, Shift-range, `Ctrl+A`, select all shown), delete with a count confirmation and Undo, bulk move / tags / read status / link check / export (JSON or HTML); broken-link finder with "Delete all broken"; duplicates merged in bulk (tags kept); filters by tag, site, date added and read status; imports HTML from any browser, Chrome/Edge/Brave `Bookmarks` JSON, Firefox `.json` backups and Ferna JSON; automatic JSON backups (daily by default) with merge or full restore; Reading list |
 | Split view | Two tabs side by side (`Alt+Shift+D`, tab menu, right-click the split button to pick); drag the divider; click a half to make it active |
