@@ -16,6 +16,8 @@ let nextTabId = 1;
 let nextWindowId = 1;
 
 const isInternal = url => /^ferna:/i.test(url || '');
+const siteOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+const sameSite = (a, b) => !!siteOf(a) && siteOf(a) === siteOf(b);
 const NEWTAB = 'ferna://newtab/';
 
 // Load-failure codes that get Ferna's own error page.
@@ -199,10 +201,19 @@ class FernaWindow {
       if (!this.private && kind === 'web') ctx.updateHistoryTitle(tab.url, title);
       changed();
     });
-    wc.on('page-favicon-updated', (e, favs) => { tab.favicon = favs && favs[0] || ''; changed(); });
+    wc.on('page-favicon-updated', (e, favs) => {
+      tab.favicon = favs && favs[0] || '';
+      changed();
+      // Keep a copy, so the icon stays when the tab sleeps, for pins and the common bar, and
+      // after a restart (not for private windows).
+      if (!this.private && kind === 'web' && tab.favicon && ctx.favicons) {
+        const page = tab.url;
+        ctx.favicons.learn(page, tab.favicon, u => wc.session.fetch(u, { cache: 'force-cache' })).then(d => { if (d && tab.url === page) changed(); }).catch(() => {});
+      }
+    });
     wc.on('did-start-loading', () => { tab.loading = true; changed(); });
     wc.on('did-stop-loading', () => { tab.loading = false; changed(); if (tab.id === this.activeId && this.ctx.sampleTabColour) setTimeout(() => this.ctx.sampleTabColour(this, tab), 400); });
-    wc.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) { tab.blocked = 0; tab.blockedPopups = []; tab.cosmeticKey = null; tab.hasVideo = false; tab.hasMedia = false; tab.pipOn = false; tab.autoPip = false; tab.pwGen = (tab.pwGen || 0) + 1; tab.pwCount = 0; tab.readerOn = false; tab.speaking = false; } });
+    wc.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) { tab.blocked = 0; tab.blockedPopups = []; tab.cosmeticKey = null; if (tab.favicon && !sameSite(tab.url, d.url)) tab.favicon = ''; tab.hasVideo = false; tab.hasMedia = false; tab.pipOn = false; tab.autoPip = false; tab.pwGen = (tab.pwGen || 0) + 1; tab.pwCount = 0; tab.readerOn = false; tab.speaking = false; } });
     wc.on('media-started-playing', () => {
       tab.hasMedia = true;
       ctx.pageFx.mediaStarted(this, tab);
@@ -773,6 +784,23 @@ class FernaWindow {
     this.win.setTitle(t && t.title ? `${t.title} – ${base}` : base);
   }
 
+  /** A tab's icon: the kept copy (stays while it sleeps and after a restart), else the page's own. */
+  iconFor(tab) {
+    const url = tab.pendingUrl || tab.url;
+    if (this.private || !this.ctx.favicons) return tab.favicon;
+    return this.ctx.favicons.urlFor(url) || tab.favicon || '';
+  }
+
+  /** Kept icons of the pinned sites and common-bar pages, by address (for entries not open). */
+  stripIcons() {
+    const ctx = this.ctx;
+    if (!ctx.favicons) return {};
+    const urls = new Set([...(ctx.ws.data.common || []), ...(ctx.ws.data.allPinned || []), ...ctx.ws.data.workspaces.flatMap(w => w.pinned || [])].map(p => p && p.url).filter(Boolean));
+    const out = {};
+    for (const u of urls) { const f = ctx.favicons.urlFor(u); if (f) out[u] = f; }
+    return out;
+  }
+
   state() {
     const ctx = this.ctx;
     const t = this.active;
@@ -796,11 +824,12 @@ class FernaWindow {
       dark: ctx.isDark(),
       focus: this.focus,
       tabs: this.tabs.map(x => ({
-        id: x.id, title: x.title, url: x.pendingUrl || x.url, favicon: x.favicon, loading: x.loading, audible: x.audible,
+        id: x.id, title: x.title, url: x.pendingUrl || x.url, favicon: this.iconFor(x), loading: x.loading, audible: x.audible,
         muted: x.muted, crashed: x.crashed, sleeping: !x.view, ws: this.tabWorkspace(x), wsOverride: x.wsOverride,
       })),
       activeId: this.activeId,
       strip: this.strip(),
+      icons: this.stripIcons(),
       workspaces: ctx.ws.data.workspaces.map(w => ({ id: w.id, name: w.name, color: w.color, icon: w.icon, image: w.image, pinned: w.pinned })),
       common: ctx.ws.data.common,
       currentWs: this.currentWs,

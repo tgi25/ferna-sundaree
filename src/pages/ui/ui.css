@@ -89,7 +89,7 @@ body.private #toolbar::before { content: "Private"; order: 99; font-size: 11px; 
 .pin-hint .icon { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; }
 .tab .snd { color: var(--accent); }
 .tab .snd .icon { width: 14px; height: 14px; }
-.tab.sleeping .favicon, .tab.sleeping .letter { opacity: .5; }
+.tab.sleeping .favicon, .tab.sleeping .letter { opacity: .8; }
 .tab.dragging { opacity: .4; }
 .tab.drop-before::before { content: ""; position: absolute; background: var(--accent); border-radius: 2px; }
 .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent-soft); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
@@ -97,7 +97,8 @@ body.private #toolbar::before { content: "Private"; order: 99; font-size: 11px; 
 .icon-btn { display: grid; place-items: center; border: 0; background: transparent; cursor: pointer; border-radius: 8px; color: var(--tabs-ink); position: relative; flex: none; }
 .icon-btn:hover { background: var(--bg-hover); color: var(--ink); }
 .icon-btn.open { background: var(--bg-raised); box-shadow: var(--shadow); }
-.icon-btn.closed .favicon, .icon-btn.closed .letter { opacity: .45; filter: grayscale(1); }
+/* Not open: the icon stays in colour (you tell sites apart by it), just a little lighter. */
+.icon-btn.closed .favicon, .icon-btn.closed .letter { opacity: .72; }
 .icon-btn.current { box-shadow: inset 0 0 0 2px var(--accent); }
 .badge { position: absolute; right: 0; bottom: 0; min-width: 12px; height: 12px; padding: 0 2px; border-radius: 6px; font-size: 8.5px; line-height: 12px; font-weight: 700; text-align: center; background: var(--ink-2); color: var(--bg-raised); }
 .ws-chip { display: flex; align-items: center; gap: 6px; border: 0; cursor: pointer; border-radius: 8px; background: transparent; color: var(--tabs-ink); font-weight: 600; white-space: nowrap; flex: none; }

@@ -121,6 +121,8 @@ function initStores() {
     ctx.settings.update(d => { if (d.dohMode === 'secure') d.dohMode = 'automatic'; d.dns063 = true; });
   }
   ctx.ws = new JsonStore(P('workspaces.json'), { workspaces: [], common: [], allPinned: [] });
+  // Site icons kept on this PC, so sleeping tabs, pins and the common bar keep theirs.
+  ctx.favicons = new (require('./favicons').FaviconCache)(new JsonStore(P('favicons.enc'), { icons: {} }, { encrypt: true }), { nativeImage });
   if (!Array.isArray(ctx.ws.data.allPinned)) ctx.ws.data.allPinned = [];
   ctx.bookmarks = new JsonStore(P('bookmarks.enc'), { items: [] }, { encrypt: true });
   ctx.bookmarks.data.items = require('./bookmarks').repair(ctx.bookmarks.data.items);
@@ -231,7 +233,7 @@ ctx.onWindowClosed = win => {
   if (ctx.lastFocused === win) ctx.lastFocused = ctx.windows[ctx.windows.length - 1] || null;
   if (ctx.windows.some(w => !w.private)) saveSession(true);
   if (!ctx.windows.length) {
-    for (const s of [ctx.settings, ctx.ws, ctx.bookmarks, ctx.history]) s.flush();
+    for (const s of [ctx.settings, ctx.ws, ctx.bookmarks, ctx.history, ctx.favicons && ctx.favicons.store].filter(Boolean)) s.flush();
     app.quit();
   }
 };
@@ -850,6 +852,11 @@ function installProtocol(ses) {
       if (!data) return new Response('Not found', { status: 404 });
       return new Response(data, { headers: { 'content-type': MIME[path.extname(rel).toLowerCase()] || 'image/png', 'cache-control': 'no-cache' } });
     }
+    if (host === 'favicon') {
+      const f = ctx.favicons && ctx.favicons.file(u.searchParams.get('k') || '');
+      if (!f) return new Response('Not found', { status: 404 });
+      return new Response(f.buf, { headers: { 'content-type': f.type, 'cache-control': 'max-age=31536000, immutable', 'x-content-type-options': 'nosniff' } });
+    }
     if (host === 'pdf') return serveFile(path.join(FEATURES, 'pdf-reader'), rel, PDF_CSP);
     if (host === 'shots') return serveFile(path.join(FEATURES, 'screenshots'), rel, SHOTS_CSP);
     if (rel.startsWith('/_shared/')) return serveFile(path.join(PAGES, '_shared'), rel.slice('/_shared/'.length), BASE_CSP);
@@ -1228,7 +1235,11 @@ function registerCommands() {
   C('perm:revoke', ['string'], ['settings'], (c, key) => { delete ctx.settings.data.permissions[key]; ctx.settings.save(); return ctx.settings.data.permissions; });
   C('privacy:clear', ['object'], ['settings', 'history'], async (c, what) => {
     const since = Number.isFinite(what.since) ? what.since : 0;
-    if (what.history) { ctx.history.data.entries = ctx.history.data.entries.filter(e => e.ts < since); ctx.history.flush(); }
+    if (what.history) {
+      ctx.history.data.entries = ctx.history.data.entries.filter(e => e.ts < since); ctx.history.flush();
+      // Kept site icons go too (pinned sites and the common bar learn theirs again on the next visit).
+      if (ctx.favicons) { const icons = ctx.favicons.store.data.icons; for (const k of Object.keys(icons)) if (icons[k].t >= since) delete icons[k]; ctx.favicons.store.flush(); ctx.favicons.byIconUrl.clear(); }
+    }
     if (what.downloads) ctx.downloads = ctx.downloads.filter(d => d.state === 'progressing');
     const storages = [];
     if (what.cookies) storages.push('cookies', 'localstorage', 'indexdb', 'serviceworkers', 'cachestorage', 'filesystem', 'websql', 'shadercache');

@@ -178,4 +178,30 @@ module.exports = async function v064({ step, assert, main, win, page, H, base, s
     await H.sleep(1200);
     assert(await paused(), 'your pause is kept');
   });
+  await step('0.6.8 icons stay: a sleeping tab, a pinned site and a common-bar page keep their favicon', async () => {
+    const url = `${base}/fav.html`;
+    await main(() => { const w = global.__ferna.windows[0]; w.switchWorkspace(null); });
+    await freshTab(url);
+    await H.until(() => main((_, u) => !!global.__ferna.favicons.lookup(u), url), 6000, 'icon kept');
+    const tab = await active();
+    await freshTab(`${base}/long.html?fav-other`);
+    // Put the first tab to sleep, as happens after a period of inactivity.
+    assert(await main((_, id) => { const w = global.__ferna.windows[0]; return w.sleepTab(w.tabs.find(t => t.id === id)); }, tab.id), 'slept');
+    const u = await ui();
+    const iconOk = sel => u.evaluate(s => { const img = document.querySelector(s); return !!img && img.tagName === 'IMG' && /^ferna:\/\/favicon\//.test(img.getAttribute('src')) && img.complete && img.naturalWidth > 0; }, sel);
+    await H.until(() => iconOk(`#tabs .tab[data-id="${tab.id}"] img.favicon`), 4000, 'sleeping tab keeps its icon');
+    // Pin it and put it on the common bar, then close it: both still show the icon.
+    await main((_, x) => { const c = global.__ferna; c.pinSite('', x, 'Fav'); c.addCommon(x, 'Fav'); }, url);
+    // Close it and the other test page (a pin also shows other open pages of its folder).
+    await main((_, b) => { const w = global.__ferna.windows[0]; for (const t of [...w.tabs]) if ((t.url || '').startsWith(b)) w.closeTab(t); }, base);
+    const idx = await main((_, x) => global.__ferna.findCommon(x), url);
+    await H.until(() => iconOk(`#tabs [data-common="${idx}"] img.favicon`), 4000, 'common bar icon');
+    await H.until(() => u.evaluate(() => [...document.querySelectorAll('#tabs [data-pinned] img.favicon')].some(i => i.complete && i.naturalWidth > 0)), 4000, 'pinned icon');
+    await shot('v068-01-kept-icons');
+    // Web pages cannot read the kept icons.
+    await freshTab(`${base}/long.html?fav-check`);
+    const fromPage = await evalActive(`fetch('ferna://favicon/?k=x').then(() => 'read', () => 'blocked')`);
+    assert(fromPage === 'blocked', `page fetch: ${fromPage}`);
+    await main((_, x) => { const c = global.__ferna; c.removeCommon(c.findCommon(x)); c.unpinSite('', c.findPin('', x)); }, url);
+  });
 };

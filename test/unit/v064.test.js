@@ -48,3 +48,24 @@ test('a page pinned and on the common bar shows open in both; the pin prefers it
   assert.equal(s.common[0].tabId, 76);
   assert.equal(s.pinned[0].tabId, 76);
 });
+
+test('favicon cache: kept per page, folder and site; only images; served as ferna://favicon', async () => {
+  const { FaviconCache } = require('../../src/main/favicons');
+  const store = { data: { icons: {} }, saves: 0, save() { this.saves++; } };
+  const fc = new FaviconCache(store);
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
+  const fetchOk = (buf, type) => async () => ({ ok: true, headers: { get: h => (h === 'content-type' ? type : String(buf.length)) }, arrayBuffer: async () => buf });
+  const d = await fc.learn('https://www.facebook.com/groups/x', 'https://static.xx.fbcdn.net/rsrc.php/fav.ico', fetchOk(png, 'application/octet-stream'));
+  assert.match(d, /^data:image\/png;base64,/);
+  assert.equal(fc.lookup('https://www.facebook.com/groups/x'), d);
+  assert.equal(fc.lookup('https://facebook.com/other'), d);            // same site
+  assert.match(fc.urlFor('https://www.facebook.com/'), /^ferna:\/\/favicon\/\?k=host%3Afacebook\.com&v=[0-9a-f]{10}$/);
+  assert.deepEqual(fc.file('host:facebook.com').buf, png);
+  // Not an image (an HTML error page): nothing kept.
+  const bad = await fc.learn('https://bad.example/', 'https://bad.example/favicon.ico', fetchOk(Buffer.from('<html>'), 'text/html'));
+  assert.equal(bad, '');
+  assert.equal(fc.lookup('https://bad.example/'), '');
+  // Internal pages and junk are ignored.
+  assert.equal(await fc.learn('ferna://settings/', 'https://x/', fetchOk(png, 'image/png')), '');
+  assert.equal(fc.file('nope'), null);
+});

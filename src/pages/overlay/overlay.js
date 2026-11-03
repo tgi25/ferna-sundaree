@@ -218,7 +218,7 @@ function renderPointer() {
     const name = w ? w.name : 'All tabs';
     return `<button class="${(d.currentWs || '') === id ? 'on' : ''}${names ? '' : ' ico'}" data-ws="${esc(id)}" title="${esc(name)} (Alt+${i})" aria-label="${esc(name)}" style="--c:${w ? esc(w.color) : '#94a3b8'}"><span class="wsi">${w ? wsIconHtml(w) : icon('grid')}</span>${names ? esc(name) : ''}</button>`;
   }).join('');
-  $('#pt-common').innerHTML = d.strip.common.map(c => `<button class="${c.tabId ? '' : 'closed'}" data-common="${c.index}" title="${esc(c.entry.title || c.entry.url)}">${faviconHtml(c.entry.url, c.tabId ? (tabById(c.tabId) || {}).favicon : '')}${c.badge ? `<span class="badge">${esc(c.badge)}</span>` : ''}</button>`).join('');
+  $('#pt-common').innerHTML = d.strip.common.map(c => `<button class="${c.tabId ? '' : 'closed'}" data-common="${c.index}" title="${esc(c.entry.title || c.entry.url)}">${faviconHtml(c.entry.url, (c.tabId && (tabById(c.tabId) || {}).favicon) || (d.icons || {})[c.entry.url] || '')}${c.badge ? `<span class="badge">${esc(c.badge)}</span>` : ''}</button>`).join('');
   $('#pt-common').style.display = d.strip.common.length ? '' : 'none';
   const match = (title, url) => !pt.q || (title || '').toLowerCase().includes(pt.q) || (url || '').toLowerCase().includes(pt.q);
   const rows = [];
@@ -255,7 +255,7 @@ function renderPointer() {
     } else if (r.kind === 'bm') {
       html += `<div class="row-tab${i === pt.sel ? ' sel' : ''}" data-i="${i}" role="option" title="${esc(r.b.url)}">${faviconHtml(r.b.url, '')}<span class="t">${esc(r.b.title || r.b.url)}</span><span class="st">${esc(hostOf(r.b.url))}</span></div>`;
     } else if (r.kind === 'pin') {
-      html += `<div class="row-tab closed${i === pt.sel ? ' sel' : ''}" data-i="${i}" role="option">${faviconHtml(r.p.pin.url, '')}<span class="t">${esc(r.p.pin.title || r.p.pin.url)}</span><span class="st">Not open</span><button class="x act on" data-unpin="${i}" title="Unpin (Alt+S)">${icon('pin')}</button></div>`;
+      html += `<div class="row-tab closed${i === pt.sel ? ' sel' : ''}" data-i="${i}" role="option">${faviconHtml(r.p.pin.url, (d.icons || {})[r.p.pin.url] || '')}<span class="t">${esc(r.p.pin.title || r.p.pin.url)}</span><span class="st">Not open</span><button class="x act on" data-unpin="${i}" title="Unpin (Alt+S)">${icon('pin')}</button></div>`;
     } else {
       const t = r.t;
       html += `<div class="row-tab${i === pt.sel ? ' sel' : ''}${t.id === d.activeId ? ' cur' : ''}" data-i="${i}" role="option" title="${esc(t.url)}">${faviconHtml(t.url, t.favicon)}<span class="t">${esc(t.title || t.url)}</span>${/^(https?|file):/i.test(t.url || '') ? (r.pinned ? `<button class="x act on" data-unpin="${i}" title="Unpin (Alt+S)">${icon('pin')}</button>` : `<button class="x act" data-star="${i}" title="Add to common bar (Alt+Shift+S)">${icon('star')}</button><button class="x act" data-pin="${i}" title="Pin here (Alt+S)">${icon('pin')}</button>`) : ''}<button class="x" data-x="${i}" title="Close (Delete)">${icon('close')}</button></div>`;

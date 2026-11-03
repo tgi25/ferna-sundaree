@@ -392,7 +392,7 @@ function renderBookmarks() {
   let html = items.length
     ? items.map(b => b.isFolder
       ? `<button class="bm bm-folder" data-bm-folder="${esc(b.id)}" title="${esc(b.title)}">${icon('folder')}<span class="t">${esc(b.title)}</span></button>`
-      : `<button class="bm" data-bm="${esc(b.id)}" title="${esc(b.title)}\n${esc(b.url)}">${faviconHtml(b.url, '')}<span class="t">${esc(b.title || b.url)}</span></button>`).join('')
+      : `<button class="bm" data-bm="${esc(b.id)}" title="${esc(b.title)}\n${esc(b.url)}">${faviconHtml(b.url, keptIcon(b.url))}<span class="t">${esc(b.title || b.url)}</span></button>`).join('')
     : '<span class="bm-empty">Bookmark pages with Ctrl+D to see them here.</span>';
   if (S.hasOtherBookmarks) html += `<button class="bm bm-other" data-other="1">${icon('folder')}<span class="t">Other bookmarks</span></button>`;
   bar.innerHTML = html;
@@ -453,12 +453,15 @@ function wsChips(compact) {
     `<button class="icon-btn ws-fav${favOn ? ' on' : ''}" data-fav-only="1" aria-pressed="${favOn}" title="${favOn ? 'Show all tabs again' : 'Show only workspaces, favourites and pinned tabs'}${S.shortcutKeys && S.shortcutKeys.favoritesOnly ? ` (${esc(S.shortcutKeys.favoritesOnly)})` : ''}">${icon('filter')}</button>`;
 }
 
+/** The kept icon of a pinned or common-bar page that is not open. */
+const keptIcon = url => (S.icons && S.icons[url]) || '';
+
 function commonHtml() {
   return S.strip.common.map(c => {
     const t = c.tabId ? tabById(c.tabId) : null;
     const cls = t ? (t.id === S.activeId ? 'open current' : 'open') : 'closed';
     return `<button class="icon-btn ${cls}" data-common="${c.index}"${t ? ` draggable="true" data-drag-tab="${t.id}"` : ''} title="${esc(c.entry.title || c.entry.url)}${t ? '' : ' (not open)'}">
-      ${faviconHtml(c.entry.url, t ? t.favicon : '')}${c.badge ? `<span class="badge">${esc(c.badge)}</span>` : ''}</button>`;
+      ${faviconHtml(c.entry.url, (t && t.favicon) || keptIcon(c.entry.url))}${c.badge ? `<span class="badge">${esc(c.badge)}</span>` : ''}</button>`;
   }).join('');
 }
 
@@ -501,7 +504,7 @@ function renderTabs() {
     const t = p.tabId ? tabById(p.tabId) : null;
     if (t) return tabHtml(t, 'pinned', { label: p.pin.title || t.title, acts: pinnedActs(p) });
     return `<div class="tab pinned closed" role="button" tabindex="-1" data-pinned="${p.index}" data-pinned-ws="${esc(p.wsId)}" title="${esc(p.pin.title || p.pin.url)}\nNot open: click to open">
-      <span class="lacts">${pinnedActs(p)}</span>${faviconHtml(p.pin.url, '')}<span class="title">${esc(p.pin.title || p.pin.url)}</span><span class="state">Not open</span></div>`;
+      <span class="lacts">${pinnedActs(p)}</span>${faviconHtml(p.pin.url, keptIcon(p.pin.url))}<span class="title">${esc(p.pin.title || p.pin.url)}</span><span class="state">Not open</span></div>`;
   }
   const listed = S.strip.tabs.map(id => tabById(id)).filter(Boolean);
   const noWs = S.strip.noWorkspace;
@@ -511,7 +514,7 @@ function renderTabs() {
     const pinnedIcons = S.strip.pinned.map(p => {
       const t = p.tabId ? tabById(p.tabId) : null;
       const cls = t ? (t.id === S.activeId ? 'open current' : 'open') : 'closed';
-      return `<button class="icon-btn ${cls}" ${t ? `data-id="${t.id}"` : `data-pinned="${p.index}" data-pinned-ws="${esc(p.wsId)}"`} title="${esc(p.pin.title || p.pin.url)}${t ? '' : ' (not open)'}${ws ? '' : `\nPinned in ${esc(wsName(p.wsId))}`}">${faviconHtml(p.pin.url, t ? t.favicon : '')}</button>`;
+      return `<button class="icon-btn ${cls}" ${t ? `data-id="${t.id}"` : `data-pinned="${p.index}" data-pinned-ws="${esc(p.wsId)}"`} title="${esc(p.pin.title || p.pin.url)}${t ? '' : ' (not open)'}${ws ? '' : `\nPinned in ${esc(wsName(p.wsId))}`}">${faviconHtml(p.pin.url, (t && t.favicon) || keptIcon(p.pin.url))}</button>`;
     }).join('');
     node.innerHTML = `
       <div class="group wsg">${wsChips(true)}</div>

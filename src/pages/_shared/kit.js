@@ -96,7 +96,7 @@ function faviconHtml(url, favicon, cls = '') {
   const letter = (host || url || '?').replace(/^ferna:\/\//, '').charAt(0).toUpperCase() || '?';
   const color = LETTER_COLORS[[...host].reduce((a, c) => a + c.charCodeAt(0), 0) % LETTER_COLORS.length];
   if (/^ferna:/.test(url || '')) return `<span class="letter ${cls}" style="background:var(--accent)">F</span>`;
-  if (favicon && /^(https?|data):/.test(favicon)) {
+  if (favicon && (/^(https?|data):/.test(favicon) || /^ferna:\/\/favicon\//.test(favicon))) {
     return `<img class="favicon ${cls}" src="${esc(favicon)}" alt="" data-letter="${esc(letter)}" data-color="${color}" referrerpolicy="no-referrer">`;
   }
   return `<span class="letter ${cls}" style="background:${color}">${esc(letter)}</span>`;
