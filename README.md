@@ -1,7 +1,7 @@
 # Ferna Sundaree
 
 A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **Ferna PDF Reader** and
-**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.6.8.
+**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.6.9.
 
 ## What it does
 
@@ -11,6 +11,7 @@ A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **F
 | Hide/unhide the bookmarks bar | `Ctrl+Shift+B` |
 | Tab bar horizontal or vertical | Top, left or right (`Ctrl+Shift+,` cycles); vertical bar resizes and collapses to icons (`Ctrl+Shift+\`) |
 | Tabs arranged as in Ferna Tabs | Workspaces, common bar (folder-aware, account badges) and pinned sites drive the tab strip; `Alt+Shift+.` / `,` rotate workspaces. Workspaces show as icons (emoji, letters or an uploaded picture; names optional). The filter button on the workspaces bar (`Alt+Shift+P`) shows only workspaces, favourites (common bar) and pinned tabs. Each tab has ☆ (add to common bar, `Alt+Shift+S`) and pin (pin in the current workspace, or in All tabs when “All” is selected, `Alt+S`) at its left and × at its right; also in the tab and page right-click menus. Drag a tab onto the common bar or the pinned area to add it there. PDFs (web or local) can be pinned and put on the common bar (tab menu, right-click in the reader, or the buttons); Settings → Workspaces pins an address, a file or a whole folder (`C:\Notes\`), and files opened from a pinned folder join that workspace |
+| Current tab stands out | The current tab has a mark in the workspace or accent colour (top edge, or left edge for vertical tabs), a bold title and, on dark or black bars, a lighter background; colours are adjusted so the mark reaches 3:1 contrast on every theme |
 | Site icons kept | Each site's icon is kept on the PC (encrypted with the profile, as history is), so sleeping tabs, pinned sites and common-bar pages keep their icon in colour when not loaded and after a restart; private windows keep none; cleared with history |
 | Recently used tab | `Ctrl+Tab` goes back to the tab you used before; keep holding `Ctrl` and press `Tab` again to go further back (`Ctrl+PageDown`/`PageUp` keep strip order) |
 | See every open page | Tab Overview `Ctrl+Shift+A` (live thumbnails, grouped by workspace); Ferna Tabs list at the pointer `Alt+Shift+L`; command palette `Ctrl+K` |

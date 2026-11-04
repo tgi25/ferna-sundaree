@@ -204,4 +204,40 @@ module.exports = async function v064({ step, assert, main, win, page, H, base, s
     assert(fromPage === 'blocked', `page fetch: ${fromPage}`);
     await main((_, x) => { const c = global.__ferna; c.removeCommon(c.findCommon(x)); c.unpinSite('', c.findPin('', x)); }, url);
   });
+  await step('0.6.9 the current tab stands out on light, dark and black themes (top and vertical tabs)', async () => {
+    const u = await ui();
+    await freshTab(`${base}/long.html?cur-a`);
+    await freshTab(`${base}/long.html?cur-b`);
+    const results = [];
+    for (const theme of ['light', 'dark']) {
+      for (const colour of [null, '#111827', '#000000']) {
+        for (const position of ['top', 'left']) {
+          const id = await main((_, a) => {
+            const ctx = global.__ferna; ctx.setSetting('tabPosition', a.position);
+            if (!a.colour) { ctx.windows[0].switchWorkspace(null); return null; }
+            const w = ctx.createWorkspace(`Cur ${a.colour}`); w.color = a.colour; ctx.ws.save(); ctx.windows[0].switchWorkspace(w.id);
+            ctx.windows[0].activate(ctx.windows[0].tabs[ctx.windows[0].tabs.length - 1]);
+            return w.id;
+          }, { theme, colour, position });
+          await main((e, t) => { e.nativeTheme.themeSource = t; }, theme);
+          await u.emulateMedia({ colorScheme: theme });
+          await H.sleep(300);
+          await H.sleep(600);
+          const c = await u.evaluate(() => ({ ...window.__fernaContrast().curTab, dark: matchMedia('(prefers-color-scheme: dark)').matches, bar: getComputedStyle(document.querySelector('#tabs')).backgroundColor, tab: getComputedStyle(document.querySelector('#tabs .tab.active')).backgroundColor, mk: getComputedStyle(document.querySelector('#tabs .tab.active'), '::after').backgroundColor }));
+          results.push({ theme, colour, position, c });
+          if (theme === 'dark' && colour === '#000000' && position === 'left') await shot('v069-01-current-tab-black');
+          if (theme === 'dark' && !colour) await shot(`v069-02-current-tab-dark-${position}`);
+          if (id) await main((_, i) => { const ctx = global.__ferna; ctx.windows[0].switchWorkspace(null); ctx.deleteWorkspace(i); }, id);
+        }
+      }
+    }
+    await u.emulateMedia({ colorScheme: null });
+    await main(e => { e.nativeTheme.themeSource = global.__ferna.settings.data.theme || 'system'; });
+    await main(() => { const ctx = global.__ferna; ctx.setSetting('tabPosition', 'top'); });
+    // Dark bars: the current tab's background is lifted clearly; light bars keep a white tab with a shadow.
+    const darkBar = r => (r.c.bar.match(/\d+/g) || []).slice(0, 3).reduce((a, v) => a + Number(v), 0) < 300;
+    const bad = results.filter(r => !r.c || r.c.mark < 3 || (r.position === 'left' && darkBar(r) && r.c.bg < 1.4));
+    assert(results.some(r => darkBar(r) && r.position === 'left'), 'a dark bar was tested');
+    assert(!bad.length, JSON.stringify(bad));
+  });
 };

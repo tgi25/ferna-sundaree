@@ -166,13 +166,40 @@ function ensureContrast() {
   st.setProperty('--tb-on-ink', css(readable(onBg, LIGHT_INK, 4.5)));
   contrastKey = 'set';
 }
+// The current tab must stand out from the tab bar on every theme. On dark bars its background
+// is lifted until it differs clearly from the bar (vertical tabs); on every bar it gets a mark in
+// the workspace or accent colour that reaches 3:1 against it. Runs after the strip is drawn.
+function ensureTabContrast() {
+  const st = document.documentElement.style;
+  st.removeProperty('--tab-cur-bg'); st.removeProperty('--tab-mark');
+  const tb = rgbOf(getComputedStyle($('#toolbar')).backgroundColor) || [255, 255, 255];
+  const tabs = rgbOf(getComputedStyle(el.tabs).backgroundColor) || tb;
+  const hex = v => rgbOf(String(v || '').trim().replace(/^#(..)(..)(..)$/, (m, r, g, b) => `rgb(${parseInt(r, 16)}, ${parseInt(g, 16)}, ${parseInt(b, 16)})`));
+  const acc = hex(getComputedStyle(document.documentElement).getPropertyValue('--accent')) || [37, 99, 235];
+  const probeEl = $('#tab-probe') || Object.assign(document.body.appendChild(document.createElement('div')), { id: 'tab-probe' });
+  probeEl.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;background:var(--tab-active-bg)';
+  const activeBg = rgbOf(getComputedStyle(probeEl).backgroundColor) || tb;
+  let cur = activeBg;
+  if (lum(tabs) < 0.4) for (let k = 0.06; contrast(cur, tabs) < 1.45 && k <= 0.42; k += 0.06) cur = activeBg.map(v => v + (255 - v) * k);
+  st.setProperty('--tab-cur-bg', css(cur));
+  const wsCol = hex(getComputedStyle(el.tabs).getPropertyValue('--ws')) || acc;
+  // The workspace colour if it shows on the tab; else the accent (a black or grey workspace
+  // would give a dull mark); then lightened or darkened as far as needed.
+  const sat = c => (Math.max(...c) - Math.min(...c)) / 255;
+  const base = contrast(wsCol, cur) >= 3 && sat(wsCol) > 0.25 ? wsCol : sat(wsCol) > 0.25 && contrast(acc, cur) < 3 ? wsCol : acc;
+  let mark = base;
+  for (let k = 0.15; contrast(mark, cur) < 3 && k <= 0.9; k += 0.15) mark = lum(cur) > 0.4 ? base.map(v => v * (1 - k)) : base.map(v => v + (255 - v) * k);
+  st.setProperty('--tab-mark', css(mark));
+}
 function applyThemeInks(th) {
   const st = document.documentElement.style;
   for (const [ours, theirs] of Object.entries(THEME_MAP)) if (/ink/.test(ours) && th.vars[theirs]) st.setProperty(ours, th.vars[theirs]);
 }
 window.__fernaContrast = () => {
   const tb = rgbOf(getComputedStyle($('#toolbar')).backgroundColor);
-  return { toolbar: contrast(tb, rgbOf(getComputedStyle($('#btn-menu')).color)), eqOn: contrast(rgbOf(getComputedStyle(document.documentElement).getPropertyValue('--tb-on-bg')), rgbOf(getComputedStyle(document.documentElement).getPropertyValue('--tb-on-ink'))), tabs: contrast(rgbOf(getComputedStyle(el.tabs).backgroundColor) || tb, rgbOf(getComputedStyle(el.tabs).color)) };
+  const at = document.querySelector('#tabs .tab.active');
+  const curTab = at ? { bg: contrast(rgbOf(getComputedStyle(at).backgroundColor) || tb, rgbOf(getComputedStyle(el.tabs).backgroundColor) || tb), mark: contrast(rgbOf(getComputedStyle(at, '::after').backgroundColor) || tb, rgbOf(getComputedStyle(at).backgroundColor) || tb) } : null;
+  return { curTab, toolbar: contrast(tb, rgbOf(getComputedStyle($('#btn-menu')).color)), eqOn: contrast(rgbOf(getComputedStyle(document.documentElement).getPropertyValue('--tb-on-bg')), rgbOf(getComputedStyle(document.documentElement).getPropertyValue('--tb-on-ink'))), tabs: contrast(rgbOf(getComputedStyle(el.tabs).backgroundColor) || tb, rgbOf(getComputedStyle(el.tabs).color)) };
 };
 $('#btn-downloads').innerHTML = icon('download') + '<span class="count" id="dl-count"></span>';
 $('#btn-overview').innerHTML = icon('grid');
@@ -477,7 +504,8 @@ function stripRelease() {
 el.tabs.addEventListener('pointerdown', e => { if (e.button === 0 || e.button === 1) stripPress = Date.now(); }, true);
 for (const ev of ['pointerup', 'pointercancel', 'dragend', 'drop', 'blur']) window.addEventListener(ev, stripRelease, true);
 
-function renderTabs() {
+function renderTabs() { drawTabs(); try { ensureTabContrast(); } catch { /* keep the strip */ } }
+function drawTabs() {
   if (stripPress && Date.now() - stripPress < 2000) { stripPending = true; return; }
   if (stripDragging) { stripPending = true; return; } // redrawing would cancel the drag
   stripPress = 0;
