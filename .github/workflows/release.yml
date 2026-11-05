@@ -40,7 +40,7 @@ jobs:
     if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: '${{ inputs.ref || github.ref }}' }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
@@ -63,7 +63,7 @@ jobs:
     env:
       SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: '${{ inputs.ref || github.ref }}' }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
@@ -125,7 +125,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: '${{ inputs.ref || github.ref }}' }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
@@ -167,7 +167,7 @@ jobs:
     env:
       MIRROR_S3_BUCKET: ${{ secrets.MIRROR_S3_BUCKET }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: '${{ inputs.ref || github.ref }}' }
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
