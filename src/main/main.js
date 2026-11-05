@@ -79,7 +79,7 @@ const DEFAULT_SETTINGS = {
   autoUpdate: true,
   blockThirdPartyCookies: true, enhancedSecurity: false, gpc: true, fingerprintProtection: true, stripTracking: true, webrtcProtection: true,
   lookalikeWarnings: true, passwordWarnings: true, defenderScan: true, extensionGuard: true,
-  selectionMenu: true, popupBlocker: true, popupAllow: [], cosmeticFiltering: true, listScriptlets: false, youtubeAds: true, equalizer: {},
+  selectionMenu: true, popupBlocker: true, popupAllow: [], cosmeticFiltering: true, listScriptlets: false, afterClose: 'right', youtubeAds: true, equalizer: {},
   historyDays: 90, lastWorkspace: null, hints: {},
   // 0.5
   bookmarkBackupDays: 1, bookmarkBackupKeep: 14, bookmarkLastBackup: 0,
@@ -1147,7 +1147,7 @@ function registerCommands() {
     blockThirdPartyCookies: v => typeof v === 'boolean', enhancedSecurity: v => typeof v === 'boolean', gpc: v => typeof v === 'boolean',
     fingerprintProtection: v => typeof v === 'boolean', stripTracking: v => typeof v === 'boolean', webrtcProtection: v => typeof v === 'boolean',
     lookalikeWarnings: v => typeof v === 'boolean', passwordWarnings: v => typeof v === 'boolean', defenderScan: v => typeof v === 'boolean', extensionGuard: v => typeof v === 'boolean',
-    cosmeticFiltering: v => typeof v === 'boolean', listScriptlets: v => typeof v === 'boolean', youtubeAds: v => typeof v === 'boolean',
+    cosmeticFiltering: v => typeof v === 'boolean', listScriptlets: v => typeof v === 'boolean', afterClose: v => ['right', 'left', 'previous', 'opener'].includes(v), youtubeAds: v => typeof v === 'boolean',
     zoomPrefs: v => v && typeof v === 'object' && ['site', 'tab'].includes(v.mode) && ['full', 'text'].includes(v.defaultType) &&
       [v.defaultFull, v.defaultText, v.defaultNonText, v.step, v.autofitMin, v.autofitMax, v.minFont].every(n => Number.isFinite(n)) &&
       Array.isArray(v.levels) && v.levels.length > 1 && v.levels.length <= 40 && v.levels.every(n => Number.isFinite(n) && n >= 25 && n <= 500) &&

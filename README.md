@@ -1,7 +1,7 @@
 # Ferna Sundaree
 
 A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **Ferna PDF Reader** and
-**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.7.1.
+**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.7.2.
 
 ## What it does
 
@@ -13,6 +13,7 @@ A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **F
 | Tabs arranged as in Ferna Tabs | Workspaces, common bar (folder-aware, account badges) and pinned sites drive the tab strip; `Alt+Shift+.` / `,` rotate workspaces. Workspaces show as icons (emoji, letters or an uploaded picture; names optional). The filter button on the workspaces bar (`Alt+Shift+P`) shows only workspaces, favourites (common bar) and pinned tabs. Each tab has ☆ (add to common bar, `Alt+Shift+S`) and pin (pin in the current workspace, or in All tabs when “All” is selected, `Alt+S`) at its left and × at its right; also in the tab and page right-click menus. Drag a tab onto the common bar or the pinned area to add it there. PDFs (web or local) can be pinned and put on the common bar (tab menu, right-click in the reader, or the buttons); Settings → Workspaces pins an address, a file or a whole folder (`C:\Notes\`), and files opened from a pinned folder join that workspace |
 | Current tab stands out | The current tab has a mark in the workspace or accent colour (top edge, or left edge for vertical tabs), a bold title and, on dark or black bars, a lighter background; colours are adjusted so the mark reaches 3:1 contrast on every theme |
 | Site icons kept | Each site's icon is kept on the PC (encrypted with the profile, as history is), so sleeping tabs, pinned sites and common-bar pages keep their icon in colour when not loaded and after a restart; private windows keep none; cleared with history |
+| After closing a tab | Settings → Tabs and bars: go to the tab on the right (default, as in Chrome), the tab on the left, the tab you used before, or the tab that opened it (falls back to the right) |
 | Recently used tab | `Ctrl+Tab` flips between the current tab and the one used before (press again to come back); `Ctrl+PageDown`/`PageUp` keep strip order |
 | See every open page | Tab Overview `Ctrl+Shift+A` (live thumbnails, grouped by workspace); Ferna Tabs list at the pointer `Alt+Shift+L`; command palette `Ctrl+K` |
 | Ferna PDF Reader | Opens every PDF (any address); Save overwrites local files directly — the browser plays the save helper; upcoming pages are pre-rendered in the background while you read (8 ahead in your reading direction, 2 behind, page data for 24 ahead; bounded by an 80-megapixel budget; Settings → Pre-render upcoming pages) so page turns are instant in large PDFs |

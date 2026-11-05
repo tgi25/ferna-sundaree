@@ -379,6 +379,7 @@ class FernaWindow {
       id: nextTabId++, url, title: o.title || '', favicon: '', loading: false, audible: false, muted: false,
       crashed: false, blocked: 0, thumb: null, keepLoaded: false, wsOverride: o.wsOverride || null,
       kind: isInternal(url) ? 'internal' : 'web', view: null, pendingUrl: null, lastGoodUrl: null,
+      openerId: o.opener ? o.opener.id : null, // the tab that opened it (for "after closing a tab: go to its parent")
     };
     // A tab opened inside a workspace stays in it, even when its site belongs elsewhere.
     if (!tab.wsOverride && this.currentWs) {
@@ -468,6 +469,7 @@ class FernaWindow {
   closeTab(tab) {
     const i = this.tabs.indexOf(tab);
     if (i < 0) return;
+    const visibleBefore = this.activeId === tab.id ? this.visibleOrder() : null;
     if (!this.private && tab.url) {
       this.closed.push({ url: tab.url, index: i, wsOverride: tab.wsOverride, title: tab.title });
       if (this.closed.length > 25) this.closed.shift();
@@ -490,12 +492,38 @@ class FernaWindow {
     }
     if (this.windowClosing || this.win.isDestroyed()) return;
     if (this.activeId === tab.id) {
-      const visible = this.visibleOrder();
-      const next = visible.find((id, k) => k >= Math.min(i, visible.length - 1)) || visible[visible.length - 1];
-      this.activate(this.tabs.find(t => t.id === next) || this.tabs[Math.min(i, this.tabs.length - 1)]);
+      const next = this.tabAfterClose(tab, visibleBefore || [], this.ctx.settings.data.afterClose);
+      this.activate(next || this.tabs[Math.min(i, this.tabs.length - 1)]);
     }
     this.pushState();
     this.ctx.saveSessionSoon();
+  }
+
+  /**
+   * The tab to show after closing the current one (Settings → Tabs → After closing a tab):
+   * 'right' the tab to its right (as in Chrome; the left one at the end), 'left' the tab to its
+   * left, 'previous' the tab you used before it, 'opener' the tab that opened it. When the chosen
+   * tab is not there, the tab to the right is used.
+   */
+  tabAfterClose(closed, visibleBefore, mode = 'right') {
+    const alive = id => id !== closed.id && this.tabs.some(t => t.id === id) && visibleBefore.includes(id);
+    const byId = id => this.tabs.find(t => t.id === id);
+    const pos = visibleBefore.indexOf(closed.id);
+    const right = () => { for (let k = pos + 1; k < visibleBefore.length; k++) if (alive(visibleBefore[k])) return visibleBefore[k]; for (let k = pos - 1; k >= 0; k--) if (alive(visibleBefore[k])) return visibleBefore[k]; return null; };
+    const left = () => { for (let k = pos - 1; k >= 0; k--) if (alive(visibleBefore[k])) return visibleBefore[k]; return right(); };
+    const previous = () => {
+      if (alive(this.prevTabId)) return this.prevTabId;
+      const recent = this.tabs.filter(t => alive(t.id)).sort((a, b) => (b.lastActive || 0) - (a.lastActive || 0))[0];
+      return recent ? recent.id : null;
+    };
+    let id = null;
+    if (pos >= 0) {
+      if (mode === 'left') id = left();
+      else if (mode === 'previous') id = previous() || right();
+      else if (mode === 'opener') id = (alive(closed.openerId) ? closed.openerId : null) || right();
+      else id = right();
+    }
+    return id ? byId(id) : null;
   }
 
   moveTab(tab, toIndex) {

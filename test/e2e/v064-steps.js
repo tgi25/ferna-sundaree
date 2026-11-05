@@ -290,4 +290,34 @@ module.exports = async function v064({ step, assert, main, win, page, H, base, s
     await shot('v071-01-pdf-prerender');
     await main(() => { const w = global.__ferna.windows[0]; for (const t of [...w.tabs]) if (/big\.pdf/.test(decodeURIComponent(t.url))) w.closeTab(t); });
   });
+  await step('0.7.2 after closing a tab: right, left, the tab used before, or the tab that opened it', async () => {
+    await main(() => { const w = global.__ferna.windows[0]; w.switchWorkspace(null); global.__ferna.setSetting('tabPosition', 'top'); });
+    // Strip: … P Q R S. R was opened from P (its parent). Used in the order Q, S, R (R is current).
+    const setup = () => main((_, b) => {
+      const w = global.__ferna.windows[0];
+      for (const t of [...w.tabs]) if (/after-close/.test(t.url || '')) w.closeTab(t);
+      const P = w.newTab(`${b}/long.html?after-close-P`);
+      const Q = w.newTab(`${b}/long.html?after-close-Q`);
+      const R = w.newTab(`${b}/long.html?after-close-R`, { opener: P, index: w.tabs.indexOf(Q) + 1 });
+      const S = w.newTab(`${b}/long.html?after-close-S`);
+      for (const t of [Q, S, R]) w.activate(t);
+      return { P: P.id, Q: Q.id, R: R.id, S: S.id };
+    }, base);
+    const results = {};
+    for (const mode of ['right', 'left', 'previous', 'opener']) {
+      const ids = await setup();
+      const got = await main((_, a) => { const c = global.__ferna; c.setSetting('afterClose', a.mode); const w = c.windows[0]; w.closeTab(w.tabs.find(t => t.id === a.R)); return w.activeId; }, { mode, R: ids.R });
+      results[mode] = Object.keys(ids).find(k => ids[k] === got) || got;
+    }
+    assert(JSON.stringify(results) === JSON.stringify({ right: 'S', left: 'Q', previous: 'S', opener: 'P' }), JSON.stringify(results));
+    // "The tab used before" really follows use, not position: used order S, Q, R → closing R shows Q.
+    const ids = await setup();
+    const got = await main((_, a) => { const c = global.__ferna; c.setSetting('afterClose', 'previous'); const w = c.windows[0]; for (const id of [a.S, a.Q, a.R]) w.activate(w.tabs.find(t => t.id === id)); w.closeTab(w.tabs.find(t => t.id === a.R)); return w.activeId; }, ids);
+    assert(got === ids.Q, `previous → Q (${got})`);
+    // The parent is gone: falls back to the tab on the right.
+    const ids2 = await setup();
+    const got2 = await main((_, a) => { const c = global.__ferna; c.setSetting('afterClose', 'opener'); const w = c.windows[0]; w.closeTab(w.tabs.find(t => t.id === a.P)); w.activate(w.tabs.find(t => t.id === a.R)); w.closeTab(w.tabs.find(t => t.id === a.R)); return w.activeId; }, ids2);
+    assert(got2 === ids2.S, `no parent → right (${got2})`);
+    await main(() => { const c = global.__ferna; c.setSetting('afterClose', 'right'); const w = c.windows[0]; for (const t of [...w.tabs]) if (/after-close/.test(t.url || '')) w.closeTab(t); });
+  });
 };

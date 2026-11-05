@@ -354,7 +354,7 @@ function pageMenu(win, tab, p) {
   const t = [];
   if (p.linkURL) {
     t.push(
-      { label: 'Open link in new tab', click: () => win.newTab(p.linkURL, { activate: false, index: win.tabs.indexOf(tab) + 1 }) },
+      { label: 'Open link in new tab', click: () => win.newTab(p.linkURL, { activate: false, index: win.tabs.indexOf(tab) + 1, opener: tab }) },
       { label: 'Preview link (Shift+click)', click: () => win.openPeek(p.linkURL, tab) },
       { label: 'Open link in split view', click: () => { const t2 = win.newTab(p.linkURL, { activate: false, index: win.tabs.indexOf(tab) + 1, opener: tab }); win.splitWith(tab, t2); } },
       { label: 'Open link in new window', click: () => win.ctx.newWindow({ url: p.linkURL }) },
