@@ -12,6 +12,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const results = [];
 let failed = 0;
 
+let afterFailure = null;
 async function step(name, fn) {
   // FERNA_E2E_ONLY=<regex> runs only matching steps (for debugging one area).
   if (process.env.FERNA_E2E_ONLY && !new RegExp(process.env.FERNA_E2E_ONLY).test(name)) return;
@@ -22,6 +23,9 @@ async function step(name, fn) {
   } catch (e) {
     failed++;
     results.push(`  FAIL ${name}: ${e.message}`);
+    // A failed step must not take the rest of the run down with it: an exam window left open
+    // stays on top and blocks every later click (that cascade happened on GitHub's runners).
+    if (afterFailure) await afterFailure().catch(() => {});
   }
   console.log(results[results.length - 1]);
 }
@@ -33,6 +37,12 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
   const downloads = path.join(profile, 'Downloads');
   fs.mkdirSync(downloads, { recursive: true });
   const { app, display } = await H.launch(profile, { FERNA_TEST_YT_HOST: 'localhost', FERNA_TEST_POLICY: JSON.stringify({ PopupBlocker: 1, TorWindowsAllowed: 0 }) });
+  afterFailure = () => app.evaluate(() => {
+    const ctx = global.__ferna;
+    if (ctx.examWin) ctx.exam.finish(ctx.examWin, 'test');
+    const w = ctx.windows[0];
+    if (w && w.overlayMode) w.closeOverlay();
+  });
   const shot = async name => { await H.sleep(700); H.screenshot(display, path.join(OUT, `${name}.png`)); };
   const main = (fn, arg) => app.evaluate(fn, arg);
   const win = () => main(() => { const w = global.__ferna.windows[0]; return { tabs: w.tabs.map(t => ({ id: t.id, kind: t.kind, url: t.url, title: t.title, ws: w.tabWorkspace(t), override: t.wsOverride })), active: w.activeId, layout: w.layoutState(), currentWs: w.currentWs, overlay: w.overlayMode }; });

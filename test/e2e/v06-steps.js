@@ -137,9 +137,11 @@ module.exports = async function v06({ step, assert, main, win, page, H, base, sh
     await H.sleep(600);
     e = await ex();
     assert(e && e.tabs === 1 && (await main(() => global.__ferna.windows.length)) >= 2, 'still open, still one tab');
+    // Real focus changes on a desktop (or a CI runner) may already have been recorded: count new ones.
+    const leftBefore = (await ex()).log.leftWindow.length;
     await main(() => global.__ferna.examWin.win.emit('blur'));
     await H.sleep(300);
-    assert((await ex()).log.leftWindow.length === 1, 'leaving recorded');
+    assert((await ex()).log.leftWindow.length === leftBefore + 1, 'leaving recorded');
     await shot('v06-05-exam-window');
     // End: wrong password first, then the right one.
     await main(() => global.__ferna.examWin.openOverlay('exampw', { title: 'Mid-semester quiz' }));
@@ -156,7 +158,7 @@ module.exports = async function v06({ step, assert, main, win, page, H, base, sh
     assert(vis, 'other windows back');
     const logs = fs.readdirSync(path.join(profile, 'exam-logs'));
     const log = JSON.parse(fs.readFileSync(path.join(profile, 'exam-logs', logs[0]), 'utf8'));
-    assert(log.endedBy === 'invigilator' && log.blocked.length === 1 && log.leftWindow.length === 1 && log.wrongPasswords === 1, JSON.stringify(log));
+    assert(log.endedBy === 'invigilator' && log.blocked.length === 1 && log.leftWindow.length >= 1 && log.wrongPasswords === 1, JSON.stringify(log));
   });
 
   await step('0.6 secure exam: time limit ends the exam by itself; exam file holds only a password hash', async () => {

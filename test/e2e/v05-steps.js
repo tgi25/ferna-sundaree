@@ -266,7 +266,9 @@ module.exports = async function v05({ step, assert, main, win, page, H, base, sh
   await step('0.5 translate: page goes through Google Translate when chosen', async () => {
     await main(() => global.__ferna.settings.set('translateService', 'google'));
     await main(() => global.__ferna.windows[0].run('translatePage'));
-    await H.until(async () => decodeURIComponent(await main(() => global.__ferna.windows[0].active.url)).includes('translate.google.com/translate?sl=auto&tl=en'), 8000, 'translate url');
+    // Offline it stays on (or shows an error page for) translate.google.com; online, Google sends
+    // it on to the site's *.translate.goog address. Either means the page went through Translate.
+    await H.until(async () => { const u = decodeURIComponent(await main(() => global.__ferna.windows[0].active.url)); return u.includes('translate.google.com/translate?sl=auto&tl=en') || /^https:\/\/[^/]+\.translate\.goog\//.test(u); }, 12000, 'translate url');
     await main(() => global.__ferna.settings.set('translateService', ''));
   });
 
