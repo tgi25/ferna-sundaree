@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { ref: '${{ inputs.ref || github.ref }}' }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - name: Known vulnerabilities in shipped dependencies (fails on high or critical)
@@ -65,7 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { ref: '${{ inputs.ref || github.ref }}' }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - name: Update mirrors known to the installed browser
@@ -127,7 +127,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { ref: '${{ inputs.ref || github.ref }}' }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - name: Packaging tools (rpmbuild for .rpm)
@@ -169,7 +169,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { ref: '${{ inputs.ref || github.ref }}' }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22 }
       - uses: actions/download-artifact@v4
         with: { path: dist, merge-multiple: true }
