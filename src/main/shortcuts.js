@@ -35,7 +35,7 @@ const DEFAULTS = {
   closeTab: ['Ctrl+W', 'Ctrl+F4'],
   reopenTab: ['Ctrl+Shift+T'],
   recentTab: ['Ctrl+Tab'],
-  recentTabBack: ['Ctrl+Shift+Tab'],
+  recentTabBack: ['Ctrl+Shift+Tab'], // same as recentTab: flips between the last two tabs
   nextTab: ['Ctrl+PageDown'],
   prevTab: ['Ctrl+PageUp'],
   newWindow: ['Ctrl+N'],
@@ -79,7 +79,7 @@ const LABELS = {
   sleepTab: 'Put this tab to sleep', taskManager: 'Task manager', readerMode: 'Reading mode', readAloud: 'Read aloud',
   translatePage: 'Translate this page', assistant: 'AI assistant side panel', passwords: 'Passwords and autofill',
   examMode: 'Secure exam mode', parentalControls: 'Parental controls', readingList: 'Reading list', addToReadingList: 'Add this page to the reading list', torWindow: 'New private window with Tor', installApp: 'Install this site as an app',
-  newTab: 'New tab', closeTab: 'Close tab', reopenTab: 'Reopen closed tab', recentTab: 'Previously used tab (hold Ctrl and press Tab again to go further back)', recentTabBack: 'Recently used tabs, the other way', nextTab: 'Next tab (strip order)', prevTab: 'Previous tab (strip order)',
+  newTab: 'New tab', closeTab: 'Close tab', reopenTab: 'Reopen closed tab', recentTab: 'Previously used tab (press again to come back)', recentTabBack: 'Previously used tab (also)', nextTab: 'Next tab (strip order)', prevTab: 'Previous tab (strip order)',
   newWindow: 'New window', privateWindow: 'New private window', focusAddress: 'Address bar', find: 'Find in page',
   history: 'History', downloads: 'Downloads', bookmark: 'Bookmark this page', bookmarkManager: 'Bookmark manager',
   zoomIn: 'Zoom in', zoomOut: 'Zoom out', zoomReset: 'Reset zoom', zoomType: 'Zoom type: full / text only', zoomAutoFit: 'Zoom AutoFit (fit to width)', fontReset: 'Reset minimum font size', zoomPanel: 'Zoom panel', extensions: 'Extensions', back: 'Back', forward: 'Forward',

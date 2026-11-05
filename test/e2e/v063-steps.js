@@ -8,21 +8,24 @@ module.exports = async function v063({ step, assert, main, win, page, H, base, s
   const active = async () => { const s = await win(); return s.tabs.find(t => t.id === s.active); };
   const state = () => main(() => global.__ferna.windows[0].state());
 
-  await step('0.6.3 Ctrl+Tab goes to the previously used tab; holding Ctrl walks further back', async () => {
+  await step('0.7.0 Ctrl+Tab flips between the current tab and the one used before', async () => {
     await main(() => { const w = global.__ferna.windows[0]; w.switchWorkspace(null); });
     for (const q of ['a', 'b', 'c']) await freshTab(`${base}/long.html?mru-${q}`);
     const id = async q => (await win()).tabs.find(t => t.url.includes(`mru-${q}`)).id;
     const A = await id('a'), B = await id('b'), C = await id('c');
     // Visit order: A, C, B (B is current).
-    for (const t of [A, C, B]) { await main((_, i) => { const w = global.__ferna.windows[0]; w.activate(w.tabs.find(x => x.id === i)); w.mru = null; }, t); await H.sleep(60); }
+    for (const t of [A, C, B]) { await main((_, i) => { const w = global.__ferna.windows[0]; w.activate(w.tabs.find(x => x.id === i)); }, t); await H.sleep(60); }
     const ctrlTab = () => main(() => global.__ferna.windows[0].run('recentTab'));
-    const ctrlUp = () => main(() => global.__ferna.windows[0].onKey({ preventDefault() {} }, { type: 'keyUp', key: 'Control' }, null));
-    await ctrlTab(); await ctrlUp();
+    await ctrlTab();
     assert((await win()).active === C, 'Ctrl+Tab → the tab used before (C)');
-    await ctrlTab(); await ctrlUp();
+    await ctrlTab();
     assert((await win()).active === B, 'Ctrl+Tab again → back to B');
-    await ctrlTab(); await ctrlTab(); await ctrlUp();
-    assert((await win()).active === A, 'holding Ctrl, Tab twice → A');
+    await ctrlTab(); await H.sleep(1500); await ctrlTab();
+    assert((await win()).active === B, 'pressed twice (even slowly, Ctrl held or not) → back where you started');
+    // Real key presses through the page.
+    const send = (type, keyCode, mods) => main((e, a) => { const w = global.__ferna.windows[0]; w.active.view.webContents.sendInputEvent({ type: a.type, keyCode: a.keyCode, modifiers: a.mods }); }, { type, keyCode, mods });
+    await send('keyDown', 'Control', ['control']); await send('keyDown', 'Tab', ['control']); await send('keyUp', 'Tab', ['control']); await send('keyUp', 'Control', []);
+    await H.until(async () => (await win()).active === C, 3000, 'real Ctrl+Tab → C');
     const keys = await main(() => global.__ferna.shortcuts.map);
     assert(keys.recentTab.some(k => k.code === 'Tab' && k.ctrl && !k.shift) && keys.nextTab.every(k => k.code !== 'Tab'), JSON.stringify({ r: keys.recentTab, n: keys.nextTab }));
   });

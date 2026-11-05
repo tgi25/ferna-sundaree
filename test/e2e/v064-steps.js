@@ -240,4 +240,27 @@ module.exports = async function v064({ step, assert, main, win, page, H, base, s
     assert(results.some(r => darkBar(r) && r.position === 'left'), 'a dark bar was tested');
     assert(!bad.length, JSON.stringify(bad));
   });
+  await step('0.7.0 filter lists are parsed in a separate process: pages never wait for it', async () => {
+    const r = await main(async (_, url) => {
+      const b = global.__ferna.blocker;
+      const old = b.engine;
+      b.testLists = [url];
+      // Measure how late a 10 ms timer fires in the main process while the lists are parsed.
+      let worst = 0, last = Date.now();
+      const iv = setInterval(() => { const now = Date.now(); worst = Math.max(worst, now - last - 10); last = now; }, 10);
+      let err = null;
+      try { await b.refresh(); } catch (e) { err = String(e); }
+      clearInterval(iv);
+      b.testLists = null;
+      if (!b.engine) return { err, noEngine: true, status: b.status, lib: !!b.lib, worst };
+      const { Request } = b.lib;
+      const blocked = b.engine.match(Request.fromRawDetails({ url: 'https://ads.ferna-test.example/x.js', sourceUrl: 'https://news.example/', type: 'script' })).match;
+      const fresh = b.engine !== old;
+      // Put the real lists back for the rest of the run.
+      b.engine = old;
+      return { err, blocked, fresh, worst };
+    }, `http://localhost:${new URL(base).port}/mini-list.txt`);
+    assert(!r.err && r.fresh && r.blocked, JSON.stringify(r));
+    assert(r.worst < 250, `main process stalled ${r.worst} ms`);
+  });
 };

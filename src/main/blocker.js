@@ -68,10 +68,12 @@ class Blocker {
   }
 
   async refresh() {
-    const engine = await this.lib.ElectronBlocker.fromLists(fetch, [...LISTS, ...(this.extraLists || [])], {
-      loadCosmeticFilters: true, loadNetworkFilters: true, enableCompression: true,
-    });
-    const bytes = engine.serialize();
+    // Downloaded and parsed in a utility process: parsing takes seconds, and every web request
+    // waits for the main process, so doing it here froze pages while they loaded.
+    const lists = process.env.FERNA_TEST && this.testLists ? this.testLists : [...LISTS, ...(this.extraLists || [])];
+    const r = await require('./listworker').runJob({ kind: 'blocker', lists, offline: !!(process.env.FERNA_TEST && this.testLists) });
+    const bytes = r.bytes instanceof Uint8Array ? r.bytes : new Uint8Array(r.bytes);
+    const engine = this.lib.ElectronBlocker.deserialize(bytes);
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
     fs.writeFileSync(`${this.file}.tmp`, bytes);
     fs.renameSync(`${this.file}.tmp`, this.file);

@@ -425,6 +425,7 @@ class FernaWindow {
     const bothInSplit = prev && this.inSplit(prev.id) && this.inSplit(tab.id);
     if (prev && prev !== tab) {
       prev.lastActive = Date.now();
+      this.prevTabId = prev.id; // Ctrl+Tab goes back here
       if (!bothInSplit) {
         this.autoPipOnLeave(prev);
         if (prev.view) { this.snapshot(prev); this.win.contentView.removeChildView(prev.view); }
@@ -881,8 +882,6 @@ class FernaWindow {
   // ---------- keyboard & commands ----------
 
   onKey(e, input, wc) {
-    // Letting go of Ctrl ends a Ctrl+Tab walk through recently used tabs.
-    if (input.type === 'keyUp' && (input.key === 'Control' || input.key === 'Meta')) this.mru = null;
     const cmd = this.ctx.shortcuts.commandFor(input);
     if (this.exam && this.ctx.examKey && wc !== this.overlay.webContents && this.ctx.examKey(this, e, input, cmd)) return;
     if (!cmd) return;
@@ -974,18 +973,11 @@ class FernaWindow {
         break;
       }
       case 'recentTab': case 'recentTabBack': {
-        // Most recently used order, as in Firefox: Ctrl+Tab goes to the tab you were on before;
-        // pressing Tab again while still holding Ctrl goes one further back.
+        // Ctrl+Tab switches to the tab you used just before; pressing it again comes back, so it
+        // flips between the two most recent tabs (TGI's choice). Ctrl+PageDown/Up keep strip order.
         const visible = new Set(this.visibleOrder());
-        if (!this.mru || Date.now() - this.mru.at > 4000) {
-          const order = this.tabs.filter(x => visible.has(x.id)).sort((a, b) => (b.id === this.activeId) - (a.id === this.activeId) || (b.lastActive || 0) - (a.lastActive || 0)).map(x => x.id);
-          this.mru = { order, i: 0, at: Date.now() };
-        }
-        const m = this.mru;
-        if (m.order.length < 2) break;
-        m.i = (m.i + (cmd === 'recentTab' ? 1 : -1) + m.order.length) % m.order.length;
-        m.at = Date.now();
-        const next = this.tabs.find(x => x.id === m.order[m.i]);
+        let next = this.tabs.find(x => x.id === this.prevTabId && x.id !== this.activeId && visible.has(x.id));
+        if (!next) next = this.tabs.filter(x => x.id !== this.activeId && visible.has(x.id)).sort((a, b) => (b.lastActive || 0) - (a.lastActive || 0))[0];
         if (next) this.activate(next);
         break;
       }

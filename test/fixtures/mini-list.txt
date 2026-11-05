@@ -1,0 +1,3 @@
+! test list
+||ads.ferna-test.example^
+127.0.0.1##.ferna-test-ad

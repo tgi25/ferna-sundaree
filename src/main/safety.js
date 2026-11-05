@@ -97,13 +97,10 @@ class Safety {
   }
 
   async refresh() {
-    const out = {};
-    for (const [k, name] of Object.entries(LISTS)) {
-      const list = parseList(await this.fetchList(name));
-      out[k] = { hosts: [...list.hosts], pages: [...list.pages] };
-    }
+    // Downloaded and parsed in a utility process, so web requests never wait for it.
+    const { out, json } = await require('./listworker').runJob({ kind: 'safety', mirrors: MIRRORS, lists: LISTS });
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
-    fs.writeFileSync(`${this.file}.tmp`, JSON.stringify(out));
+    fs.writeFileSync(`${this.file}.tmp`, json);
     fs.renameSync(`${this.file}.tmp`, this.file);
     this.load(out);
     this.updated = new Date();

@@ -130,6 +130,16 @@ function initStores() {
   ctx.sessionStore = new JsonStore(P('session.enc'), { windows: [] }, { encrypt: true });
   ctx.shotsStore = new JsonStore(P('screenshots.json'), {});
   ctx.pdfStore = new JsonStore(P('pdf-reader.enc'), { sync: {}, local: {} }, { encrypt: true });
+  // 0.7.0: Ctrl+Tab / Ctrl+Shift+Tab belong to "previous tab" (flip between the last two). Older
+  // saved keys that gave them to next/previous tab in strip order are moved off.
+  if (!ctx.settings.data.keys070) ctx.settings.update(d => {
+    const sc = d.shortcuts || (d.shortcuts = {});
+    for (const [cmd, key] of [['nextTab', 'ctrl+tab'], ['prevTab', 'ctrl+shift+tab']]) {
+      if (Array.isArray(sc[cmd])) { sc[cmd] = sc[cmd].filter(k => String(k).toLowerCase().replace(/\s/g, '') !== key); if (!sc[cmd].length) delete sc[cmd]; }
+    }
+    for (const cmd of ['recentTab', 'recentTabBack']) if (Array.isArray(sc[cmd]) && !sc[cmd].length) delete sc[cmd];
+    d.keys070 = true;
+  });
   ctx.shortcuts = new ShortcutRegistry(ctx.settings.data.shortcuts);
   pruneHistory();
 }
@@ -765,7 +775,13 @@ function hardenSession(ses, { private: isPrivate = false } = {}) {
         const r = ctx.blocker.match(details);
         if (r.block) {
           const tab = ctx.tabForContents(webContentsId);
-          if (tab) { tab.blocked = (tab.blocked || 0) + 1; const w = ctx.contents.get(webContentsId); if (w && w.activeId === tab.id) w.pushState(); }
+          if (tab) {
+            tab.blocked = (tab.blocked || 0) + 1;
+            // The shield's counter: at most twice a second (busy sites block requests constantly,
+            // and redrawing the browser for each one kept the main process needlessly busy).
+            const w = ctx.contents.get(webContentsId);
+            if (w && w.activeId === tab.id && !w._countTimer) w._countTimer = setTimeout(() => { w._countTimer = null; if (!w.win.isDestroyed()) w.pushState(); }, 500);
+          }
           return cb({ cancel: true });
         }
         if (r.redirect) return cb({ redirectURL: r.redirect });
