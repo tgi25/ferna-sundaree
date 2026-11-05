@@ -3,7 +3,7 @@
 // dragging a tab onto the common bar or the pinned area, ad-blocking scriptlets once at page
 // start, pinning PDFs from the tab menu, local files claimed by pinned folders.
 
-module.exports = async function v064({ step, assert, main, win, page, H, base, shot, freshTab, evalActive }) {
+module.exports = async function v064({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, app }) {
   const ui = () => page('ferna://ui/');
   const active = async () => { const s = await win(); return s.tabs.find(t => t.id === s.active); };
   const state = () => main(() => global.__ferna.windows[0].state());
@@ -262,5 +262,32 @@ module.exports = async function v064({ step, assert, main, win, page, H, base, s
     }, `http://localhost:${new URL(base).port}/mini-list.txt`);
     assert(!r.err && r.fresh && r.blocked, JSON.stringify(r));
     assert(r.worst < 250, `main process stalled ${r.worst} ms`);
+  });
+  await step('0.7.1 PDF reader pre-renders upcoming pages in the background (instant page turns)', async () => {
+    await main((_, b) => global.__ferna.windows[0].newTab(`${b}/big.pdf`), base);
+    const pv = await H.until(() => app.windows().find(p => p.url().includes('big.pdf')), 8000, 'reader page');
+    await H.until(() => pv.evaluate(() => document.querySelector('#welcome').hidden && window.__fernaViewer && window.__fernaViewer.pages.length === 60), 15000, 'opened (60 pages)');
+    // Without scrolling, the next pages get drawn while idle.
+    await H.until(() => pv.evaluate(() => window.__fernaViewer.prerenderStatus().ahead >= 6), 15000, 'pages ahead drawn');
+    let st = await pv.evaluate(() => window.__fernaViewer.prerenderStatus());
+    // Jump to page 30: the pages after it are drawn too; far pages are freed.
+    await pv.evaluate(() => window.__fernaViewer.goToPage(30));
+    await H.until(() => pv.evaluate(() => { const s = window.__fernaViewer.prerenderStatus(); return s.current === 29 && s.ahead >= 6; }), 15000, 'ahead of page 30');
+    const far = await pv.evaluate(() => window.__fernaViewer.pages.slice(0, 10).filter(p => p.renderedKey).length);
+    assert(far === 0, `pages 1–10 freed (${far} kept)`);
+    // A page that was pre-rendered shows at once: no placeholder, canvas already there.
+    const instant = await pv.evaluate(async () => {
+      const v = window.__fernaViewer; const target = v.pages[33];
+      const ready = !!target.renderedKey && !!target.canvasWrapper.querySelector('canvas');
+      v.goToPage(34);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      return { ready, canvas: !!target.canvasWrapper.querySelector('canvas'), placeholder: target.div.contains(target.placeholder) };
+    });
+    assert(instant.ready && instant.canvas && !instant.placeholder, JSON.stringify(instant));
+    // Turned off in the reader's settings: nothing beyond the neighbours is drawn.
+    const off = await pv.evaluate(async () => { const v = window.__fernaViewer; v.settings.prerender = false; v.goToPage(50); await new Promise(r => setTimeout(r, 2500)); const s = v.prerenderStatus(); v.settings.prerender = true; return s; });
+    assert(off.drawn <= 13, JSON.stringify(off));
+    await shot('v071-01-pdf-prerender');
+    await main(() => { const w = global.__ferna.windows[0]; for (const t of [...w.tabs]) if (/big\.pdf/.test(decodeURIComponent(t.url))) w.closeTab(t); });
   });
 };

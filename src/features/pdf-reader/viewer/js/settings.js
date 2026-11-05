@@ -13,6 +13,7 @@ const DEFAULTS = {
   refPopupZoom: 1,            // v1.5: default popup zoom (1 = page width fills the popup)
   refPopupRemember: false,
   ocrLang: 'eng',              // v1.5: OCR language — 'eng' | 'sin' | 'sin+eng'    // v1.5: keep the size/zoom last set with the mouse as the new default
+  prerender: true,           // Sundaree: draw upcoming pages in the background (instant page turns)
   smoothSelect: true,         // v1.4: Ferna's own text selection (nearest character, line bands)
   wordSelect: true,           // v1.4: dragging selects whole words (Alt = single characters)
   aiLanguage: 'auto',         // v1.4: answer language — 'auto' | 'en' | 'si'

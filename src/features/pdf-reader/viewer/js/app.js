@@ -50,7 +50,8 @@ const state = {
 };
 
 const container = $('#viewerContainer');
-const viewer = new Viewer(container, $('#viewer'));
+const viewer = new Viewer(container, $("#viewer"));
+window.__fernaViewer = viewer; // read by the browser's tests (pre-render status)
 const store = new AnnotationStore();
 viewer.history = store;
 let tools, search, sidebar, doctext, refPopup, engine, aiPanel;
@@ -1062,6 +1063,7 @@ async function openSettings() {
     row('Keep shape, text and note tools active', 'Otherwise they return to Select after one use.', chk('stickyTools')),
     row('Default zoom', null, zoomSel),
     row('Remember last page and zoom per document', null, chk('rememberPosition')),
+    row('Pre-render upcoming pages', 'While you read, the next pages are drawn in the background so turning pages is instant, even in large PDFs. Uses more memory; turn off on low-memory computers.', chk('prerender')),
     row('Show cross-references as popups', 'Figure, table, equation and citation references open a preview card instead of jumping away. Ctrl+click a link to jump.', chk('refPopups')),
     row('Popup size (width × height)', 'Default size of reference, figure and table popups. You can still resize a popup from its edges with the mouse.', popSize),
     row('Popup zoom', 'Default zoom inside the popup. Ctrl + wheel (or a touchpad pinch) over a popup zooms on the fly.', popZoom),

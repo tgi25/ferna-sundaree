@@ -1,7 +1,7 @@
 # Ferna Sundaree
 
 A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **Ferna PDF Reader** and
-**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.7.0.
+**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.7.1.
 
 ## What it does
 
@@ -15,7 +15,7 @@ A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **F
 | Site icons kept | Each site's icon is kept on the PC (encrypted with the profile, as history is), so sleeping tabs, pinned sites and common-bar pages keep their icon in colour when not loaded and after a restart; private windows keep none; cleared with history |
 | Recently used tab | `Ctrl+Tab` flips between the current tab and the one used before (press again to come back); `Ctrl+PageDown`/`PageUp` keep strip order |
 | See every open page | Tab Overview `Ctrl+Shift+A` (live thumbnails, grouped by workspace); Ferna Tabs list at the pointer `Alt+Shift+L`; command palette `Ctrl+K` |
-| Ferna PDF Reader | Opens every PDF (any address); Save overwrites local files directly — the browser plays the save helper |
+| Ferna PDF Reader | Opens every PDF (any address); Save overwrites local files directly — the browser plays the save helper; upcoming pages are pre-rendered in the background while you read (8 ahead in your reading direction, 2 behind, page data for 24 ahead; bounded by an 80-megapixel budget; Settings → Pre-render upcoming pages) so page turns are instant in large PDFs |
 | Ferna Screenshots | `Alt+Shift+V` visible, `F` entire page (one capture, no stitching), `R` region across the whole page, `E` element; opens in the Screenshots editor |
 | Chrome extensions and themes | “Add to Chrome” works on chromewebstore.google.com; install .crx (signature verified) or .zip; load unpacked folders; toolbar buttons, popups, badges, pin from the puzzle menu; Chrome themes recolour the bars and new tab page. Permissions are shown before every install |
 | No Windows title bar | Minimise / maximise / close sit on the tab bar (tabs on top) or the toolbar (vertical tabs: one bar, as in Brave); `Ctrl+Shift+H` hides them with the tab bar |

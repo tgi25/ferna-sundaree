@@ -7,6 +7,13 @@ const PAGE_GAP = 12;          // vertical gap between pages (px)
 const SIDE_MARGIN = 12;       // left/right margin around a page (px)
 const MAX_CANVAS_PIXELS = 24e6;
 const KEEP_RENDERED = 12;     // pages kept in memory around the current page
+// Background pre-rendering: once the pages on screen are drawn, the next pages in the direction
+// you are reading are drawn while the reader is idle, so turning pages is instant even in large
+// documents. Bounded by a pixel budget so huge pages or high zoom do not use too much memory.
+const PRERENDER_AHEAD = 8;    // pages ahead of the current one
+const PRERENDER_BEHIND = 2;   // pages behind it
+const PRERENDER_PIXELS = 80e6; // canvas pixels kept for pre-rendered pages (≈ 320 MB at most)
+const PREFETCH_PAGES = 24;     // pages whose data is loaded ahead (cheap: no drawing)
 export const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6.4];
 
 export class PageView {
@@ -273,7 +280,13 @@ export class Viewer extends Emitter {
     this._renderQueueBusy = false;
     this._scrollRaf = 0;
 
+    this._dir = 1;             // reading direction: 1 down, -1 up
+    this._lastTop = 0;
+    this._lastScrollAt = 0;
     container.addEventListener('scroll', () => {
+      const t = container.scrollTop;
+      if (t !== this._lastTop) { this._dir = t > this._lastTop ? 1 : -1; this._lastTop = t; }
+      this._lastScrollAt = performance.now();
       if (this._scrollRaf) return;
       this._scrollRaf = requestAnimationFrame(() => { this._scrollRaf = 0; this._onScroll(); });
     }, { passive: true });
@@ -513,6 +526,9 @@ export class Viewer extends Emitter {
       if (pv.div.offsetTop <= probe) cur = i;
     }
     this.visible = visible;
+    // A background page being drawn gives way to pages that came on screen, or that you left behind.
+    const bg = this._bgPage;
+    if (bg && (visible.some((i) => this.pages[i] && !this._isDrawn(this.pages[i])) || !this._prerenderOrder().includes(bg.index))) bg.cancelRender();
     if (cur !== this.current || force) {
       const changed = cur !== this.current;
       this.current = cur;
@@ -522,14 +538,42 @@ export class Viewer extends Emitter {
   }
 
   renderVisible() {
+    if (this._renderQueueBusy) this._again = true; // the running pass starts over when it ends
     clearTimeout(this._renderTimer);
     this._renderTimer = setTimeout(() => this._pump(), 30);
   }
 
+  /** Wait until the reader is idle (not scrolling, browser idle), at most ~0.5 s. */
+  _idle() {
+    return new Promise((resolve) => {
+      const go = () => {
+        if (performance.now() - this._lastScrollAt < 150) { setTimeout(go, 120); return; }
+        if (typeof requestIdleCallback === 'function') requestIdleCallback(() => resolve(), { timeout: 500 });
+        else setTimeout(resolve, 16);
+      };
+      go();
+    });
+  }
+
+  /** Pages to draw in the background, nearest first, ahead of the current page before behind it. */
+  _prerenderOrder() {
+    const out = [], n = this.pages.length, c = this.current, dir = this._dir || 1;
+    for (let d = 1; d <= Math.max(PRERENDER_AHEAD, PRERENDER_BEHIND); d++) {
+      if (d <= PRERENDER_AHEAD) { const i = c + dir * d; if (i >= 0 && i < n) out.push(i); }
+      if (d <= PRERENDER_BEHIND) { const i = c - dir * d; if (i >= 0 && i < n) out.push(i); }
+    }
+    return out;
+  }
+
+  _isDrawn(pv) { return pv.renderedKey === `${pv.scale.toFixed(4)}|${pv.rotation}`; }
+
   async _pump() {
     if (this._renderQueueBusy || !this.pages.length) return;
     this._renderQueueBusy = true;
+    this._again = false;
+    const docAtStart = this.pdf;
     try {
+      // 1. The pages on screen, then their neighbours: right away.
       while (true) {
         const vis = this.visible || [];
         const want = [...vis];
@@ -538,20 +582,64 @@ export class Viewer extends Emitter {
           if (b < this.pages.length) want.push(b);
           if (a >= 0) want.push(a);
         }
-        const next = want.map((i) => this.pages[i]).find((pv) => pv && pv.renderedKey !== `${pv.scale.toFixed(4)}|${pv.rotation}`);
+        const next = want.map((i) => this.pages[i]).find((pv) => pv && !this._isDrawn(pv));
         if (!next) break;
         await next.render();
       }
-      // free canvases far from the current page
-      const keep = new Set();
-      for (let d = 0; keep.size < KEEP_RENDERED && d < this.pages.length; d++) {
-        if (this.current - d >= 0) keep.add(this.current - d);
-        if (this.current + d < this.pages.length) keep.add(this.current + d);
+      this._release();
+      // 2. Upcoming pages, while you read: one at a time when idle; anything that comes on
+      //    screen meanwhile goes first (the loop starts over).
+      if (this.settings?.prerender !== false) {
+        let budget = PRERENDER_PIXELS;
+        for (const i of this._prerenderOrder()) {
+          const pv = this.pages[i];
+          if (!pv) continue;
+          if (!this._isDrawn(pv)) {
+            await this._idle();
+            if (this.pdf !== docAtStart || !this.pages.length) return;
+            const vis = this.visible || [];
+            if (this._again || vis.some((v) => this.pages[v] && !this._isDrawn(this.pages[v]))) { this._again = true; return; }
+            if (!this._prerenderOrder().includes(i)) continue; // you moved on: skip it
+            this._bgPage = pv;
+            await pv.render();
+            this._bgPage = null;
+          }
+          const c = pv.canvasWrapper.querySelector('canvas');
+          budget -= c ? c.width * c.height : 0;
+          if (budget <= 0) break;
+        }
+        this._release();
+        // Page data (not drawing) further ahead, so even far jumps start sooner.
+        const c = this.current, dir = this._dir || 1;
+        for (let d = 1; d <= PREFETCH_PAGES; d++) {
+          const i = c + dir * d;
+          if (i < 0 || i >= this.pages.length) break;
+          if (!this.pages[i].pdfPage) { await this._idle(); if (this.pdf !== docAtStart || this._again) return; try { await this.pages[i].ensurePage(); } catch { break; } }
+        }
       }
-      for (const pv of this.pages) if (!keep.has(pv.index) && pv.renderedKey) pv.releaseCanvas();
     } finally {
+      this._bgPage = null;
       this._renderQueueBusy = false;
+      if (this._again) { this._again = false; this.renderVisible(); }
     }
+  }
+
+  /** Free canvases far from where you are (the pages pre-rendered ahead are kept). */
+  _release() {
+    const keep = new Set(this.visible || []);
+    for (let d = 0; keep.size < KEEP_RENDERED && d < this.pages.length; d++) {
+      if (this.current - d >= 0) keep.add(this.current - d);
+      if (this.current + d < this.pages.length) keep.add(this.current + d);
+    }
+    if (this.settings?.prerender !== false) for (const i of this._prerenderOrder()) keep.add(i);
+    for (const pv of this.pages) if (!keep.has(pv.index) && pv.renderedKey && pv !== this._bgPage) pv.releaseCanvas();
+  }
+
+  /** Pre-rendered pages and memory, for the status of the reader (and tests). */
+  prerenderStatus() {
+    let drawn = 0, pixels = 0;
+    for (const pv of this.pages) { if (this._isDrawn(pv)) { drawn++; const c = pv.canvasWrapper.querySelector('canvas'); pixels += c ? c.width * c.height : 0; } }
+    return { current: this.current, dir: this._dir, drawn, pixels, ahead: this._prerenderOrder().filter((i) => this._isDrawn(this.pages[i])).length };
   }
 
   pageFromEvent(e) {
