@@ -1,7 +1,7 @@
 # Ferna Sundaree
 
 A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **Ferna PDF Reader** and
-**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.7.2.
+**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.7.3.
 
 ## What it does
 
