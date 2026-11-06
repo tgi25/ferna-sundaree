@@ -22,6 +22,15 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
         return { d3: document.body.classList.contains('d3'), transform: cs.transform, shadow: cs.boxShadow, rx: t.style.getPropertyValue('--rx'), ry: t.style.getPropertyValue('--ry'), bar: getComputedStyle(document.querySelector('#toolbar')).boxShadow };
       }, box.id);
     };
+    // At rest, buttons and tabs are flat; the current tab stays raised.
+    await u.mouse.move(5, 300);
+    await H.sleep(400);
+    const rest = await u.evaluate(() => {
+      const other = document.querySelector('#tabs .tab[data-id]:not(.active)'), cur = document.querySelector('#tabs .tab.active'), b = document.querySelector('#btn-reload');
+      const cs = e => getComputedStyle(e);
+      return { otherT: cs(other).transform, otherImg: cs(other).backgroundImage, btnT: cs(b).transform, btnImg: cs(b).backgroundImage, btnShadow: cs(b).boxShadow, curT: cs(cur).transform, curShadow: cs(cur).boxShadow };
+    });
+    assert(rest.otherT === 'none' && rest.otherImg === 'none' && rest.btnT === 'none' && rest.btnImg === 'none' && !/rgba?\([^)]*\) 0px 2px 0px/.test(rest.btnShadow) && rest.curT !== 'none' && /px/.test(rest.curShadow), JSON.stringify(rest));
     const light = await pick('top', 'light');
     assert(light.d3 && light.transform !== 'none' && /matrix3d|matrix/.test(light.transform) && light.rx && light.ry && /inset/.test(light.bar), JSON.stringify(light));
     await shot('v080-01-3d-light-top');
@@ -275,5 +284,31 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
     await shot('v080-12-smartws-settings');
     await main((_, id) => { const c = global.__ferna; c.deleteWorkspace(id); const w = c.windows[0]; for (const t of [...w.tabs]) if (/\.localhost:|ferna:\/\/settings/.test(t.url)) w.closeTab(t); }, made.w.id);
     assert(await main(() => (global.__ferna.settings.data.wsSchedules || []).length === 0), 'schedule removed with its workspace');
+  });
+  await step('0.8.1 Ctrl+Shift+H: a bar brought back by the window edge never keeps it on screen', async () => {
+    await main(() => global.__ferna.setSetting('tabPosition', 'top'));
+    // Hide, bring it back with the edge, show with the key, hide with the key: it must hide.
+    await main(() => global.__ferna.windows[0].run('toggleTabBar'));
+    await main(() => { const w = global.__ferna.windows[0]; w.reveal.tabs = true; w.relayout(); });
+    await main(() => global.__ferna.windows[0].run('toggleTabBar'));
+    await main(() => global.__ferna.windows[0].run('toggleTabBar'));
+    await H.sleep(200);
+    assert(!(await win()).layout.showTabs, 'hidden after the key');
+    // Brought back by the edge: goes away once the pointer is on the page (real pointer, if xdotool is here).
+    let xdo = false;
+    try { require('child_process').execSync('command -v xdotool', { stdio: 'ignore' }); xdo = true; } catch { xdo = false; }
+    if (xdo) {
+      const disp = await main(() => process.env.DISPLAY);
+      const mv = (x, y) => require('child_process').execSync(`DISPLAY=${disp} xdotool mousemove ${x} ${y}`);
+      const b = await main(() => global.__ferna.windows[0].win.getContentBounds());
+      mv(b.x + 300, b.y + 5);
+      await main(() => { const w = global.__ferna.windows[0]; w.reveal.tabs = true; w.relayout(); });
+      await H.sleep(1000);
+      assert((await win()).layout.showTabs, 'stays while the pointer is on the bars');
+      mv(b.x + 500, b.y + 500);
+      await H.until(async () => !(await win()).layout.showTabs, 3000, 'hides once the pointer is on the page');
+    }
+    await main(() => global.__ferna.windows[0].run('toggleTabBar'));
+    assert((await win()).layout.showTabs, 'shown again');
   });
 };

@@ -806,6 +806,32 @@ class FernaWindow {
     } else if (t && t.view) t.view.setBounds(content);
     if (this.peek) this.layoutPeek();
     this.pushState();
+    if (this.reveal.tabs || this.reveal.toolbar) this.watchReveal();
+  }
+
+  /**
+   * Bars brought back by the window edge go away again once the pointer has been on the page for
+   * half a second. Checked here from the pointer position, because the bars' own "pointer left"
+   * event is missed when the pointer moves quickly onto the page (it then sits in another view).
+   */
+  watchReveal() {
+    if (this._revealTimer) return;
+    let away = 0;
+    this._revealTimer = setInterval(() => {
+      if (this.win.isDestroyed() || !(this.reveal.tabs || this.reveal.toolbar)) { clearInterval(this._revealTimer); this._revealTimer = null; return; }
+      const s = this.ctx.settings.data;
+      if (!s.tabBarHidden && !this.focus) { this.reveal = { tabs: false, toolbar: false }; clearInterval(this._revealTimer); this._revealTimer = null; this.relayout(); return; }
+      if (this.overlayMode || (this.ui.webContents.isFocused() && this.win.isFocused())) { away = 0; return; } // typing in the address bar, a menu open
+      const p = screen.getCursorScreenPoint();
+      const b = this.win.getContentBounds();
+      const L = this.layoutState();
+      const c = this.sideLayout(L.content);
+      const x = p.x - b.x, y = p.y - b.y;
+      const inWin = x >= 0 && y >= 0 && x < b.width && y < b.height;
+      const onPage = inWin && x >= c.x && x < c.x + c.width + (this.side ? 9999 : 0) && y >= c.y + 8 && y < c.y + c.height;
+      away = onPage || !inWin ? away + 1 : 0;
+      if (away >= 3) { this.reveal = { tabs: false, toolbar: false }; clearInterval(this._revealTimer); this._revealTimer = null; this.relayout(); }
+    }, 200);
   }
 
   /** The page area once the side panel (assistant) takes its share on the right. */
@@ -957,7 +983,10 @@ class FernaWindow {
     const s = ctx.settings.data;
     switch (cmd) {
       case 'toggleTabBar':
+        // A bar brought back by the window edge must not keep it on screen after the shortcut.
+        for (const w of ctx.windows) w.reveal = { tabs: false, toolbar: false };
         ctx.setSetting('tabBarHidden', !s.tabBarHidden);
+        for (const w of ctx.windows) w.relayout();
         if (ctx.settings.data.tabBarHidden && !s.hints.tabBarHidden) {
           ctx.settings.update(d => { d.hints.tabBarHidden = true; });
           this.sendUi('toast', { text: 'Tab bar hidden. Press Ctrl+Shift+H or move the pointer to the edge to show it.' });
