@@ -1,0 +1,101 @@
+/* ---------- 3D look (Settings → Appearance → 3D look; on by default) ----------
+   Bars are lit from above: a highlight on their top edge, a shade at the bottom. Tabs, buttons,
+   pinned and common-bar icons are raised tiles; pointing at one lifts it towards you and tilts it
+   after the pointer (--rx / --ry, set by ui.js), with a light spot where the pointer is
+   (--mx / --my); pressing pushes it in. Colours come from the theme, so it works in light, dark
+   and workspace colours. Reduced-motion users get depth without movement. */
+body.d3 {
+  --d3-hi: rgba(255, 255, 255, .55);     /* top-edge highlight */
+  --d3-hi-soft: rgba(255, 255, 255, .22);
+  --d3-lo: rgba(15, 23, 42, .16);        /* bottom-edge shade */
+  --d3-drop: rgba(15, 23, 42, .28);      /* shadow under raised things */
+  --d3-spot: rgba(255, 255, 255, .5);    /* light spot under the pointer */
+  --d3-ease: cubic-bezier(.2, .9, .25, 1.2);
+}
+@media (prefers-color-scheme: dark) {
+  body.d3 { --d3-hi: rgba(255, 255, 255, .16); --d3-hi-soft: rgba(255, 255, 255, .07); --d3-lo: rgba(0, 0, 0, .45); --d3-drop: rgba(0, 0, 0, .6); --d3-spot: rgba(255, 255, 255, .14); }
+}
+/* The bars' own brightness decides (a workspace or site colour can make them dark in light mode,
+   or light in dark mode); ui.js sets darkbars / lightbars. */
+body.d3.darkbars { --d3-hi: rgba(255, 255, 255, .16); --d3-hi-soft: rgba(255, 255, 255, .07); --d3-lo: rgba(0, 0, 0, .45); --d3-drop: rgba(0, 0, 0, .6); --d3-spot: rgba(255, 255, 255, .14); }
+body.d3.lightbars { --d3-hi: rgba(255, 255, 255, .55); --d3-hi-soft: rgba(255, 255, 255, .22); --d3-lo: rgba(15, 23, 42, .16); --d3-drop: rgba(15, 23, 42, .28); --d3-spot: rgba(255, 255, 255, .5); }
+
+/* Bars: lit from above, with a bevel. */
+body.d3 #toolbar {
+  background-image: linear-gradient(to bottom, var(--d3-hi-soft), transparent 45%, var(--d3-lo)), var(--toolbar-img, none);
+  box-shadow: inset 0 1px 0 var(--d3-hi), inset 0 -1px 0 var(--d3-lo);
+  border-bottom-color: color-mix(in srgb, var(--line) 50%, var(--d3-lo));
+}
+body.d3 #bookmarks { background-image: linear-gradient(to bottom, var(--d3-lo), transparent 30%); box-shadow: inset 0 -1px 0 var(--d3-lo); }
+body.d3 #tabs.h {
+  background-image: linear-gradient(to bottom, var(--d3-hi-soft), transparent 60%, var(--d3-lo)), var(--frame-img, none);
+  box-shadow: inset 0 3px 0 -1px var(--ws), inset 0 -2px 3px -2px var(--d3-drop);
+}
+body.d3 #tabs.v {
+  background-image: linear-gradient(to right, var(--d3-hi-soft), transparent 35%, transparent 80%, var(--d3-lo)), var(--frame-img, none);
+  box-shadow: inset 3px 0 0 -1px var(--ws), inset -6px 0 10px -8px var(--d3-drop);
+}
+body.d3 #tabs.v.right { background-image: linear-gradient(to left, var(--d3-hi-soft), transparent 35%, transparent 80%, var(--d3-lo)), var(--frame-img, none); box-shadow: inset -3px 0 0 -1px var(--ws), inset 6px 0 10px -8px var(--d3-drop); }
+
+/* The address box sits sunken into the bar. */
+body.d3 #omnibox { box-shadow: inset 0 2px 4px var(--d3-lo), inset 0 -1px 0 var(--d3-hi-soft), 0 1px 0 var(--d3-hi); }
+body.d3 #omnibox:focus-within { box-shadow: inset 0 2px 4px var(--d3-lo), 0 0 0 3px var(--accent-soft); }
+
+/* Raised tiles: tabs, toolbar buttons, pinned/common icons, workspace chips. */
+body.d3 .tab, body.d3 .tb, body.d3 .icon-btn, body.d3 .ws-chip, body.d3 #tabs.v .new-tab-row {
+  transform-style: preserve-3d;
+  transition: transform .18s var(--d3-ease), box-shadow .18s ease, background-color .12s ease;
+  will-change: transform;
+}
+body.d3 { --d3-side: color-mix(in srgb, var(--d3-lo) 100%, transparent); }
+body.d3 .tab {
+  background-image: linear-gradient(to bottom, var(--d3-hi-soft), transparent 55%);
+  box-shadow: inset 0 1px 0 var(--d3-hi-soft), inset 0 -1px 0 var(--d3-lo), 0 1px 1px var(--d3-lo);
+}
+/* Vertical tabs, buttons, icons and chips have a visible edge below, like keys on a keyboard. */
+body.d3 #tabs.v .tab, body.d3 .tb:not(:disabled), body.d3 .icon-btn, body.d3 .ws-chip {
+  background-image: linear-gradient(to bottom, var(--d3-hi-soft), transparent 70%);
+  box-shadow: inset 0 1px 0 var(--d3-hi), inset 0 -1px 0 var(--d3-lo), 0 2px 0 var(--d3-side), 0 3px 5px -1px var(--d3-drop);
+}
+/* Pointer over: lift, tilt after the pointer, light spot. */
+body.d3 .tab:hover, body.d3 .tb:hover:not(:disabled), body.d3 .icon-btn:hover, body.d3 .ws-chip:hover, body.d3 #tabs.v .new-tab-row:hover {
+  position: relative; z-index: 2;
+  background-image:
+    radial-gradient(circle at var(--mx, 50%) var(--my, 30%), var(--d3-spot), transparent 60%),
+    linear-gradient(to bottom, var(--d3-hi), transparent 60%);
+  box-shadow: inset 0 1px 0 var(--d3-hi), inset 0 -1px 0 var(--d3-lo), 0 3px 0 var(--d3-side), 0 12px 20px -6px var(--d3-drop), 0 4px 6px -2px var(--d3-drop);
+}
+body.d3 .tb:hover:not(:disabled), body.d3 .icon-btn:hover, body.d3 .ws-chip:hover {
+  transform: perspective(220px) translateY(-3px) translateZ(12px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+}
+body.d3 #tabs.h .tab:hover { transform: perspective(500px) translateY(-3px) translateZ(8px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transform-origin: 50% 100%;
+  box-shadow: inset 0 1px 0 var(--d3-hi), 0 -6px 14px -6px var(--d3-drop), 0 0 0 1px var(--d3-lo); }
+body.d3 #tabs.v .tab:hover, body.d3 #tabs.v .new-tab-row:hover { transform: perspective(600px) translateY(-2px) translateX(2px) translateZ(14px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
+/* Pressed: pushed into the bar. */
+body.d3 .tab:active, body.d3 .tb:active:not(:disabled), body.d3 .icon-btn:active, body.d3 .ws-chip:active, body.d3 #tabs.v .new-tab-row:active {
+  transform: perspective(400px) translateY(2px) translateZ(-4px) scale(.97);
+  box-shadow: inset 0 3px 6px var(--d3-drop), inset 0 -1px 0 var(--d3-hi-soft), 0 0 0 var(--d3-side);
+  transition-duration: .06s;
+}
+/* The current tab stands highest: raised, lit, with a soft shadow below. */
+body.d3 #tabs .tab.active {
+  background-image: linear-gradient(to bottom, var(--d3-hi), transparent 70%);
+  box-shadow: inset 0 1px 0 var(--d3-hi), inset 0 -1px 0 var(--d3-lo), 0 5px 12px -4px var(--d3-drop), 0 1px 2px var(--d3-drop);
+}
+body.d3 #tabs.h .tab.active { box-shadow: inset 0 1px 0 var(--d3-hi), 0 -4px 10px -4px var(--d3-drop), 1px 0 0 var(--line), -1px 0 0 var(--line); }
+body.d3 #tabs.v .tab.active { transform: translateX(1px) translateY(-1px); box-shadow: inset 0 1px 0 var(--d3-hi), inset 0 -1px 0 var(--d3-lo), 0 3px 0 var(--d3-side), 0 8px 16px -6px var(--d3-drop); }
+/* Room for the edges and lifts: rows and tiles are spaced a little further apart. */
+body.d3 #tabs.v .section { gap: 4px; padding: 0 2px 4px; }
+body.d3 #tabs.v .common { gap: 6px; padding: 0 2px 4px; }
+body.d3 #tabs.v .scroll { padding-top: 2px; }
+body.d3 #toolbar { gap: 4px; }
+body.d3 .tb.on, body.d3 .icon-btn.current, body.d3 .ws-chip.current { box-shadow: inset 0 1px 0 var(--d3-hi), 0 3px 8px -3px var(--d3-drop), 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+body.d3.hc .tb.on { box-shadow: inset 0 1px 0 var(--d3-hi), 0 4px 10px -3px var(--d3-drop), 0 0 0 2px color-mix(in srgb, var(--tb-on-bg, var(--accent)) 35%, transparent), 0 0 10px color-mix(in srgb, var(--tb-on-bg, var(--accent)) 45%, transparent); }
+/* Small parts inside a tab pop out a little too. */
+body.d3 .tab .x:hover, body.d3 .tab .act:hover { box-shadow: inset 0 1px 0 var(--d3-hi), 0 2px 4px -1px var(--d3-drop); transform: translateY(-1px); }
+body.d3 .tab .favicon, body.d3 .tab .letter, body.d3 .icon-btn .favicon, body.d3 .icon-btn .letter { filter: drop-shadow(0 1px 1px var(--d3-drop)); }
+/* While dragging, nothing tilts. */
+body.d3 #tabs.tab-dragging .tab, body.d3 .tab.dragging { transform: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  body.d3 .tab, body.d3 .tb, body.d3 .icon-btn, body.d3 .ws-chip, body.d3 #tabs.v .new-tab-row { transition: none; transform: none !important; }
+}

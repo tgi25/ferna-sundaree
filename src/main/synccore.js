@@ -76,7 +76,7 @@ function merge3value(base, local, remote) {
 }
 
 /** Settings that follow you between PCs (not window sizes, paths, or per-PC choices). */
-const SYNCED_SETTINGS = ['searchEngine', 'theme', 'accent', 'tabPosition', 'verticalWidth', 'verticalCollapsed', 'bookmarksBarHidden', 'httpsFirst', 'httpsExceptions',
+const SYNCED_SETTINGS = ['searchEngine', 'theme', 'accent', 'tabPosition', 'depth3d', 'safetyCheck', 'factCheckAuto', 'smartWorkspaces', 'verticalWidth', 'verticalCollapsed', 'bookmarksBarHidden', 'httpsFirst', 'httpsExceptions',
   'blocker', 'blockerAllow', 'cosmeticFiltering', 'listScriptlets', 'afterClose', 'youtubeAds', 'popupBlocker', 'popupAllow', 'customFilters', 'filterLists', 'safeBrowsing', 'stripTracking', 'gpc',
   'fingerprintProtection', 'lookalikeWarnings', 'passwordWarnings', 'selectionMenu', 'wsShowNames', 'stripFavoritesOnly', 'shortcuts', 'zoomPrefs', 'zoomSites',
   'sleepingTabs', 'sleepAfterMinutes', 'autoPip', 'linkPreview', 'translateTo', 'spellLangs', 'readerRate', 'reader', 'equalizer'];

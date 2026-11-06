@@ -23,7 +23,7 @@ const POPULAR = [
   'researchgate.net', 'academia.edu', 'springer.com', 'elsevier.com', 'sciencedirect.com', 'ieee.org', 'acm.org', 'arxiv.org', 'scholar.google.com',
   // Sri Lanka
   'combank.lk', 'combankdigital.com', 'sampath.lk', 'sampathbank.com', 'hnb.lk', 'hnb.net', 'boc.lk', 'peoplesbank.lk', 'ndbbank.com',
-  'seylan.lk', 'nationstrust.com', 'dfcc.lk', 'panasiabank.lk', 'unionb.com', 'amana.lk', 'cbsl.gov.lk', 'ird.gov.lk',
+  'seylan.lk', 'nationstrust.com', 'dfcc.lk', 'pabcbank.com', 'unionb.com', 'amanabank.lk', 'cbsl.gov.lk', 'ird.gov.lk',
   'dialog.lk', 'mobitel.lk', 'slt.lk', 'hutch.lk', 'airtel.lk', 'daraz.lk', 'kapruka.com', 'ikman.lk', 'pickme.lk', 'srilankan.com',
   'sjp.ac.lk', 'ugc.ac.lk', 'mydialog.lk', 'genie.lk', 'frimi.lk', 'payhere.lk',
 ];

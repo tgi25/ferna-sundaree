@@ -114,7 +114,7 @@ $('#zoom-clear').onclick = async () => { if (confirm('Forget the saved zoom of e
 $$('[data-open]').forEach(b => { b.onclick = () => { location.href = b.dataset.open; }; });
 
 // ---------- workspaces ----------
-async function loadWs() { WS = await api.cmd('ws:get'); renderWs(); }
+async function loadWs() { WS = await api.cmd('ws:get'); renderWs(); renderWsx(); }
 
 function renderWs() {
   const box = $('#wslist');
@@ -250,7 +250,41 @@ function shrinkIcon(file) {
   });
 }
 
-async function saveWs() { WS = await api.cmd('ws:save', { workspaces: WS.workspaces, common: WS.common, allPinned: WS.allPinned || [] }); renderWs(); }
+// ---------- smart workspaces ----------
+const DAYN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+async function renderWsx(info) {
+  info = info || await api.cmd('wsx:info');
+  const sug = $('#wsx-sug');
+  sug.innerHTML = info.suggestions.map(r => `<div class="row" data-id="${esc(r.id)}"><div class="grow">Suggested: <b>${esc(r.name)}</b><div class="hint">You open ${esc(r.text)} together around ${esc(r.time)} on ${esc(r.label)} (${r.support} days recently).</div></div>
+    <button class="btn small primary" data-a="sched">Create, open at ${esc(r.time)}</button><button class="btn small" data-a="plain">Create</button><button class="btn small" data-a="dismiss">Dismiss</button></div>`).join('');
+  sug.querySelectorAll('button').forEach(b => b.onclick = async () => {
+    const id = b.closest('[data-id]').dataset.id;
+    if (b.dataset.a === 'dismiss') return renderWsx(await api.cmd('wsx:dismiss', id));
+    await api.cmd('wsx:create', id, b.dataset.a === 'sched');
+    WS = await api.cmd('ws:get'); renderWs(); renderWsx();
+  });
+  const box = $('#wsx-sched');
+  box.innerHTML = info.schedules.map(s => `<div class="row" data-ws="${esc(s.wsId)}"><div class="grow">Opens <b>${esc(s.name)}</b><div class="hint">At this time on the days ticked, or when you start the browser up to 90 minutes later. It switches to the workspace and opens its pinned sites.</div>
+      <div class="chips">${DAYN.map((d, i) => `<label class="chip" style="padding:3px 8px"><input type="checkbox" data-d="${i}" ${s.days.includes(i) ? 'checked' : ''}> ${d}</label>`).join('')}</div></div>
+      <input class="field" type="time" value="${esc(s.time)}" style="width:110px" aria-label="Time"><button class="btn small" data-a="now">Open now</button><button class="btn small danger" data-a="del">Remove</button><label class="switch"><input type="checkbox" data-a="on" ${s.on !== false ? 'checked' : ''}><span></span></label></div>`).join('');
+  box.querySelectorAll('[data-ws]').forEach(row => {
+    const id = row.dataset.ws;
+    const save = async () => renderWsx(await api.cmd('wsx:set-schedule', id, { days: [...row.querySelectorAll('[data-d]')].filter(x => x.checked).map(x => Number(x.dataset.d)), time: row.querySelector('input[type=time]').value, on: row.querySelector('[data-a=on]').checked }));
+    row.querySelectorAll('input').forEach(i => i.onchange = save);
+    row.querySelector('[data-a=del]').onclick = async () => renderWsx(await api.cmd('wsx:remove-schedule', id));
+    row.querySelector('[data-a=now]').onclick = () => api.cmd('wsx:open-now', id);
+  });
+  const sel = $('#wsx-ws');
+  const taken = new Set(info.schedules.map(s => s.wsId));
+  const free = ((WS && WS.workspaces) || []).filter(w => !taken.has(w.id));
+  sel.innerHTML = free.map(w => `<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('');
+  sel.hidden = $('#wsx-add').hidden = !free.length;
+  $('#wsx-forget').title = `Ferna has noticed ${info.learnedDays} day${info.learnedDays === 1 ? '' : 's'} of opening sites.`;
+}
+$('#wsx-add').onclick = async () => { const id = $('#wsx-ws').value; if (id) renderWsx(await api.cmd('wsx:set-schedule', id, { days: [1, 2, 3, 4, 5], time: '08:00', on: true })); };
+$('#wsx-forget').onclick = async () => renderWsx(await api.cmd('wsx:forget'));
+
+async function saveWs() { WS = await api.cmd('ws:save', { workspaces: WS.workspaces, common: WS.common, allPinned: WS.allPinned || [] }); renderWs(); renderWsx(); }
 
 $('#ws-add').onclick = () => {
   const colors = ['#2563eb', '#16a34a', '#d97706', '#9333ea', '#dc2626', '#0891b2'];
@@ -465,7 +499,9 @@ $('#sync-start').onclick = async () => {
 $('#sync-now').onclick = async () => { $('#sync-status').textContent = 'Syncing…'; await api.cmd('sync:now'); loadSync(); };
 $('#sync-stop').onclick = async () => { if (confirm('Turn off sync on this PC? Your data stays here and in the sync folder.')) { await api.cmd('sync:disable'); loadSync(); } };
 for (const id of ['#sync-pw2', '#sync-hist2']) $(id).onchange = () => api.cmd('sync:options', { passwords: $('#sync-pw2').checked, history: $('#sync-hist2').checked });
-api.on('refresh', () => loadSync());
+api.on('refresh', () => { loadSync(); renderWsx(); });
+// Smart-workspace suggestions and schedules change outside this page.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) renderWsx(); });
 
 async function loadProfiles() {
   const p = await api.cmd('profiles:list');

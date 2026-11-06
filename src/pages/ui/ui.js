@@ -33,6 +33,12 @@ $('#btn-split').innerHTML = icon('split');
 $('#btn-split').onclick = () => api.cmd('split:act', 'toggle');
 $('#btn-split').addEventListener('contextmenu', e => { e.preventDefault(); api.cmd('menu:split'); });
 $('#btn-assistant').innerHTML = icon('sparkle');
+$('#btn-feeds').insertAdjacentHTML('afterbegin', icon('feeds'));
+$('#btn-feeds').onclick = () => api.cmd('feeds:toggle-panel');
+$('#btn-rss').innerHTML = icon('rss');
+$('#btn-check').insertAdjacentHTML('afterbegin', icon('shield'));
+$('#btn-check').onclick = () => api.cmd('check:toggle-panel');
+$('#btn-rss').onclick = () => api.cmd('feeds:rss-menu');
 $('#btn-assistant').onclick = () => api.cmd('run', 'assistant');
 $('#btn-reader').innerHTML = icon('reader');
 $('#btn-reader').onclick = () => api.cmd('run', 'readerMode');
@@ -182,6 +188,8 @@ function ensureTabContrast() {
   let cur = activeBg;
   if (lum(tabs) < 0.4) for (let k = 0.06; contrast(cur, tabs) < 1.45 && k <= 0.42; k += 0.06) cur = activeBg.map(v => v + (255 - v) * k);
   st.setProperty('--tab-cur-bg', css(cur));
+  document.body.classList.toggle('darkbars', lum(tabs) < 0.4);
+  document.body.classList.toggle('lightbars', lum(tabs) >= 0.4);
   const wsCol = hex(getComputedStyle(el.tabs).getPropertyValue('--ws')) || acc;
   // The workspace colour if it shows on the tab; else the accent (a black or grey workspace
   // would give a dull mark); then lightened or darkened as far as needed.
@@ -271,14 +279,21 @@ $('#find-close').onclick = () => api.cmd('find:close');
 
 // ---------- toast ----------
 let toastTimer = null;
-api.on('toast', ({ text }) => {
+api.on('toast', ({ text, action, cmd, ms }) => {
   const L = S && S.layout;
   const bar = L && (L.toolbar || L.tabs);
   el.toast.style.top = `${bar ? bar.y + Math.max(2, (Math.min(bar.height, 44) - 32) / 2) : 6}px`;
   el.toast.textContent = text;
+  // An optional action button (a command of this page, from a fixed list).
+  if (action && /^(feeds:toggle-panel|feeds:open-digest|check:toggle-panel|wsx:accept|wsx:settings)$/.test(cmd || '')) {
+    const b = document.createElement('button');
+    b.className = 'toast-act'; b.textContent = String(action).slice(0, 30);
+    b.onclick = () => { el.toast.classList.remove('on'); api.cmd(cmd); };
+    el.toast.append(' ', b);
+  }
   el.toast.classList.add('on');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.toast.classList.remove('on'), 3500);
+  toastTimer = setTimeout(() => el.toast.classList.remove('on'), Math.max(2000, Math.min(15000, ms || (action ? 7000 : 3500))));
 });
 
 // ---------- reveal hidden bars ----------
@@ -332,6 +347,7 @@ function render(state) {
   applyTheme(S.ctxTheme ? null : S.theme);
   applyCtxTheme(S.ctxTheme);
   document.body.classList.toggle('hc', !!S.highContrast);
+  document.body.classList.toggle('d3', S.settings.depth3d !== false);
   document.body.classList.toggle('exam', !!S.exam);
   ensureContrast();
   renderToolbar();
@@ -386,6 +402,27 @@ function renderToolbar() {
   $('#btn-split').classList.toggle('on', !!n.split);
   $('#btn-split').title = n.split ? 'Leave split view (Alt+Shift+D). Right-click for more.' : 'Split view: this tab and the next side by side (Alt+Shift+D). Right-click to choose.';
   $('#btn-assistant').classList.toggle('on', S.side === 'assistant');
+  $('#btn-feeds').classList.toggle('on', S.side === 'feeds');
+  const fc = $('#feeds-count'); const fu = S.feedsUnread || 0;
+  fc.textContent = fu > 99 ? '99+' : String(fu); fc.classList.toggle('on', fu > 0);
+  $('#btn-feeds').title = `Ferna Feeds: your news and research${fu ? ` (${fu} unread)` : ''}`;
+  $('#btn-feeds').hidden = !!S.private;
+  const ck = $('#btn-check');
+  const c = n.check;
+  ck.hidden = !(c && c.level) || !!S.exam;
+  ck.classList.toggle('on', S.side === 'check');
+  if (c && c.level) {
+    ck.dataset.level = c.level;
+    ck.title = c.danger ? 'Warning: this page pretends to be another organisation. Click for details.'
+      : c.level === 'danger' ? 'Warning: this page asks for a password or card over an insecure connection.'
+      : c.level === 'scam' ? 'Warning: this page uses scam wording. Click for details.'
+      : c.cov && c.cov.line ? `Fact check: ${c.cov.line}`
+      : c.level === 'warn' ? 'This article has wording worth checking. Click to see who else reports it.'
+      : 'News article: click to see who else reports it (fact check)';
+  }
+  const rss = $('#btn-rss');
+  rss.hidden = !n.feeds;
+  if (n.feeds) { rss.classList.toggle('on', !!n.feeds.subscribed); rss.title = n.feeds.subscribed ? 'You follow this site’s feed (Ferna Feeds)' : `This page has ${n.feeds.count > 1 ? `${n.feeds.count} feeds` : 'a feed'}: follow it in Ferna Feeds`; }
   const web = !!n.url && !n.internal && /^https?:/.test(n.url);
   $('#btn-reader').hidden = !web; $('#btn-reader').classList.toggle('on', !!n.reader);
   $('#btn-translate').hidden = !web;
@@ -723,3 +760,32 @@ setInterval(() => {
   t.textContent = `${Math.floor(left / 3600) ? `${Math.floor(left / 3600)}:` : ''}${String(Math.floor(left / 60) % 60).padStart(2, '0')}:${String(left % 60).padStart(2, '0')} left`;
   t.classList.toggle('low', left < 300);
 }, 1000);
+
+// ---------- 3D look: tilt after the pointer ----------
+// Over a tab, button or icon, the tile tilts towards the pointer (a few degrees; less on wide
+// tabs) and a light spot follows it. Only CSS variables change, once per frame.
+(() => {
+  const SEL = '.tab, .tb, .icon-btn, .ws-chip, .new-tab-row';
+  let cur = null, raf = 0, last = null;
+  const reset = n => { if (n) for (const p of ['--rx', '--ry', '--mx', '--my']) n.style.removeProperty(p); };
+  document.addEventListener('pointermove', e => {
+    if (!document.body.classList.contains('d3')) return;
+    const t = e.target instanceof Element ? e.target.closest(SEL) : null;
+    if (t !== cur) { reset(cur); cur = t; }
+    if (!t) return;
+    last = e;
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      if (!cur || !last) return;
+      const r = cur.getBoundingClientRect();
+      const x = Math.max(0, Math.min(1, (last.clientX - r.left) / r.width)), y = Math.max(0, Math.min(1, (last.clientY - r.top) / r.height));
+      const k = Math.min(1, 60 / Math.max(r.width, 1)); // wide tabs tilt less
+      cur.style.setProperty('--rx', `${((0.5 - y) * 14).toFixed(2)}deg`);
+      cur.style.setProperty('--ry', `${((x - 0.5) * 14 * k).toFixed(2)}deg`);
+      cur.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
+      cur.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
+    });
+  }, { passive: true });
+  document.addEventListener('pointerleave', () => { reset(cur); cur = null; });
+})();

@@ -42,6 +42,8 @@ function create(ctx, { dataDir }) {
 
   // ---------- side panel ----------
   function toggle(win, force) {
+    // Another panel (feeds) is open: the assistant takes its place.
+    if (win.side && win.side.kind !== 'assistant') { const v = win.side.view; win.side = null; if (!win.win.isDestroyed()) win.win.contentView.removeChildView(v); }
     if (win.side && force !== true) { close(win); return; }
     if (win.side) return win.side.view;
     let view = win.sideCache;

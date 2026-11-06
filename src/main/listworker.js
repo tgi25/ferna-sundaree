@@ -45,6 +45,13 @@ async function run(msg) {
     }
     return { ok: true, out, json: JSON.stringify(out) };
   }
+  if (msg.kind === 'feeds') return require('./feeds/worker').run(msg, fetch);
+  if (msg.kind === 'page') {
+    // One page for the feed reader: its text (reader view) or the feeds it announces.
+    const W = require('./feeds/worker'), P = require('./feeds/parse');
+    const r = await W.getText(fetch, msg.url, { ua: msg.ua });
+    return { ok: true, url: r.url, html: msg.html ? String(r.text || '').slice(0, 3 * 1024 * 1024) : '', meta: P.pageMeta(r.text, r.url), feeds: P.discoverFeeds(r.text, r.url), isFeed: /^\s*(<\?xml|<rss|<feed|<rdf|\{)/i.test(r.text || '') };
+  }
   throw new Error('unknown job');
 }
 

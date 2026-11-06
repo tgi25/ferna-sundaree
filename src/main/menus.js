@@ -400,6 +400,7 @@ function pageMenu(win, tab, p) {
       { label: 'Translate selection', click: () => win.ctx.translateText(win, tab, p.selectionText) },
       { label: 'Read aloud', click: () => win.ctx.pageFx.readAloud(win, tab, p.selectionText) },
       { label: 'Ask the AI assistant about this', click: () => win.ctx.askAssistant(win, { text: p.selectionText, action: 'explain' }) },
+      { label: 'Check this claim or message', click: () => win.ctx.check.checkSelection(win, p.selectionText) },
       { type: 'separator' },
     );
   }

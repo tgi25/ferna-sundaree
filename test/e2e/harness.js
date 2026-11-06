@@ -17,7 +17,7 @@ function serve() {
       const rel = req.url.startsWith('/document') ? '/test.pdf' : decodeURIComponent(req.url.split('?')[0]);
       const p = path.join(FIX, rel);
       if (!p.startsWith(FIX) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) { res.writeHead(404); res.end('nf'); return; }
-      const type = p.endsWith('.pdf') ? 'application/pdf' : p.endsWith('.html') ? 'text/html; charset=utf-8' : p.endsWith('.webm') ? 'video/webm' : 'application/octet-stream';
+      const type = p.endsWith('.pdf') ? 'application/pdf' : p.endsWith('.html') ? 'text/html; charset=utf-8' : p.endsWith('.webm') ? 'video/webm' : p.endsWith('.xml') ? 'application/xml; charset=utf-8' : 'application/octet-stream';
       const headers = { 'content-type': type };
       if (req.url.includes('nopdfext')) headers['content-type'] = 'application/pdf';
       res.writeHead(200, headers);

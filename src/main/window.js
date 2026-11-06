@@ -85,6 +85,7 @@ class FernaWindow {
     if (opts.restore && opts.restore.tabs && opts.restore.tabs.length) {
       opts.restore.tabs.forEach((t, i) => this.newTab(t.url, { activate: false, lazy: i !== opts.restore.active, wsOverride: t.wsOverride, title: t.title }));
       const act = this.tabs[opts.restore.active] || this.tabs[0];
+      if (act) act.noRoutine = true; // loading it at start-up is not you opening it (smart workspaces)
       this.activate(act);
     } else {
       this.newTab(opts.url || NEWTAB, {});
@@ -213,7 +214,7 @@ class FernaWindow {
     });
     wc.on('did-start-loading', () => { tab.loading = true; changed(); });
     wc.on('did-stop-loading', () => { tab.loading = false; changed(); if (tab.id === this.activeId && this.ctx.sampleTabColour) setTimeout(() => this.ctx.sampleTabColour(this, tab), 400); });
-    wc.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) { tab.blocked = 0; tab.blockedPopups = []; tab.cosmeticKey = null; if (tab.favicon && !sameSite(tab.url, d.url)) tab.favicon = ''; tab.hasVideo = false; tab.hasMedia = false; tab.pipOn = false; tab.autoPip = false; tab.pwGen = (tab.pwGen || 0) + 1; tab.pwCount = 0; tab.readerOn = false; tab.speaking = false; } });
+    wc.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) { tab.blocked = 0; tab.blockedPopups = []; tab.cosmeticKey = null; tab.feeds = null; tab.check = null; tab.checkGen = (tab.checkGen || 0) + 1; if (tab.favicon && !sameSite(tab.url, d.url)) tab.favicon = ''; tab.hasVideo = false; tab.hasMedia = false; tab.pipOn = false; tab.autoPip = false; tab.pwGen = (tab.pwGen || 0) + 1; tab.pwCount = 0; tab.readerOn = false; tab.speaking = false; } });
     wc.on('media-started-playing', () => {
       tab.hasMedia = true;
       ctx.pageFx.mediaStarted(this, tab);
@@ -286,7 +287,16 @@ class FernaWindow {
       menus.pageMenu(this, tab, params).popup({ window: this.win });
     });
     wc.on('dom-ready', () => { if (kind === 'web') { ctx.zoomOnDomReady(this, tab); ctx.pageFx.domReady(this, tab); } });
-    wc.on('did-finish-load', () => { if (kind === 'web') ctx.zoomOnLoad(this, tab); });
+    wc.on('did-finish-load', () => {
+      if (kind !== 'web') return;
+      ctx.zoomOnLoad(this, tab);
+      // Feeds this page announces: the RSS button in the address bar.
+      if (ctx.feeds && !this.private) ctx.feeds.discoverInTab(tab).then(f => { tab.feeds = f; if (tab.id === this.activeId) this.pushState(); }).catch(() => {});
+      // Safety check: fake bank pages, scam wording, news articles (the fact-check bubble).
+      if (ctx.check) ctx.check.scanTab(this, tab).catch(() => {});
+      // Smart workspaces: the first time today you opened this site.
+      if (ctx.smartws) ctx.smartws.note(this, tab);
+    });
     wc.on('enter-html-full-screen', () => { this.htmlFullscreen = true; this.win.setFullScreen(true); this.relayout(); });
     wc.on('leave-html-full-screen', () => { this.htmlFullscreen = false; this.win.setFullScreen(false); this.relayout(); });
     wc.on('zoom-changed', (e, dir) => this.run(dir === 'in' ? 'zoomIn' : 'zoomOut'));
@@ -847,7 +857,7 @@ class FernaWindow {
         bookmarksBarHidden: ctx.settings.data.bookmarksBarHidden, verticalCollapsed: ctx.settings.data.verticalCollapsed,
         verticalWidth: ctx.settings.data.verticalWidth, accent: ctx.settings.data.accent, theme: ctx.settings.data.theme,
         hintShown: !!ctx.settings.data.hints.tabBarHidden,
-        wsShowNames: !!ctx.settings.data.wsShowNames, stripFavoritesOnly: !!ctx.settings.data.stripFavoritesOnly,
+        wsShowNames: !!ctx.settings.data.wsShowNames, stripFavoritesOnly: !!ctx.settings.data.stripFavoritesOnly, depth3d: ctx.settings.data.depth3d !== false,
       },
       shortcutKeys: Object.fromEntries(['favoritesOnly', 'pinTab', 'addToCommon'].map(k => [k, (ctx.shortcuts.map[k] && ctx.shortcuts.map[k].raw && ctx.shortcuts.map[k].raw[0]) || ''])),
       dark: ctx.isDark(),
@@ -875,6 +885,8 @@ class FernaWindow {
         bookmarked: !!ctx.findBookmark(pageUrlOf(url)),
         split: !!(t && this.inSplit(t.id)), reader: !!(t && t.readerOn), speaking: !!(t && t.speaking),
         passwords: t ? (t.pwCount || 0) : 0, container: t ? ctx.containerOf(this, t) : null,
+        feeds: t && t.feeds && t.feeds.length && !this.private ? { count: t.feeds.length, subscribed: t.feeds.some(f => ctx.feeds && ctx.feeds.isSubscribed(f.url)) } : null,
+        check: t && t.check ? { level: t.check.danger || t.check.insecure ? 'danger' : t.check.scam.length ? 'scam' : t.check.claim.length ? 'warn' : t.check.article ? 'article' : '', article: t.check.article, cov: t.check.cov, danger: !!t.check.danger, scam: t.check.scam.length, claim: t.check.claim.length } : null,
         blocked: t ? t.blocked : 0,
         blockerOn: !!ctx.settings.data.blocker && !ctx.settings.data.blockerAllow.includes(hostOf(url)),
       },
@@ -884,6 +896,7 @@ class FernaWindow {
       split: this.split && t && this.inSplit(t.id) ? (() => { const c = this.sideLayout(this.layoutState().content); return { ...this.split, activeId: t.id, content: c, divider: this.splitRects(c).divider }; })() : null,
       media: this.mediaCount(),
       side: this.side ? this.side.kind : null,
+      feedsUnread: ctx.feeds && !this.private ? ctx.feeds.unreadCount() : 0,
       app: this.appMode ? { name: this.appMode.name, origin: this.appMode.origin } : null,
       ctxTheme: ctx.ctxTheme ? ctx.ctxTheme(this) : null,
       highContrast: ctx.settings.data.highContrastToolbar !== false,
@@ -899,6 +912,8 @@ class FernaWindow {
       this._stateTimer = null;
       if (this.win.isDestroyed() || this.ui.webContents.isDestroyed()) return;
       this.ui.webContents.send('state', this.state());
+      // The safety-check panel follows the active tab.
+      if (this.side && this.side.kind === 'check' && this._checkTab !== this.activeId) { this._checkTab = this.activeId; this.ctx.check.refreshPanel(this); }
       if (this.overlayMode === 'pointer') this.overlay.webContents.send('state', this.state());
     }, 8);
   }

@@ -873,6 +873,7 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
   await require('./v06-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile });
   await require('./v063-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile });
   await require('./v064-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile, app });
+  await require('./v080-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile, app });
 
   // An exam window cannot be closed: end any left over by a failed step.
   await main(() => { const ctx = global.__ferna; if (ctx.examWin) ctx.exam.finish(ctx.examWin, 'test'); }).catch(() => {});

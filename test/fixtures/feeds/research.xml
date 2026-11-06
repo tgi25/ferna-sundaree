@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel rdf:about="http://localhost/research"><title>cs.NE updates on arXiv.org (test)</title><link>http://localhost/research</link></channel>
+<item rdf:about="http://localhost/abs/2611.00001"><title>Adaptive Particle Swarm Optimisation with Learned Inertia for Neural Architecture Search</title><link>http://localhost/abs/2611.00001</link>
+<description>We propose an adaptive particle swarm optimisation method that learns the inertia weight with a small neural network. Experiments show it outperforms genetic algorithms and random search on three neural architecture search benchmarks. Our method reduces search cost by 40 percent.</description><dc:date>2026-11-06T13:38:27Z</dc:date></item>
+<item rdf:about="http://localhost/abs/2611.00002"><title>A Sinhala Language Model for Low-Resource Machine Translation</title><link>http://localhost/abs/2611.00002</link>
+<description>We present a transformer language model for Sinhala trained on a new dataset. Fine-tuning improves machine translation between Sinhala and English by 4 BLEU on a public benchmark.</description><dc:date>2026-11-06T13:38:27Z</dc:date></item>
+</rdf:RDF>

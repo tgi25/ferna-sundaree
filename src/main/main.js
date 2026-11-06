@@ -91,7 +91,9 @@ const DEFAULT_SETTINGS = {
   sync: { folder: '', enabled: false, passwords: true, history: false, last: 0 },
   splitRatio: 0.5, sideWidth: 380,
   // 0.6
-  eqPresets: [], workspaceThemes: true, adaptiveTheme: false, themeSchedule: { on: false, dark: '19:00', light: '06:30' }, highContrastToolbar: true,
+  eqPresets: [], workspaceThemes: true, adaptiveTheme: false, themeSchedule: { on: false, dark: '19:00', light: '06:30' }, highContrastToolbar: true, depth3d: true,
+  // 0.8
+  safetyCheck: true, factCheckAuto: false, checkTrusted: [], smartWorkspaces: true, wsSchedules: [],
 };
 
 // ---------- context shared by every window ----------
@@ -376,6 +378,7 @@ ctx.createWorkspace = name => {
 ctx.deleteWorkspace = id => {
   ctx.ws.data.workspaces = ctx.ws.data.workspaces.filter(w => w.id !== id);
   ctx.ws.save();
+  if ((ctx.settings.data.wsSchedules || []).some(s => s.wsId === id)) ctx.settings.set('wsSchedules', ctx.settings.data.wsSchedules.filter(s => s.wsId !== id));
   for (const win of ctx.windows) {
     if (win.currentWs === id) win.currentWs = null;
     win.tabs.forEach(t => { if (t.wsOverride === id) t.wsOverride = null; });
@@ -874,6 +877,8 @@ function installProtocol(ses) {
       return new Response(f.buf, { headers: { 'content-type': f.type, 'cache-control': 'max-age=31536000, immutable', 'x-content-type-options': 'nosniff' } });
     }
     if (host === 'pdf') return serveFile(path.join(FEATURES, 'pdf-reader'), rel, PDF_CSP);
+    // The feed reader makes articles readable with Mozilla's Readability (a page-side library).
+    if (host === 'feeds' && rel === '/readability.js') return serveFile(path.dirname(require.resolve('@mozilla/readability/Readability.js')), 'Readability.js', BASE_CSP);
     if (host === 'shots') return serveFile(path.join(FEATURES, 'screenshots'), rel, SHOTS_CSP);
     if (rel.startsWith('/_shared/')) return serveFile(path.join(PAGES, '_shared'), rel.slice('/_shared/'.length), BASE_CSP);
     if (!/^[a-z0-9-]+$/.test(host) || host.startsWith('_')) return new Response('Not found', { status: 404 });
@@ -1163,14 +1168,16 @@ function registerCommands() {
     translateTo: v => typeof v === 'string' && /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(v), translateAsked: v => typeof v === 'boolean', translateService: v => ['', 'google', 'ai'].includes(v),
     spellLangs: v => Array.isArray(v) && v.length <= 10 && v.every(x => typeof x === 'string' && x.length <= 12),
     readerRate: v => Number.isFinite(v) && v >= 0.5 && v <= 2.5, readerVoice: v => typeof v === 'string' && v.length <= 200,
-    workspaceThemes: v => typeof v === 'boolean', adaptiveTheme: v => typeof v === 'boolean', highContrastToolbar: v => typeof v === 'boolean',
+    workspaceThemes: v => typeof v === 'boolean', adaptiveTheme: v => typeof v === 'boolean', highContrastToolbar: v => typeof v === 'boolean', depth3d: v => typeof v === 'boolean',
+    safetyCheck: v => typeof v === 'boolean', factCheckAuto: v => typeof v === 'boolean', smartWorkspaces: v => typeof v === 'boolean',
+    checkTrusted: v => Array.isArray(v) && v.length <= 200 && v.every(x => typeof x === 'string' && /^[a-z0-9.-]{1,253}$/.test(x)),
     themeSchedule: v => v && typeof v === 'object' && typeof v.on === 'boolean' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v.dark) && /^([01]\d|2[0-3]):[0-5]\d$/.test(v.light),
     splitRatio: v => Number.isFinite(v) && v >= 0.2 && v <= 0.8, sideWidth: v => Number.isInteger(v) && v >= 300 && v <= 560,
   };
   ctx.SETTABLE = SETTABLE;
   // Other internal pages may change only their own settings.
-  const PAGE_KEYS = { passwords: ['passwordManager', 'autofillAddresses', 'autofillCards', 'passwordLeakCheck'], assistant: ['assistant', 'translateTo', 'sideWidth', 'translateService'] };
-  C('settings:set', ['string', 'any'], ['settings', 'passwords', 'assistant'], (c, key, value) => {
+  const PAGE_KEYS = { check: ['factCheckAuto', 'safetyCheck'], passwords: ['passwordManager', 'autofillAddresses', 'autofillCards', 'passwordLeakCheck'], assistant: ['assistant', 'translateTo', 'sideWidth', 'translateService'] };
+  C('settings:set', ['string', 'any'], ['settings', 'passwords', 'assistant', 'check'], (c, key, value) => {
     if (c.host !== 'settings' && !(PAGE_KEYS[c.host] || []).includes(key)) throw new Error('Not allowed from this page');
     if (ctx.policyLocked && ctx.policyLocked(key)) throw new Error('This setting is managed by your organisation');
     if (ctx.examWin && ['theme', 'accent', 'themeSchedule', 'workspaceThemes', 'adaptiveTheme', 'highContrastToolbar'].includes(key)) throw new Error('Themes are locked during an exam');
@@ -1771,6 +1778,14 @@ app.whenReady().then(async () => {
   ctx.toggleAssistant = win => ctx.assistant.toggle(win);
   ctx.askAssistant = (win, req) => ctx.assistant.ask(win, { ...req, tabId: win.active ? win.active.id : null });
   require('./translate').install(ctx);
+  ctx.feeds = require('./feeds').create(ctx, { dataDir: DATA_DIR });
+  registerFeeds(ipc.command);
+  ctx.feeds.start();
+  ctx.check = require('./check').create(ctx);
+  registerCheck(ipc.command);
+  ctx.smartws = require('./smartws').create(ctx, { dataDir: DATA_DIR });
+  registerSmartWs(ipc.command);
+  ctx.smartws.start();
   ctx.sync = require('./sync').create(ctx, { dataDir: DATA_DIR });
   ctx.sync.register(ipc.command);
   ctx.installApp = (win, tab) => require('./webapps').install(ctx, win, tab);
@@ -1833,7 +1848,7 @@ app.whenReady().then(async () => {
     const w = ctx.newWindow({ url: urls[0] });
     urls.slice(1).forEach(u => w.newTab(u));
   }
-  if (process.env.FERNA_TEST) { global.__ferna = ctx; ctx._menus = require('./menus'); ctx._crx = require('./crx'); ctx._ipc = ipc; ctx._ws = ws; }
+  if (process.env.FERNA_TEST) { global.__ferna = ctx; ctx._menus = require('./menus'); ctx._crx = require('./crx'); ctx._ipc = ipc; ctx._ws = ws; ctx._routines = require('./routines'); }
 }).catch(e => {
   console.error('Ferna Sundaree could not start:', e);
   try { dialog.showErrorBox('Ferna Sundaree could not start', String(e && e.stack || e)); } catch { /* headless */ }
@@ -1841,3 +1856,111 @@ app.whenReady().then(async () => {
 });
 
 module.exports = { ctx };
+
+
+// ---------- Ferna Feeds: commands for the feed reader page and the toolbar ----------
+function registerFeeds(C) {
+  const F = ['feeds'];
+  const UI = ['ui'];
+  const fx = () => ctx.feeds;
+  const win = c => ctx.windowFor(c.wc) || ctx.windows[0];
+  C('feeds:list', ['object'], F, (c, q) => fx().list(q));
+  C('feeds:item', ['string'], F, (c, id) => { const it = fx().item(id); return it ? { ...it, vec: undefined, feed: (fx().feedsInfo().find(f => f.id === it.feedId) || {}).title || '' } : null; });
+  C('feeds:info', [], F, () => ({ feeds: fx().feedsInfo(), starters: fx().STARTERS, prefs: fx().prefs(), labels: require('./feeds/nlp').CAT_LABEL }));
+  C('feeds:subscribe', ['string', 'object?'], F, async (c, url, o) => { try { const f = await fx().subscribe(url, o || {}); return { ok: true, feed: { id: f.id, title: f.title, category: f.category } }; } catch (e) { return { ok: false, error: String(e.message || e), code: e.code || '' }; } });
+  C('feeds:unsubscribe', ['string'], F, (c, id) => { fx().unsubscribe(id); return true; });
+  C('feeds:update', ['string', 'object'], F, (c, id, p) => !!fx().updateFeed(id, p));
+  C('feeds:poll', ['bool?'], F, async (c, force) => fx().poll({ force: !!force }));
+  C('feeds:read', ['array', 'bool'], F, (c, ids, read) => { fx().setRead(ids.filter(x => typeof x === 'string'), read); return true; });
+  C('feeds:all-read', ['string'], F, (c, cat) => { fx().markAllRead(cat); return true; });
+  C('feeds:opened', ['string'], F, (c, id) => !!fx().opened(id));
+  C('feeds:save', ['string', 'bool'], F, (c, id, v) => !!fx().setSaved(id, v));
+  C('feeds:ai-summary', ['string'], F, async (c, id) => { try { return { ok: true, text: await fx().aiSummary(id) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  C('feeds:digest', ['bool?'], F, async (c, fresh) => {
+    let d = fx().digests()[0];
+    if (fresh || !d) d = fx().buildDigest();
+    return d;
+  });
+  C('feeds:takeaways', [], F, async () => { try { const d = fx().digests()[0] || fx().buildDigest(); return { ok: true, text: await fx().aiTakeaways(d) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  C('feeds:article', ['string'], F, async (c, id) => { try { return { ok: true, ...(await fx().articleHtml(id)) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  C('feeds:fulltext', ['string', 'text'], F, (c, id, t) => { fx().storeFullText(id, t); return true; });
+  C('feeds:prefs', [], F, () => fx().prefs());
+  C('feeds:set-prefs', ['object'], F, (c, p) => fx().setPrefs(p));
+  C('feeds:opml-export', [], F, async c => {
+    const w = win(c);
+    const r = await dialog.showSaveDialog(w.win, { title: 'Export feeds (OPML)', defaultPath: path.join(app.getPath('documents'), 'Ferna feeds.opml'), filters: [{ name: 'OPML', extensions: ['opml', 'xml'] }] });
+    if (r.canceled || !r.filePath) return { ok: false };
+    fs.writeFileSync(r.filePath, fx().exportOpml());
+    return { ok: true, file: r.filePath };
+  });
+  C('feeds:opml-import', [], F, async c => {
+    const w = win(c);
+    const r = await dialog.showOpenDialog(w.win, { title: 'Import feeds (OPML)', properties: ['openFile'], filters: [{ name: 'OPML', extensions: ['opml', 'xml', 'txt'] }] });
+    if (r.canceled || !r.filePaths[0]) return { ok: false };
+    const st = fs.statSync(r.filePaths[0]);
+    if (st.size > 5 * 1024 * 1024) return { ok: false, error: 'File too large' };
+    return { ok: true, ...(await fx().importOpml(fs.readFileSync(r.filePaths[0], 'utf8'))) };
+  });
+  C('feeds:open-url', ['string', 'bool?'], F, (c, url, bg) => { if (/^https?:/i.test(url)) win(c).newTab(url, { activate: !bg }); return true; });
+  C('feeds:open-page', ['string?'], F, (c, hash) => { const w = win(c); w.newTab(`ferna://feeds/${hash ? `#${String(hash).replace(/[^a-z0-9-]/gi, '')}` : ''}`); fx().closePanel(w); return true; });
+  C('feeds:close-panel', [], F, c => { fx().closePanel(win(c)); return true; });
+  // Toolbar: the feeds button, the RSS button in the address bar, the digest notice.
+  C('feeds:toggle-panel', [], UI, c => { fx().togglePanel(win(c)); return true; });
+  C('feeds:open-digest', [], UI, c => { const v = fx().togglePanel(win(c), true); if (v) setTimeout(() => { try { v.webContents.send('refresh', { what: 'feeds', show: 'digest' }); } catch { /* gone */ } }, 300); return true; });
+  C('feeds:rss-menu', [], UI, c => {
+    const w = win(c); const t = w.active;
+    const list = (t && t.feeds) || [];
+    const sub = async (url, type, title) => {
+      try { const f = await fx().subscribe(url, { type, title }); w.sendUi('toast', { text: `Following “${f.title}” (${require('./feeds/nlp').CAT_LABEL[f.category]})`, action: 'Open feeds', cmd: 'feeds:toggle-panel', ms: 6000 }); w.pushState(); }
+      catch (e) { w.sendUi('toast', { text: String(e.message || e) }); }
+    };
+    const items = list.map(f => fx().isSubscribed(f.url)
+      ? { label: `✓ ${f.title || f.url} (following)`, enabled: false }
+      : { label: `Follow “${f.title || f.url}”`, click: () => sub(f.url, 'rss', f.title) });
+    if (t && /^https?:/.test(t.url || '')) items.push({ type: 'separator' }, { label: list.length ? 'Follow this page itself (new links on it)' : 'Follow this page (it has no feed: new links on it become items)', click: () => sub(t.url, 'scrape', t.title) });
+    items.push({ type: 'separator' }, { label: 'Open Ferna Feeds', click: () => fx().togglePanel(w, true) });
+    Menu.buildFromTemplate(items).popup({ window: w.win });
+    return true;
+  });
+}
+
+function registerCheck(C) {
+  const K = ['check'];
+  const UI = ['ui'];
+  const ck = () => ctx.check;
+  const win = c => ctx.windowFor(c.wc) || ctx.windows[0];
+  C('check:state', [], K, c => ck().panelState(win(c)));
+  C('check:coverage', ['text', 'string?'], K, async (c, headline, host) => {
+    const w = win(c);
+    if (w.private) return { ok: false, error: 'Not available in a private window.' };
+    try {
+      const cov = await ck().coverage(String(headline).slice(0, 400), host || '');
+      const t = w.active;
+      if (t && t.check && host && t.check.host === host) { t.check.cov = { reliable: cov.reliable, results: cov.results.length, factChecks: cov.factChecks.length, line: require('./guard').summaryLine(cov, t.check.claim) }; w.pushState(); }
+      return { ok: true, cov, line: require('./guard').summaryLine(cov, (t && t.check && t.check.claim) || []) };
+    } catch (e) { return { ok: false, error: String(e.message || e) }; }
+  });
+  C('check:message', ['text'], K, (c, text) => ck().checkMessage(text));
+  C('check:clear-pending', [], K, c => { win(c).checkText = ''; return true; });
+  C('check:trust', ['string'], K, (c, host) => { ck().trust(host); return true; });
+  C('check:rescan', [], K, async c => { const w = win(c); if (w.active) await ck().scanTab(w, w.active, { again: true }); return ck().panelState(w); });
+  C('check:open-url', ['string'], K, (c, url) => { if (/^https?:/i.test(url)) win(c).newTab(url, { activate: true }); return true; });
+  C('check:close-panel', [], K, c => { ck().closePanel(win(c)); return true; });
+  C('check:toggle-panel', [], UI, c => { ck().togglePanel(win(c)); return true; });
+}
+
+function registerSmartWs(C) {
+  const SET = ['settings'];
+  const sw = () => ctx.smartws;
+  const win = c => ctx.windowFor(c.wc) || ctx.windows[0];
+  C('wsx:info', [], SET, () => sw().info());
+  C('wsx:set-schedule', ['string', 'object'], SET, (c, id, o) => sw().setSchedule(id, o));
+  C('wsx:remove-schedule', ['string'], SET, (c, id) => sw().removeSchedule(id));
+  C('wsx:create', ['string', 'bool'], SET, (c, id, sched) => sw().createFrom(id, sched));
+  C('wsx:dismiss', ['string'], SET, (c, id) => { sw().dismiss(id); return sw().info(); });
+  C('wsx:forget', [], SET, () => sw().forget());
+  C('wsx:open-now', ['string'], SET, (c, id) => { const s = (ctx.settings.data.wsSchedules || []).find(x => x.wsId === id) || { wsId: id, days: [], time: '' }; return sw().openWorkspace(s, ctx.lastFocused || ctx.windows[0]); });
+  // From the toast in the toolbar
+  C('wsx:accept', [], ['ui'], c => { sw().accept(win(c)); return true; });
+  C('wsx:settings', [], ['ui'], c => { win(c).openInternal('ferna://settings/#workspaces'); return true; });
+}

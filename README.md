@@ -1,7 +1,7 @@
 # Ferna Sundaree
 
 A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **Ferna PDF Reader** and
-**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.7.3.
+**Ferna Screenshots** built in. Built on Electron 45 (Chromium 156). Version 0.8.0.
 
 ## What it does
 
@@ -52,6 +52,11 @@ A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs**, **F
 | Context-aware themes | Workspace colours tint the bars and accent; adaptive colour from the site you are on; dark mode on a schedule; all off in exam mode |
 | Equalizer genres and presets | 28 presets incl. Reggae, Dub, Synthwave, Bossa Nova, Afrobeats, Bhangra, Ambient, Baila, Metal, Blues, Country, Latin, K-pop, Lo-fi, Indian classical, Gospel (all in Auto-EQ); save, use and delete your own named presets |
 | High-contrast toolbar | Icon and text colours chosen against the actual bar colour to keep ≥ 4.5 : 1 (WCAG AA) with any theme; solid highlight and glow for buttons that are on; outlined hover and focus |
+| 3D look | Tab bar and toolbar raised and lit; tabs, buttons and workspace chips are key-like tiles that lift and tilt after the pointer on hover (a light spot follows it) and press in when clicked; the current tab sits highest; light and dark; respects reduced motion; Settings → Appearance → 3D look |
+| Ferna Feeds | Intelligent RSS reader in the side panel or a tab: RSS 2.0, RSS 1.0/RDF, Atom and JSON Feed; feed auto-discovery (orange RSS button in the address bar) and a scraping fallback for sites without a feed; streams Local (Sri Lanka) / Global / Research & Academia / Tech & AI plus custom channels; one coverage card per story (TF-IDF clustering, “N sources”); extractive summaries on the PC, optional AI summaries; topic tags; relevance from your interests, what you open and +/-/regex rules, with auto-hide of low-relevance items; full-text reader (Readability + sanitizer); saved articles cached in IndexedDB for offline reading; daily digest; OPML import/export; background fetching in a utility process with per-site rate limits, conditional GET and configurable intervals; encrypted on disk; verified Sri Lankan starter feeds (English and Sinhala) |
+| Fact-check bubble | On news articles a shield in the address bar opens the Safety check panel: other coverage of the same story from Google News (searched without cookies), established outlets (international and Sri Lankan) counted separately from other sites, fact-checks (Fact Crescendo Sri Lanka, AFP and others), and warning signs in English and Sinhala (share-before-deleted, miracle cures, all-caps, no author or date). Shows evidence, not verdicts. Search on click, or automatically (Settings → Privacy). Right-click selected text → Check this claim or message |
+| Scam and payment guard | A page asking for a password, card, PIN or OTP that presents itself as a Sri Lankan bank (official addresses from the CBSL list of licensed banks), wallet, telecom, courier or government office but is not on its site gets a warning before you type (Leave / Go to the official site / I trust this site). Pages with the patterns of Sri Lankan SMS and WhatsApp scams (courier customs fee, prize wins, OTP requests, account blocking, KYC update links, easy money) are flagged; pasted or selected messages are checked, and each link in them is compared with the organisation the message names. Runs on the PC |
+| Smart workspaces | Notices sites you open together at about the same time of day on 3+ days (e.g. LMS, Gmail and timetable at 8 a.m. on weekdays) and offers a workspace with those sites pinned that opens itself on a schedule (also when the browser starts up to 90 min later). Settings → Workspaces: days, time, open now, any workspace on a schedule, forget. Notes stay on the PC, encrypted, six weeks; never in private windows |
 | Also | Bookmarks (import/export), history, downloads, private windows, find, zoom per site, print, session restore, focus mode, tracker/ad/malware blocking, HTTPS-first, secure DNS, re-assignable shortcuts |
 
 ## Security model (short)

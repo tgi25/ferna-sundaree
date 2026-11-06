@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>World Test Wire</title><link href="http://localhost/world/"/><id>urn:world</id><updated>2026-11-06T13:38:27Z</updated>
+<entry><title>Sri Lanka gets IMF nod on fourth review of bailout programme</title><link href="http://localhost/world/sri-lanka-imf-nod-fourth-review"/><id>urn:w1</id><published>2026-11-06T13:38:27Z</published>
+<summary type="html">&lt;p&gt;The IMF board completed the fourth review of Sri Lanka's EFF programme, unlocking about 344 million dollars. The fund said reforms were on track.&lt;/p&gt;</summary></entry>
+<entry><title>Leaders meet in Geneva for climate talks</title><link href="http://localhost/world/geneva-climate-talks"/><id>urn:w2</id><published>2026-11-06T13:38:27Z</published>
+<summary>World leaders met in Geneva to discuss emissions targets and climate finance for developing countries.</summary></entry>
+<entry><title>Celebrity gossip roundup of the week</title><link href="http://localhost/world/celebrity-gossip-roundup"/><id>urn:w3</id><published>2026-11-06T13:38:27Z</published>
+<summary>The week's celebrity gossip and red carpet moments.</summary></entry>
+</feed>

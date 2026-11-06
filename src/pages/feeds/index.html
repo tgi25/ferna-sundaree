@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ferna Feeds</title>
+<link rel="stylesheet" href="/_shared/base.css">
+<link rel="stylesheet" href="feeds.css">
+</head>
+<body>
+  <div id="app">
+    <header id="head">
+      <div class="brand"><span class="logo" id="logo"></span><b>Ferna Feeds</b></div>
+      <div class="search"><span id="s-ic"></span><input id="q" type="search" placeholder="Search your feeds" aria-label="Search your feeds"></div>
+      <div class="hbtns">
+        <button class="hb" id="b-refresh" title="Check feeds now"></button>
+        <button class="hb" id="b-digest" title="Today's digest"></button>
+        <button class="hb" id="b-manage" title="Feeds, interests and filters"></button>
+        <button class="hb panel-only" id="b-full" title="Open in a tab"></button>
+        <button class="hb panel-only" id="b-close" title="Close the panel"></button>
+      </div>
+    </header>
+    <nav id="streams" aria-label="Streams"></nav>
+    <main id="main">
+      <section id="list-view">
+        <div id="bar">
+          <div class="seg" id="sort"><button data-sort="smart" class="on" title="Most relevant to you first">For you</button><button data-sort="new" title="Newest first">Newest</button></div>
+          <label class="chk"><input type="checkbox" id="unread"> Unread only</label>
+          <span id="hidden-note"></span>
+          <span class="grow"></span>
+          <button class="btn small" id="b-allread">Mark all read</button>
+        </div>
+        <div id="cards" role="feed" aria-busy="false"></div>
+      </section>
+      <section id="reader" hidden></section>
+      <section id="digest" hidden></section>
+      <section id="manage" hidden></section>
+    </main>
+  </div>
+  <script src="/_shared/kit.js"></script>
+  <script src="/readability.js"></script>
+  <script src="feeds.js"></script>
+</body>
+</html>
