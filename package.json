@@ -23,7 +23,7 @@
   "dependencies": {
     "@ghostery/adblocker-electron": "^2.20.3",
     "@mozilla/readability": "^0.6.0",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.6.1",
     "electron-chrome-extensions": "^4.10.0",
     "electron-chrome-web-store": "^0.13.0"
   },
