@@ -45,11 +45,35 @@ const STARTERS = {
   ],
 };
 
+/** How the feed pages look and behave (Manage → Display, and the Aa button). */
+const VIEW_DEFAULTS = {
+  fontSize: 15, fontFamily: 'system', readWidth: 760, density: 'cards', images: true,
+  openMode: 'reader', buttonOpens: 'panel', markRead: 'scroll', cluster: true, keepUnreadSaved: false,
+};
+const VIEW_RULES = {
+  fontSize: v => Number.isInteger(v) && v >= 11 && v <= 26,
+  fontFamily: v => ['system', 'serif', 'sans', 'sinhala', 'mono', 'wide'].includes(v),
+  readWidth: v => Number.isInteger(v) && v >= 480 && v <= 1600,
+  density: v => ['cards', 'compact', 'titles'].includes(v),
+  images: v => typeof v === 'boolean',
+  openMode: v => ['reader', 'reader-tab', 'tab', 'background'].includes(v),
+  buttonOpens: v => ['panel', 'tab'].includes(v),
+  markRead: v => ['scroll', 'hover', 'open'].includes(v),
+  cluster: v => typeof v === 'boolean',
+};
+/** One address, however it is written: https or http, www or not, a trailing slash or not. */
+function canon(url) {
+  try {
+    const u = new URL(url);
+    return `${u.hostname.toLowerCase().replace(/^www\./, '')}${u.port ? `:${u.port}` : ''}${u.pathname.replace(/\/+$/, '') || ''}${u.search}`;
+  } catch { return String(url || ''); }
+}
+
 function create(ctx, { dataDir }) {
   const P_ = f => path.join(dataDir, f);
   const store = new JsonStore(P_('feeds.enc'), {
     feeds: [], channels: [], interests: '', rules: '', learned: {}, digests: [],
-    settings: { interval: DEFAULT_INTERVAL, hideLow: false, threshold: 0.1, aiSummaries: true, digestHour: 6 },
+    settings: { interval: DEFAULT_INTERVAL, hideLow: false, threshold: 0.1, aiSummaries: true, digestHour: 6, ...VIEW_DEFAULTS },
   }, { encrypt: true });
   const itemsStore = new JsonStore(P_('feed-items.enc'), { items: [] }, { encrypt: true });
   const S = () => store.data.settings;
@@ -62,11 +86,12 @@ function create(ctx, { dataDir }) {
 
   // ---------- notify the feed pages and the toolbar ----------
   let notifyTimer = null;
-  function notify() {
+  // quiet: only counts changed (read while scrolling); the pages update their numbers, not their lists.
+  function notify({ quiet = false } = {}) {
     clearTimeout(notifyTimer);
     notifyTimer = setTimeout(() => {
       for (const wc of require('electron').webContents.getAllWebContents()) {
-        try { if (!wc.isDestroyed() && /^ferna:\/\/feeds\//.test(wc.getURL())) wc.send('refresh', { what: 'feeds' }); } catch { /* gone */ }
+        try { if (!wc.isDestroyed() && /^ferna:\/\/feeds\//.test(wc.getURL())) wc.send('refresh', { what: 'feeds', quiet, counts: quiet ? counts() : undefined }); } catch { /* gone */ }
       }
       for (const w of ctx.windows) w.pushState();
     }, 150);
@@ -88,11 +113,22 @@ function create(ctx, { dataDir }) {
   // ---------- subscriptions ----------
   const newId = () => `f${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   /** Subscribe to a feed (or follow a page without one). Checks it first; returns the feed. */
-  async function subscribe(url, { type = 'rss', title = '', category = '' } = {}) {
+  const findFeed = url => { const k = canon(url); return store.data.feeds.find(f => canon(f.url) === k || (f.requested && canon(f.requested) === k)); };
+  const inFlight = new Map(); // canonical address → the subscription being checked
+  /** Subscribe; the same address asked for twice (at once or later) gives the one feed. */
+  function subscribe(url, o = {}) {
     url = P.safeUrl(url);
-    if (!url) throw new Error('Only http(s) addresses can be followed.');
-    const existing = store.data.feeds.find(f => f.url === url);
-    if (existing) return existing;
+    if (!url) return Promise.reject(new Error('Only http(s) addresses can be followed.'));
+    const existing = findFeed(url);
+    if (existing) return Promise.resolve(Object.assign(existing, { existed: true }));
+    const k = canon(url);
+    if (inFlight.has(k)) return inFlight.get(k);
+    const p = subscribeNew(url, o).finally(() => inFlight.delete(k));
+    inFlight.set(k, p);
+    return p;
+  }
+  async function subscribeNew(url, { type = 'rss', title = '', category = '' } = {}) {
+    const requested = url;
     let feedTitle = title, cat = category, site = '';
     if (type === 'rss') {
       const W = require('./worker');
@@ -101,8 +137,13 @@ function create(ctx, { dataDir }) {
       try { parsed = P.parseFeed(r.text, r.url); } catch {
         const found = P.discoverFeeds(r.text, r.url);
         if (!found.length) { const e = new Error('No feed found at this address. You can follow the page instead.'); e.code = 'NOFEED'; throw e; }
-        return subscribe(found[0].url, { type: 'rss', title: title || found[0].title, category });
+        const f2 = await subscribe(found[0].url, { type: 'rss', title: title || found[0].title, category });
+        if (!f2.requested) { f2.requested = requested; store.save(); }
+        return f2;
       }
+      // The address may redirect to a feed you already follow.
+      const again = findFeed(url) || (r.url && findFeed(r.url));
+      if (again) return Object.assign(again, { existed: true });
       feedTitle = feedTitle || parsed.title || new URL(url).hostname;
       site = parsed.link || '';
       cat = cat || N.feedCategory(url, `${feedTitle} ${site}`, parsed.items.slice(0, 10).map(i => `${i.title} ${i.text.slice(0, 200)}`).join(' '));
@@ -111,6 +152,8 @@ function create(ctx, { dataDir }) {
       site = url;
       cat = cat || N.feedCategory(url, feedTitle);
     }
+    const dup = findFeed(url);
+    if (dup) return Object.assign(dup, { existed: true });
     const f = { id: newId(), url, type: type === 'scrape' ? 'scrape' : 'rss', title: String(feedTitle).slice(0, 200), site, category: N.CATEGORIES.includes(cat) ? cat : 'global', added: Date.now(), nextFetch: 0, errors: 0, lastError: '', etag: '', lastModified: '', seen: [] };
     store.data.feeds.push(f);
     store.save();
@@ -118,11 +161,29 @@ function create(ctx, { dataDir }) {
     notify();
     return f;
   }
-  function unsubscribe(id) {
-    store.data.feeds = store.data.feeds.filter(f => f.id !== id);
-    itemsStore.data.items = items().filter(it => it.feedId !== id || it.saved);
+  function unsubscribe(ids) {
+    const set = new Set([].concat(ids));
+    const before = store.data.feeds.length;
+    store.data.feeds = store.data.feeds.filter(f => !set.has(f.id));
+    itemsStore.data.items = items().filter(it => !set.has(it.feedId) || it.saved);
+    for (const c of store.data.channels) c.feeds = (c.feeds || []).filter(x => !set.has(x));
     store.save(); itemsStore.save(); notify();
+    return before - store.data.feeds.length;
   }
+  /** Remove the duplicates an earlier version could make (same address twice): keep the oldest. */
+  function dedupeFeeds() {
+    const seen = new Map();
+    const drop = [];
+    for (const f of store.data.feeds) { const k = canon(f.url); if (seen.has(k)) { drop.push(f); for (const it of items()) if (it.feedId === f.id) it.feedId = seen.get(k).id; } else seen.set(k, f); }
+    if (!drop.length) return 0;
+    store.data.feeds = store.data.feeds.filter(f => !drop.includes(f));
+    // The same article fetched twice under two copies: keep one.
+    const links = new Set();
+    itemsStore.data.items = items().filter(it => { if (!it.link) return true; const k = `${it.feedId}|${it.link}`; if (links.has(k) && !it.saved) return false; links.add(k); return true; });
+    store.save(); itemsStore.save();
+    return drop.length;
+  }
+  dedupeFeeds();
   function updateFeed(id, patch) {
     const f = feedById(id);
     if (!f) return null;
@@ -235,28 +296,61 @@ function create(ctx, { dataDir }) {
       pool = pool.filter(it => { const s = `${it.title} ${it.summary} ${it.text}`.toLowerCase(); return s.includes(raw) || (terms.length && terms.every(t => N.tokens(s).includes(t))); });
     }
     const groups = new Map();
-    for (const it of pool) { const k = it.cluster || it.id; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); }
+    const together = S().cluster !== false && !feedId;
+    for (const it of pool) { const k = together ? it.cluster || it.id : it.id; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); }
     let cards = [...groups.values()].map(g => {
-      g.sort((a, b) => (b.text || '').length - (a.text || '').length);
+      // The lead story: the best-scoring report, then the fullest; the others are "also reported by".
       const lead = g.slice().sort((a, b) => (b.score || 0) - (a.score || 0) || (b.text || '').length - (a.text || '').length)[0];
+      g.sort((a, b) => (a === lead ? -1 : b === lead ? 1 : (b.date || 0) - (a.date || 0)));
       const date = Math.max(...g.map(x => x.date || x.added || 0));
       return {
         id: lead.id, cluster: lead.cluster || lead.id, title: lead.title, link: lead.link, summary: lead.aiSummary || lead.summary, ai: !!lead.aiSummary,
         image: (g.find(x => x.image) || {}).image || '', tags: lead.tags || [], category: lead.category, score: Math.max(...g.map(x => x.score || 0)), date,
         read: g.every(x => x.read), saved: g.some(x => x.saved), hidden: g.every(x => x.hidden),
-        sources: g.map(x => ({ id: x.id, feed: (feedById(x.feedId) || {}).title || '', title: x.title, link: x.link, date: x.date, read: x.read })),
+        feedId: lead.feedId, feed: (feedById(lead.feedId) || {}).title || '',
+        sources: g.map(x => ({ id: x.id, feedId: x.feedId, feed: (feedById(x.feedId) || {}).title || '', title: x.title, link: x.link, date: x.date, read: x.read })),
       };
     });
     if (unreadOnly) cards = cards.filter(c => !c.read);
     if (sort === 'new') cards.sort((a, b) => b.date - a.date);
+    else if (sort === 'old') cards.sort((a, b) => a.date - b.date);
     else cards.sort((a, b) => (b.score + Math.min(0.2, (b.sources.length - 1) * 0.05)) - (a.score + Math.min(0.2, (a.sources.length - 1) * 0.05)) || b.date - a.date);
-    const counts = { all: 0, local: 0, global: 0, research: 0, tech: 0, saved: 0 };
-    for (const it of items()) { if (it.hidden) continue; if (!it.read) { counts.all++; counts[it.category] = (counts[it.category] || 0) + 1; } if (it.saved) counts.saved++; }
-    return { cards: cards.slice(0, limit), total: cards.length, hiddenCount, counts };
+    return { cards: cards.slice(0, limit), total: cards.length, hiddenCount, counts: counts() };
+  }
+  /** Unread items per stream, per channel and per feed (the numbers in the side list). */
+  function counts() {
+    const c = { all: 0, local: 0, global: 0, research: 0, tech: 0, saved: 0, feeds: {}, channels: {} };
+    const chans = store.data.channels.map(ch => ({ id: ch.id, feeds: new Set(ch.feeds || []), rs: N.compileRules(ch.keywords).filter(r => r.sign > 0) }));
+    for (const it of items()) {
+      if (it.saved) c.saved++;
+      if (it.hidden || it.read) continue;
+      c.all++; c[it.category] = (c[it.category] || 0) + 1;
+      c.feeds[it.feedId] = (c.feeds[it.feedId] || 0) + 1;
+      for (const ch of chans) if (ch.feeds.has(it.feedId) || ch.rs.some(r => r.re.test(`${it.title} ${it.summary}`))) c.channels[ch.id] = (c.channels[ch.id] || 0) + 1;
+    }
+    return c;
   }
   function item(id) { return items().find(it => it.id === id) || null; }
-  function setRead(ids, read = true) { for (const it of items()) if (ids.includes(it.id)) it.read = read; itemsStore.save(); notify(); }
-  function markAllRead(category = 'all') { for (const it of items()) if (category === 'all' || it.category === category) it.read = true; itemsStore.save(); notify(); }
+  function setRead(ids, read = true, { quiet = false } = {}) {
+    const set = new Set(ids);
+    let n = 0;
+    for (const it of items()) if (set.has(it.id) && it.read !== read) { it.read = read; n++; }
+    if (n) { itemsStore.save(); notify({ quiet }); }
+    return counts();
+  }
+  /** Mark read: a stream, a feed, a channel, and/or what is older than a time. */
+  function markAllRead(category = 'all', { feedId = '', channel = '', olderThan = 0, ids = null } = {}) {
+    let pool = items();
+    if (feedId) pool = pool.filter(it => it.feedId === feedId);
+    if (category && category !== 'all') pool = pool.filter(it => it.category === category);
+    if (channel) { const ch = store.data.channels.find(c => c.id === channel); if (ch) { const rs = N.compileRules(ch.keywords); pool = pool.filter(it => (ch.feeds || []).includes(it.feedId) || rs.some(r => r.sign > 0 && r.re.test(`${it.title} ${it.summary}`))); } }
+    if (olderThan) pool = pool.filter(it => (it.date || it.added || 0) < olderThan);
+    if (ids) { const set = new Set(ids); pool = pool.filter(it => set.has(it.id)); }
+    let n = 0;
+    for (const it of pool) if (!it.read) { it.read = true; n++; }
+    itemsStore.save(); notify();
+    return n;
+  }
   /** You opened an item: it is read, and your reading profile learns from it. */
   function opened(id) {
     const it = item(id);
@@ -368,6 +462,43 @@ function create(ctx, { dataDir }) {
     return { found: list.length, added };
   }
 
+  // ---------- everything: feeds, channels, interests, filters and settings (a .json file) ----------
+  function exportAll() {
+    return {
+      format: 'ferna-feeds', version: 1, exported: new Date().toISOString(),
+      feeds: store.data.feeds.map(f => ({ id: f.id, url: f.url, type: f.type, title: f.title, site: f.site, category: f.category, paused: !!f.paused, interval: f.interval || null })),
+      channels: store.data.channels, interests: store.data.interests, rules: store.data.rules, settings: { ...VIEW_DEFAULTS, ...S() },
+    };
+  }
+  function importAll(data, { replaceSettings = true } = {}) {
+    if (!data || data.format !== 'ferna-feeds' || !Array.isArray(data.feeds)) throw new Error('This is not a Ferna Feeds export.');
+    let added = 0;
+    const idMap = new Map();
+    for (const f of data.feeds.slice(0, 2000)) {
+      const url = P.safeUrl(f && f.url);
+      if (!url) continue;
+      const have = findFeed(url);
+      if (have) { idMap.set(f.id, have.id); continue; }
+      const nf = { id: newId(), url, type: f.type === 'scrape' ? 'scrape' : 'rss', title: String(f.title || new URL(url).hostname).slice(0, 200), site: P.safeUrl(f.site) || '', category: N.CATEGORIES.includes(f.category) ? f.category : N.feedCategory(url, f.title), paused: !!f.paused, interval: Number.isInteger(f.interval) ? f.interval : undefined, added: Date.now(), nextFetch: 0, errors: 0, lastError: '', etag: '', lastModified: '', seen: [] };
+      store.data.feeds.push(nf); idMap.set(f.id, nf.id); added++;
+    }
+    const p = {};
+    if (replaceSettings) {
+      if (typeof data.interests === 'string') p.interests = data.interests;
+      if (typeof data.rules === 'string') p.rules = data.rules;
+      if (data.settings && typeof data.settings === 'object') Object.assign(p, data.settings);
+      if (Array.isArray(data.channels)) {
+        const mine = new Map(store.data.channels.map(c => [c.name, c]));
+        for (const c of data.channels) mine.set(String(c.name || 'Channel'), { ...c, feeds: (c.feeds || []).map(x => idMap.get(x) || x) });
+        p.channels = [...mine.values()];
+      }
+    }
+    store.save();
+    setPrefs(p);
+    if (added) setTimeout(() => poll().catch(() => {}), 50);
+    return { found: data.feeds.length, added };
+  }
+
   // ---------- settings ----------
   function setPrefs(p) {
     if (typeof p.interests === 'string') { store.data.interests = p.interests.slice(0, 4000); interestVec = N.interestVector(store.data.interests); }
@@ -380,11 +511,12 @@ function create(ctx, { dataDir }) {
     if (Number.isInteger(p.digestHour) && p.digestHour >= 0 && p.digestHour <= 23) s.digestHour = p.digestHour;
     if (Array.isArray(p.channels)) store.data.channels = p.channels.slice(0, 30).map(c => ({ id: String(c.id || newId()).slice(0, 40), name: String(c.name || 'Channel').slice(0, 60), keywords: String(c.keywords || '').slice(0, 4000), feeds: Array.isArray(c.feeds) ? c.feeds.filter(x => typeof x === 'string').slice(0, 200) : [] }));
     if (p.forgetLearned) store.data.learned = {};
+    for (const [k, ok] of Object.entries(VIEW_RULES)) if (k in p && ok(p[k])) s[k] = p[k];
     rescore(); store.save(); itemsStore.save(); notify();
     return prefs();
   }
   function prefs() {
-    return { interests: store.data.interests, rules: store.data.rules, channels: store.data.channels, settings: S(), learnedTerms: Object.entries(store.data.learned).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([k]) => k.replace(/_/g, ' ')), aiReady: !!(ctx.assistant && ctx.assistant.configured()) };
+    return { interests: store.data.interests, rules: store.data.rules, channels: store.data.channels, settings: { ...VIEW_DEFAULTS, ...S() }, learnedTerms: Object.entries(store.data.learned).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([k]) => k.replace(/_/g, ' ')), aiReady: !!(ctx.assistant && ctx.assistant.configured()) };
   }
   function feedsInfo() {
     const counts = new Map(), unread = new Map();
@@ -415,11 +547,11 @@ function create(ctx, { dataDir }) {
   }
 
   return {
-    STARTERS, subscribe, unsubscribe, updateFeed, poll, start, list, item, setRead, markAllRead, opened, setSaved,
+    STARTERS, VIEW_DEFAULTS, canon, counts, exportAll, importAll, dedupeFeeds, subscribe, unsubscribe, updateFeed, poll, start, list, item, setRead, markAllRead, opened, setSaved,
     buildDigest, maybeDigest, digests: () => store.data.digests, aiSummary, aiTakeaways, articleHtml, storeFullText,
     discoverInTab, isSubscribed, exportOpml, importOpml, setPrefs, prefs, feedsInfo, unreadCount, clearHistory,
     togglePanel, closePanel, rescore, store, itemsStore,
   };
 }
 
-module.exports = { create, STARTERS };
+module.exports = { create, STARTERS, VIEW_DEFAULTS, canon };

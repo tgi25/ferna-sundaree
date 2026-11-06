@@ -93,6 +93,7 @@ const DEFAULT_SETTINGS = {
   // 0.6
   eqPresets: [], workspaceThemes: true, adaptiveTheme: false, themeSchedule: { on: false, dark: '19:00', light: '06:30' }, highContrastToolbar: true, depth3d: true,
   // 0.8
+  feedsPanelWidth: 420,
   safetyCheck: true, factCheckAuto: false, checkTrusted: [], smartWorkspaces: true, wsSchedules: [],
 };
 
@@ -1169,6 +1170,7 @@ function registerCommands() {
     spellLangs: v => Array.isArray(v) && v.length <= 10 && v.every(x => typeof x === 'string' && x.length <= 12),
     readerRate: v => Number.isFinite(v) && v >= 0.5 && v <= 2.5, readerVoice: v => typeof v === 'string' && v.length <= 200,
     workspaceThemes: v => typeof v === 'boolean', adaptiveTheme: v => typeof v === 'boolean', highContrastToolbar: v => typeof v === 'boolean', depth3d: v => typeof v === 'boolean',
+    feedsPanelWidth: v => Number.isInteger(v) && v >= 320 && v <= 900,
     safetyCheck: v => typeof v === 'boolean', factCheckAuto: v => typeof v === 'boolean', smartWorkspaces: v => typeof v === 'boolean',
     checkTrusted: v => Array.isArray(v) && v.length <= 200 && v.every(x => typeof x === 'string' && /^[a-z0-9.-]{1,253}$/.test(x)),
     themeSchedule: v => v && typeof v === 'object' && typeof v.on === 'boolean' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v.dark) && /^([01]\d|2[0-3]):[0-5]\d$/.test(v.light),
@@ -1866,13 +1868,35 @@ function registerFeeds(C) {
   const win = c => ctx.windowFor(c.wc) || ctx.windows[0];
   C('feeds:list', ['object'], F, (c, q) => fx().list(q));
   C('feeds:item', ['string'], F, (c, id) => { const it = fx().item(id); return it ? { ...it, vec: undefined, feed: (fx().feedsInfo().find(f => f.id === it.feedId) || {}).title || '' } : null; });
-  C('feeds:info', [], F, () => ({ feeds: fx().feedsInfo(), starters: fx().STARTERS, prefs: fx().prefs(), labels: require('./feeds/nlp').CAT_LABEL }));
+  C('feeds:info', [], F, () => ({ feeds: fx().feedsInfo(), starters: fx().STARTERS, prefs: fx().prefs(), labels: require('./feeds/nlp').CAT_LABEL, panelWidth: ctx.settings.data.feedsPanelWidth || 420 }));
   C('feeds:subscribe', ['string', 'object?'], F, async (c, url, o) => { try { const f = await fx().subscribe(url, o || {}); return { ok: true, feed: { id: f.id, title: f.title, category: f.category } }; } catch (e) { return { ok: false, error: String(e.message || e), code: e.code || '' }; } });
-  C('feeds:unsubscribe', ['string'], F, (c, id) => { fx().unsubscribe(id); return true; });
+  C('feeds:unsubscribe', ['any'], F, (c, ids) => { const list = [].concat(ids).filter(x => typeof x === 'string').slice(0, 2000); return { removed: fx().unsubscribe(list) }; });
+  C('feeds:update-many', ['array', 'object'], F, (c, ids, p) => { let n = 0; for (const id of ids.filter(x => typeof x === 'string').slice(0, 2000)) if (fx().updateFeed(id, p)) n++; return n; });
+  C('feeds:poll-feeds', ['array'], F, async (c, ids) => fx().poll({ only: ids.filter(x => typeof x === 'string').slice(0, 200) }));
+  C('feeds:counts', [], F, () => fx().counts());
+  C('feeds:panel-width', ['int'], F, (c, w) => { const v = Math.max(320, Math.min(900, w)); ctx.setSetting('feedsPanelWidth', v); for (const x of ctx.windows) if (x.side && x.side.kind === 'feeds') x.relayout(); return v; });
+  C('feeds:export-all', [], F, async c => {
+    const w = win(c);
+    const r = await dialog.showSaveDialog(w.win, { title: 'Export Ferna Feeds (feeds and settings)', defaultPath: path.join(app.getPath('documents'), 'Ferna feeds and settings.json'), filters: [{ name: 'Ferna Feeds settings', extensions: ['json'] }] });
+    if (r.canceled || !r.filePath) return { ok: false };
+    fs.writeFileSync(r.filePath, JSON.stringify(fx().exportAll(), null, 2));
+    return { ok: true, file: r.filePath };
+  });
+  C('feeds:import-all', [], F, async c => {
+    const w = win(c);
+    const r = await dialog.showOpenDialog(w.win, { title: 'Import Ferna Feeds (feeds and settings)', properties: ['openFile'], filters: [{ name: 'Ferna Feeds settings or OPML', extensions: ['json', 'opml', 'xml'] }] });
+    if (r.canceled || !r.filePaths[0]) return { ok: false };
+    if (fs.statSync(r.filePaths[0]).size > 5 * 1024 * 1024) return { ok: false, error: 'File too large' };
+    const text = fs.readFileSync(r.filePaths[0], 'utf8');
+    try {
+      if (/^\s*</.test(text)) return { ok: true, ...(await fx().importOpml(text)) };
+      return { ok: true, ...fx().importAll(JSON.parse(text)) };
+    } catch (e) { return { ok: false, error: String(e.message || e) }; }
+  });
   C('feeds:update', ['string', 'object'], F, (c, id, p) => !!fx().updateFeed(id, p));
   C('feeds:poll', ['bool?'], F, async (c, force) => fx().poll({ force: !!force }));
-  C('feeds:read', ['array', 'bool'], F, (c, ids, read) => { fx().setRead(ids.filter(x => typeof x === 'string'), read); return true; });
-  C('feeds:all-read', ['string'], F, (c, cat) => { fx().markAllRead(cat); return true; });
+  C('feeds:read', ['array', 'bool', 'bool?'], F, (c, ids, read, quiet) => fx().setRead(ids.filter(x => typeof x === 'string'), read, { quiet: !!quiet }));
+  C('feeds:all-read', ['string', 'object?'], F, (c, cat, o) => fx().markAllRead(cat, { feedId: typeof (o && o.feedId) === 'string' ? o.feedId : '', channel: typeof (o && o.channel) === 'string' ? o.channel : '', olderThan: Number(o && o.olderThan) || 0, ids: Array.isArray(o && o.ids) ? o.ids.filter(x => typeof x === 'string') : null }));
   C('feeds:opened', ['string'], F, (c, id) => !!fx().opened(id));
   C('feeds:save', ['string', 'bool'], F, (c, id, v) => !!fx().setSaved(id, v));
   C('feeds:ai-summary', ['string'], F, async (c, id) => { try { return { ok: true, text: await fx().aiSummary(id) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
@@ -1902,10 +1926,19 @@ function registerFeeds(C) {
     return { ok: true, ...(await fx().importOpml(fs.readFileSync(r.filePaths[0], 'utf8'))) };
   });
   C('feeds:open-url', ['string', 'bool?'], F, (c, url, bg) => { if (/^https?:/i.test(url)) win(c).newTab(url, { activate: !bg }); return true; });
-  C('feeds:open-page', ['string?'], F, (c, hash) => { const w = win(c); w.newTab(`ferna://feeds/${hash ? `#${String(hash).replace(/[^a-z0-9-]/gi, '')}` : ''}`); fx().closePanel(w); return true; });
+  C('feeds:open-page', ['string?', 'bool?'], F, (c, hash, keepPanel) => { const w = win(c); w.newTab(`ferna://feeds/${hash ? `#${String(hash).replace(/[^a-z0-9/_-]/gi, '')}` : ''}`); if (!keepPanel) fx().closePanel(w); return true; });
   C('feeds:close-panel', [], F, c => { fx().closePanel(win(c)); return true; });
   // Toolbar: the feeds button, the RSS button in the address bar, the digest notice.
-  C('feeds:toggle-panel', [], UI, c => { fx().togglePanel(win(c)); return true; });
+  C('feeds:toggle-panel', [], UI, c => {
+    const w = win(c);
+    // "Open Ferna Feeds in a tab": go to the feeds tab (or open one) instead of the side panel.
+    if (fx().prefs().settings.buttonOpens === 'tab' && !(w.side && w.side.kind === 'feeds')) {
+      const t = w.tabs.find(x => /^ferna:\/\/feeds\//.test(x.url || ''));
+      if (t) w.activate(t); else w.newTab('ferna://feeds/');
+      return true;
+    }
+    fx().togglePanel(w); return true;
+  });
   C('feeds:open-digest', [], UI, c => { const v = fx().togglePanel(win(c), true); if (v) setTimeout(() => { try { v.webContents.send('refresh', { what: 'feeds', show: 'digest' }); } catch { /* gone */ } }, 300); return true; });
   C('feeds:rss-menu', [], UI, c => {
     const w = win(c); const t = w.active;

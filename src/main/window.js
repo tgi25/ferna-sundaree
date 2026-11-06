@@ -837,7 +837,9 @@ class FernaWindow {
   /** The page area once the side panel (assistant) takes its share on the right. */
   sideLayout(content) {
     if (!this.side) return content;
-    const w = Math.max(300, Math.min(560, Number(this.ctx.settings.data.sideWidth) || 380));
+    const w = this.side.kind === 'feeds'
+      ? Math.max(320, Math.min(900, Number(this.ctx.settings.data.feedsPanelWidth) || 420))
+      : Math.max(300, Math.min(560, Number(this.ctx.settings.data.sideWidth) || 380));
     const width = Math.max(200, content.width - w);
     this.side.view.setBounds({ x: content.x + width, y: content.y, width: content.width - width, height: content.height });
     return { ...content, width };

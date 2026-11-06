@@ -12,7 +12,8 @@
       <div class="brand"><span class="logo" id="logo"></span><b>Ferna Feeds</b></div>
       <div class="search"><span id="s-ic"></span><input id="q" type="search" placeholder="Search your feeds" aria-label="Search your feeds"></div>
       <div class="hbtns">
-        <button class="hb" id="b-refresh" title="Check feeds now"></button>
+        <button class="hb" id="b-view" title="Display: font, width, layout (Aa)">Aa</button>
+        <button class="hb" id="b-refresh" title="Check feeds now (R)"></button>
         <button class="hb" id="b-digest" title="Today's digest"></button>
         <button class="hb" id="b-manage" title="Feeds, interests and filters"></button>
         <button class="hb panel-only" id="b-full" title="Open in a tab"></button>
@@ -23,17 +24,22 @@
     <main id="main">
       <section id="list-view">
         <div id="bar">
-          <div class="seg" id="sort"><button data-sort="smart" class="on" title="Most relevant to you first">For you</button><button data-sort="new" title="Newest first">Newest</button></div>
+          <div class="seg" id="sort"><button data-sort="smart" class="on" title="Most relevant to you first">For you</button><button data-sort="new" title="Newest first">Newest</button><button data-sort="old" title="Oldest first">Oldest</button></div>
           <label class="chk"><input type="checkbox" id="unread"> Unread only</label>
+          <select class="field small" id="feed-pick" aria-label="Show one feed"></select>
           <span id="hidden-note"></span>
           <span class="grow"></span>
-          <button class="btn small" id="b-allread">Mark all read</button>
+          <div class="mr"><button class="btn small" id="b-allread" title="Mark everything shown here as read (Shift+A)">Mark all read</button><button class="btn small" id="b-readmenu" title="Mark older items as read" aria-label="More ways to mark read">▾</button>
+            <div class="menu" id="readmenu" hidden><button data-older="86400000">Older than a day</button><button data-older="604800000">Older than a week</button><button data-older="above">Above the one in view</button></div></div>
         </div>
+        <div id="scope" hidden></div>
         <div id="cards" role="feed" aria-busy="false"></div>
       </section>
       <section id="reader" hidden></section>
       <section id="digest" hidden></section>
       <section id="manage" hidden></section>
+      <div id="viewpop" class="pop" hidden role="dialog" aria-label="Display"></div>
+      <div id="keys" class="pop keys" hidden role="dialog" aria-label="Keyboard shortcuts"></div>
     </main>
   </div>
   <script src="/_shared/kit.js"></script>

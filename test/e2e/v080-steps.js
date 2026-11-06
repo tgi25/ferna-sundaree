@@ -267,6 +267,7 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
       for (const t of [...w.tabs]) if (/\.localhost:/.test(t.url)) w.closeTab(t);
       w.switchWorkspace(null);
       const d = new Date(Date.now() - 60000);
+      c.lastFocused = w; // the schedule opens in the window you used last
       c.setSetting('wsSchedules', [{ wsId: id, days: [d.getDay()], time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`, on: true, last: '' }]);
       c.smartws.tick();
     }, made.w.id);
@@ -310,5 +311,125 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
     }
     await main(() => global.__ferna.windows[0].run('toggleTabBar'));
     assert((await win()).layout.showTabs, 'shown again');
+  });
+  await step('0.8.2 feeds: Remove works on the first click and Add ticked never adds a feed twice (however often Manage was opened)', async () => {
+    const r0 = await main(async (_, b) => {
+      const F = global.__ferna.feeds;
+      for (const f of [...F.store.data.feeds]) F.unsubscribe(f.id);
+      F.STARTERS.local.unshift(['Test Lanka', `${b}/feeds/lanka.xml`], ['Test Many', `${b}/feeds/many.xml`]);
+      // The same address at once, and written differently: one feed
+      const u = `${b}/feeds/research.xml`;
+      const fs = await Promise.all([F.subscribe(u), F.subscribe(u), F.subscribe(`${u}/`), F.subscribe(u.replace('http://localhost', 'http://LOCALHOST'))]);
+      return { ids: [...new Set(fs.map(f => f.id))].length, n: F.store.data.feeds.length };
+    }, lh());
+    assert(r0.ids === 1 && r0.n === 1, JSON.stringify(r0));
+    await main(() => { const w = global.__ferna.windows[0]; global.__ferna.feeds.closePanel(w); w.newTab('ferna://feeds/#manage'); });
+    const p = await page('ferna://feeds/#manage');
+    await p.reload();
+    // Open Manage several times (each used to add another set of click handlers)
+    for (let i = 0; i < 4; i++) { await p.evaluate(() => document.querySelector('#b-manage').click()); await H.sleep(150); await p.evaluate(() => { if (document.querySelector('#manage').hidden) document.querySelector('#b-manage').click(); }); await H.sleep(250); }
+    await H.until(() => p.evaluate(() => !!document.querySelector('[data-addpack="local"]')), 5000, 'manage');
+    await p.evaluate(() => { for (const b of document.querySelectorAll('input[data-pack="local"]')) if (/Test/.test(b.dataset.name)) b.checked = true; document.querySelector('[data-addpack="local"]').click(); });
+    await H.until(() => main(() => global.__ferna.feeds.store.data.feeds.length === 3), 8000, 'two added');
+    await H.sleep(800);
+    const urls = await main(() => global.__ferna.feeds.store.data.feeds.map(f => f.url));
+    assert(urls.length === 3 && new Set(urls).size === 3, JSON.stringify(urls));
+    // Remove: one click asks once, inline; "Yes" removes it
+    await H.until(() => p.evaluate(() => document.querySelectorAll('[data-unsub]').length === 3), 5000, 'rows');
+    await p.evaluate(() => document.querySelector('[data-unsub]').click());
+    const asks = await p.evaluate(() => document.querySelectorAll('.confirm').length);
+    assert(asks === 1, `asked ${asks} times`);
+    await shot('v082-01-remove-confirm');
+    await p.evaluate(() => document.querySelector('.confirm [data-yes]').click());
+    await H.until(() => main(() => global.__ferna.feeds.store.data.feeds.length === 2), 4000, 'removed with one click');
+    // Duplicates left by older versions are cleaned up
+    const dd = await main(() => { const F = global.__ferna.feeds; const f = F.store.data.feeds[0]; F.store.data.feeds.push({ ...f, id: 'dup1', url: f.url.replace('http://', 'http://www.').replace('www.localhost', 'localhost') + '/' }); const n = F.dedupeFeeds(); return { n, left: F.store.data.feeds.length }; });
+    assert(dd.n === 1 && dd.left === 2, JSON.stringify(dd));
+    // Bulk: select all, remove both with one confirmation
+    await H.until(() => p.evaluate(() => document.querySelectorAll('[data-sel]').length === 2), 5000, 'two rows');
+    await p.evaluate(() => { const a = document.querySelector('#m-selall'); a.click(); });
+    await H.until(() => p.evaluate(() => !document.querySelector('.bulk-acts').hidden && /2 selected/.test(document.querySelector('#m-selcount').textContent)), 3000, 'bulk bar');
+    await shot('v082-02-bulk');
+    await p.evaluate(() => document.querySelector('[data-bulk="remove"]').click());
+    await p.evaluate(() => document.querySelector('#m-confirm [data-yes]').click());
+    await H.until(() => main(() => global.__ferna.feeds.store.data.feeds.length === 0), 4000, 'bulk removed');
+    await main(() => { const F = global.__ferna.feeds; F.STARTERS.local = F.STARTERS.local.filter(x => !/^Test/.test(x[0])); });
+  });
+
+  await step('0.8.2 feeds: read as you scroll, open modes, display settings, clusters with sources, export and import of everything', async () => {
+    await main(async (_, b) => {
+      const F = global.__ferna.feeds;
+      for (const n of ['many', 'lanka', 'world']) await F.subscribe(`${b}/feeds/${n}.xml`);
+      await F.poll({ force: true });
+      F.setPrefs({ markRead: 'scroll', openMode: 'reader', density: 'cards', fontSize: 15, cluster: true });
+    }, lh());
+    await main(() => { const w = global.__ferna.windows[0]; for (const t of [...w.tabs]) if (/^ferna:\/\/feeds\//.test(t.url || '')) w.closeTab(t); w.newTab('ferna://feeds/?scrolltest'); });
+    await H.sleep(600);
+    const p = await page('ferna://feeds/?scrolltest'); // not the hidden panel kept for later
+    await p.evaluate(() => { [...document.querySelectorAll('.st')].find(b => b.dataset.stream === 'all').click(); });
+    await H.until(() => p.evaluate(() => document.querySelectorAll('.fc').length >= 30), 8000, 'many cards');
+    const before = await main(() => global.__ferna.feeds.unreadCount());
+    const nav0 = await p.evaluate(() => document.querySelector('.st[data-stream="all"] .n').textContent);
+    // Scroll down through the list: items that pass the top become read; the counts go down
+    for (let i = 0; i < 8; i++) { await p.evaluate(() => { document.querySelector('#cards').scrollBy(0, 300); }); await H.sleep(120); }
+    await H.sleep(900);
+    const after = await main(() => global.__ferna.feeds.unreadCount());
+    const nav1 = await p.evaluate(() => document.querySelector('.st[data-stream="all"] .n').textContent);
+    const readCards = await p.evaluate(() => document.querySelectorAll('.fc.read').length);
+    assert(after < before && Number(nav1) === after && Number(nav0) === before && readCards >= 3, JSON.stringify({ before, after, nav0, nav1, readCards }));
+    const badge = await (await ui()).evaluate(() => document.querySelector('#feeds-count').textContent);
+    assert(Number(badge) === after, `toolbar ${badge} vs ${after}`);
+    await shot('v082-03-read-on-scroll');
+    // A story covered twice: one card, "Also reported by", expand the reports
+    await p.evaluate(() => document.querySelector('#cards').scrollTo(0, 0));
+    await p.evaluate(() => { [...document.querySelectorAll('.fc')].find(c => /IMF/.test(c.textContent)).querySelector('[data-act="sources"]').click(); });
+    const cl = await p.evaluate(() => { const c = [...document.querySelectorAll('.fc')].find(x => /IMF/.test(x.textContent)); return { also: c.querySelector('.also').textContent, items: c.querySelectorAll('.srcs li').length, lead: !!c.querySelector('.srcs .lead') }; });
+    assert(/Also reported by/.test(cl.also) && cl.items >= 2 && cl.lead, JSON.stringify(cl));
+    // Grouping off: two cards for that story
+    await main(() => global.__ferna.feeds.setPrefs({ cluster: false }));
+    await H.until(() => p.evaluate(() => [...document.querySelectorAll('.fc')].filter(c => /IMF/.test(c.querySelector('h3').textContent)).length >= 2), 5000, 'ungrouped');
+    await main(() => global.__ferna.feeds.setPrefs({ cluster: true }));
+    // Display: text size, font and reading width apply at once; side-panel width
+    await p.evaluate(() => document.querySelector('#b-view').click());
+    await p.evaluate(() => { const r = document.querySelector('#viewpop [data-v="fontSize"]'); r.value = '19'; r.dispatchEvent(new Event('input', { bubbles: true })); const f = document.querySelector('#viewpop [data-v="fontFamily"]'); f.value = 'serif'; f.dispatchEvent(new Event('change', { bubbles: true })); });
+    const dsp = await p.evaluate(() => ({ fs: document.body.style.getPropertyValue('--fs'), ff: getComputedStyle(document.querySelector('.fc h3')).fontFamily, h3: getComputedStyle(document.querySelector('.fc h3')).fontSize }));
+    assert(dsp.fs === '19px' && /Georgia|Serif/i.test(dsp.ff) && dsp.h3 === '19px', JSON.stringify(dsp));
+    await shot('v082-04-display');
+    await H.until(() => main(() => global.__ferna.feeds.prefs().settings.fontSize === 19), 3000, 'saved');
+    await main(() => global.__ferna.feeds.setPrefs({ fontSize: 15, fontFamily: 'system' }));
+    await p.evaluate(() => document.querySelector('#viewpop [data-close]').click());
+    // Open modes: the original page in a new tab; the reader in a new tab
+    await main(() => global.__ferna.feeds.setPrefs({ openMode: 'tab' }));
+    await H.sleep(500);
+    const n0 = await main(() => global.__ferna.windows[0].tabs.length);
+    await p.evaluate(() => [...document.querySelectorAll('.fc h3 a')].find(a => /Tea exports/.test(a.textContent)).click());
+    await H.until(() => main((_, a) => global.__ferna.windows[0].tabs.length === a + 1 && /example\.lk\/many/.test(global.__ferna.windows[0].active.pendingUrl || global.__ferna.windows[0].active.url), n0), 4000, 'original in a tab');
+    await main(() => { const w = global.__ferna.windows[0]; w.closeTab(w.active); });
+    await main(() => global.__ferna.feeds.setPrefs({ openMode: 'reader-tab' }));
+    await H.sleep(500);
+    await p.evaluate(() => [...document.querySelectorAll('.fc h3 a')].find(a => /Rupee/.test(a.textContent)).click());
+    await H.until(() => main(() => /^ferna:\/\/feeds\/#read\//.test(global.__ferna.windows[0].active.url || '')), 4000, 'reader in a tab');
+    const rt = await page('ferna://feeds/#read/');
+    await H.until(() => rt.evaluate(() => /Rupee/.test((document.querySelector('.rd h1') || {}).textContent || '')), 5000, 'reader tab shows it');
+    await main(() => { const w = global.__ferna.windows[0]; w.closeTab(w.active); global.__ferna.feeds.setPrefs({ openMode: 'reader' }); });
+    // Side panel width
+    await main(() => { const w = global.__ferna.windows[0]; global.__ferna.setSetting('feedsPanelWidth', 600); global.__ferna.feeds.togglePanel(w, true); });
+    await H.sleep(400);
+    const pw = await main(() => global.__ferna.windows[0].side.view.getBounds().width);
+    assert(pw === 600, `panel ${pw}`);
+    await main(() => { const w = global.__ferna.windows[0]; global.__ferna.feeds.closePanel(w); global.__ferna.setSetting('feedsPanelWidth', 420); });
+    // Export everything, remove all, import: feeds, channels, interests and display come back
+    const ex = await main(async () => {
+      const F = global.__ferna.feeds;
+      F.setPrefs({ interests: 'machine learning', fontSize: 17, channels: [{ id: 'c1', name: 'Economy', keywords: '+IMF', feeds: [F.store.data.feeds[0].id] }] });
+      const data = JSON.parse(JSON.stringify(F.exportAll()));
+      F.unsubscribe(F.store.data.feeds.map(f => f.id)); F.setPrefs({ interests: '', fontSize: 15, channels: [] });
+      const r = F.importAll(data);
+      const again = F.importAll(data);
+      const s = F.prefs();
+      return { r, again, feeds: F.store.data.feeds.length, interests: s.interests, fs: s.settings.fontSize, ch: s.channels.length, chFeedOk: F.store.data.feeds.some(f => f.id === s.channels[0].feeds[0]) };
+    });
+    assert(ex.r.added === 3 && ex.again.added === 0 && ex.feeds === 3 && ex.interests === 'machine learning' && ex.fs === 17 && ex.ch === 1 && ex.chFeedOk, JSON.stringify(ex));
+    await main(() => { const F = global.__ferna.feeds; F.unsubscribe(F.store.data.feeds.map(f => f.id)); F.setPrefs({ interests: '', fontSize: 15, channels: [] }); });
   });
 };
