@@ -447,6 +447,15 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
     const pb = await u.evaluate(() => ({ host: document.querySelector('#tabs .pagebar .pb-url').textContent.trim(), btns: [...document.querySelectorAll('#tabs .pagebar [data-pb]')].map(b => b.dataset.pb) }));
     assert(/localhost|127\.0\.0\.1/.test(pb.host) && ['back', 'reload', 'edit', 'bookmark', 'more'].every(x => pb.btns.includes(x)), JSON.stringify(pb));
     await shot('v083-01-pagebar-top');
+    // 0.8.4: every address-bar button is in the strip too, and they work from there
+    const tools = await u.evaluate(() => [...document.querySelectorAll('#tabs .pagebar .pb-tools [data-pb]')].map(b => ({ k: b.dataset.pb, dis: b.disabled })));
+    for (const k of ['copy', 'clear', 'reader', 'translate', 'rss', 'zoom', 'eq', 'shield', 'shot', 'bookmarks', 'feeds', 'assistant', 'overview']) assert(tools.some(t => t.k === k && !t.dis), `strip has ${k}: ${JSON.stringify(tools)}`);
+    await u.evaluate(() => document.querySelector('#tabs .pagebar [data-pb="zoom"]').click());
+    await H.until(() => main(() => global.__ferna.windows[0].overlayMode === 'zoom'), 3000, 'zoom from the strip');
+    await main(() => global.__ferna.windows[0].closeOverlay());
+    await u.evaluate(() => document.querySelector('#tabs .pagebar [data-pb="feeds"]').click());
+    await H.until(() => main(() => (global.__ferna.windows[0].side || {}).kind === 'feeds'), 3000, 'feeds from the strip');
+    await main(() => global.__ferna.feeds.closePanel(global.__ferna.windows[0]));
     // Back from the strip
     await u.evaluate(() => document.querySelector('#tabs .pagebar [data-pb="back"]').click());
     await H.until(async () => /one/.test(await evalActive('location.href')), 5000, 'went back');
@@ -481,6 +490,8 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
     const ov = await page('ferna://overlay/');
     await H.until(() => ov.evaluate(() => !!document.querySelector('.pop-page') && /three/.test(document.querySelector('#pt-q').value)), 4000, 'tabs list with the address');
     await shot('v083-04-tabslist-page');
+    const lt = await ov.evaluate(() => [...document.querySelectorAll('.pop-tools [data-pp]')].map(b => b.dataset.pp));
+    for (const k of ['copy', 'clear', 'reader', 'translate', 'rss', 'zoom', 'eq', 'shield', 'shot', 'bookmarks', 'feeds', 'assistant', 'overview']) assert(lt.includes(k), `tabs list has ${k}: ${lt}`);
     await ov.evaluate(b => { const q = document.querySelector('#pt-q'); q.value = `${b}/long.html?four`; q.dispatchEvent(new Event('input')); }, base);
     await H.sleep(200);
     await ov.keyboard.press('Enter');
@@ -489,6 +500,18 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
     await C('toggleTabBar');
     L = (await win()).layout;
     assert(L.showTabs && L.showToolbar, 'all back');
+    // The address bar keeps these buttons on every page (greyed out where they do not apply)
+    const ids = ['#btn-copyurl', '#btn-clearurl', '#btn-reader', '#btn-translate', '#btn-rss', '#btn-zoom', '#btn-eq', '#btn-shield', '#btn-shot', '#btn-bookmarks', '#btn-feeds', '#btn-assistant', '#btn-overview'];
+    const vis = async () => u.evaluate(list => list.map(id => { const b = document.querySelector(id); const r = b.getBoundingClientRect(); return { id, shown: !b.hidden && r.width > 0, dis: b.disabled }; }), ids);
+    await H.until(async () => (await vis()).every(x => x.shown), 4000, 'address bar back with its buttons');
+    let v = await vis();
+    await main(() => global.__ferna.windows[0].newTab('ferna://newtab/'));
+    await H.until(async () => (await vis()).find(x => x.id === '#btn-reader').dis, 4000, 'new tab page');
+    v = await vis();
+    assert(v.every(x => x.shown), `new tab page: ${JSON.stringify(v.filter(x => !x.shown))}`);
+    assert(v.find(x => x.id === '#btn-reader').dis && !v.find(x => x.id === '#btn-overview').dis, JSON.stringify(v));
+    await shot('v084-01-toolbar-buttons');
+    await main(() => { const w = global.__ferna.windows[0]; w.closeTab(w.active); });
   });
 
   await step('0.8.3 feeds: Newest and Unread only by default; reading history; digest text size and zoom', async () => {

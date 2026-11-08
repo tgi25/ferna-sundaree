@@ -245,7 +245,8 @@ body.app #omnibox, body.app #btn-bookmarks, body.app #btn-overview, body.app #bt
 #tabs [data-dz].dz-over { outline-color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); border-color: var(--accent); }
 
 /* Feeds: the address-bar RSS button (orange like feed icons; filled when you follow the feed). */
-#btn-rss { color: #ea580c; }
+#btn-rss { color: var(--ink-2); }
+#btn-rss.found { color: #ea580c; }
 #btn-rss.on { color: #fff; background: #ea580c; }
 /* Safety check (fact-check bubble, scam & payment guard) */
 #btn-check { position: relative; color: var(--ink-2); }
@@ -261,6 +262,15 @@ body.exam #btn-check { display: none !important; }
 
 /* ---------- The address bar inside Ferna Tabs (while Ctrl+Shift+H hides the address bar) ---------- */
 .pagebar { display: flex; align-items: center; gap: 1px; flex: none; -webkit-app-region: no-drag; }
+.pagebar .pb-main, .pagebar .pb-tools { display: flex; align-items: center; gap: 1px; }
+#tabs.h .pagebar .pb-tools { margin-left: 4px; padding-left: 4px; border-left: 1px solid var(--line); }
+#tabs.h .pagebar .pb-tools .pb { width: 24px; }
+.pagebar .pb.found { color: #ea580c; }
+.pagebar .pb.off { opacity: .6; }
+.pagebar .pb.on:not([data-pb="bookmark"]) { background: var(--accent-soft, rgba(37, 99, 235, .12)); }
+#tabs.v .pagebar { flex-direction: column; align-items: stretch; gap: 4px; }
+#tabs.v .pagebar .pb-main { width: 100%; }
+#tabs.v .pagebar .pb-tools { flex-wrap: wrap; justify-content: flex-start; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 #tabs.h .pagebar { padding-bottom: 4px; margin-right: 4px; padding-right: 6px; border-right: 1px solid var(--line); }
 .pagebar .pb { width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--tabs-ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
 .pagebar .pb .icon { width: 15px; height: 15px; }

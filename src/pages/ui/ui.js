@@ -253,9 +253,10 @@ $('#btn-clearurl').onclick = () => {
   el.address.focus();
   syncOmniActs();
 };
+// Copy and Clear stay in the address bar; they are greyed out when there is nothing to do.
 function syncOmniActs() {
-  $('#btn-copyurl').hidden = !(S && S.nav && S.nav.url);
-  $('#btn-clearurl').hidden = !el.address.value;
+  $('#btn-copyurl').disabled = !(S && S.nav && S.nav.url && S.nav.url !== 'ferna://newtab/');
+  $('#btn-clearurl').disabled = !el.address.value;
 }
 el.address.addEventListener('input', syncOmniActs);
 
@@ -386,7 +387,7 @@ function renderToolbar() {
   star.title = n.bookmarked ? 'Remove bookmark (Ctrl+D)' : 'Bookmark this page (Ctrl+D)';
   const zb = $('#btn-zoom');
   const z = n.zoom || { level: 100, type: 'full', isDefault: true };
-  zb.hidden = n.internal || !n.url;
+  zb.hidden = false; zb.disabled = n.internal || !n.url;
   zb.classList.toggle('text', z.type === 'text');
   $('#zoom-level').textContent = z.isDefault && z.level === 100 ? '' : `${z.level}%`;
   zb.title = `Zoom: ${z.type === 'text' ? 'text only' : 'full page'} ${z.level}%${z.minFont ? `, minimum font ${z.minFont}px` : ''} (Alt+Z)`;
@@ -406,7 +407,7 @@ function renderToolbar() {
   const fc = $('#feeds-count'); const fu = S.feedsUnread || 0;
   fc.textContent = fu > 99 ? '99+' : String(fu); fc.classList.toggle('on', fu > 0);
   $('#btn-feeds').title = `Ferna Feeds: your news and research${fu ? ` (${fu} unread)` : ''}`;
-  $('#btn-feeds').hidden = !!S.private;
+  $('#btn-feeds').disabled = !!S.private;
   const ck = $('#btn-check');
   const c = n.check;
   ck.hidden = !(c && c.level) || !!S.exam;
@@ -421,11 +422,14 @@ function renderToolbar() {
       : 'News article: click to see who else reports it (fact check)';
   }
   const rss = $('#btn-rss');
-  rss.hidden = !n.feeds;
-  if (n.feeds) { rss.classList.toggle('on', !!n.feeds.subscribed); rss.title = n.feeds.subscribed ? 'You follow this site’s feed (Ferna Feeds)' : `This page has ${n.feeds.count > 1 ? `${n.feeds.count} feeds` : 'a feed'}: follow it in Ferna Feeds`; }
   const web = !!n.url && !n.internal && /^https?:/.test(n.url);
-  $('#btn-reader').hidden = !web; $('#btn-reader').classList.toggle('on', !!n.reader);
-  $('#btn-translate').hidden = !web;
+  // Always in the address bar: greyed out where they do not apply.
+  rss.hidden = false; rss.disabled = !web || !!S.private;
+  rss.classList.toggle('found', !!n.feeds);
+  rss.classList.toggle('on', !!(n.feeds && n.feeds.subscribed));
+  rss.title = n.feeds ? (n.feeds.subscribed ? 'You follow this site’s feed (Ferna Feeds)' : `This page has ${n.feeds.count > 1 ? `${n.feeds.count} feeds` : 'a feed'}: follow it in Ferna Feeds`) : 'Page feed: follow this site in Ferna Feeds (no feed found here; the page itself can be followed)';
+  $('#btn-reader').hidden = false; $('#btn-reader').disabled = !web; $('#btn-reader').classList.toggle('on', !!n.reader);
+  $('#btn-translate').hidden = false; $('#btn-translate').disabled = !web;
   $('#btn-key').hidden = !web || !n.passwords;
   $('#btn-key').title = `${n.passwords} saved password${n.passwords === 1 ? '' : 's'} for this site`;
   const dv = $('#split-divider');
@@ -434,11 +438,12 @@ function renderToolbar() {
   $('#btn-pip').hidden = n.internal || !n.hasVideo;
   $('#btn-pip').classList.toggle('on', !!n.pipOn);
   const eqb = $('#btn-eq');
-  eqb.hidden = n.internal || !(n.hasMedia || (n.eq && n.eq.enabled));
+  eqb.hidden = false; eqb.disabled = !!n.internal || !n.url;
   eqb.classList.toggle('on', !!(n.eq && n.eq.enabled));
   eqb.title = n.eq && n.eq.enabled ? `Equalizer: ${n.eq.label} (Alt+Q)` : 'Equalizer: off (Alt+Q)';
   const shield = $('#btn-shield');
   shield.classList.toggle('off-shield', !n.blockerOn);
+  syncOmniActs();
   const cnt = $('#blocked-count');
   cnt.textContent = n.blocked > 99 ? '99+' : String(n.blocked);
   cnt.classList.toggle('on', n.blockerOn && n.blocked > 0);
@@ -545,6 +550,39 @@ for (const ev of ['pointerup', 'pointercancel', 'dragend', 'drop', 'blur']) wind
 // Compact: back, reload, the site (click it to edit the address), bookmark, and one ⋯ button with
 // every other address-bar action. Shown only while the address bar itself is hidden.
 const pagebarOn = () => !!(S && S.layout.hiddenByKey && !S.layout.toolbar && S.layout.tabs && !S.focus && !S.exam);
+// The address-bar buttons that stay with the address wherever it is shown: [action, icon, title].
+const PAGE_TOOLS = [
+  ['copy', 'copy', 'Copy this address'], ['clear', 'close', 'Clear the address and type a new one'],
+  ['reader', 'reader', 'Reading mode (F9)'], ['translate', 'translate', 'Translate this page (Alt+Shift+T)'],
+  ['rss', 'rss', 'Page feed: follow this site in Ferna Feeds'], ['zoom', 'zoom', 'Zoom (Alt+Z)'],
+  ['eq', 'eq', 'Equalizer (Alt+Q)'], ['shield', 'shield', 'Tracker and ad blocking'],
+  ['shot', 'camera', 'Screenshot'], ['bookmarks', 'bookmarks', 'Bookmarks (Ctrl+Shift+Y)'],
+  ['feeds', 'feeds', 'Ferna Feeds'], ['assistant', 'sparkle', 'AI assistant (Alt+A)'], ['overview', 'grid', 'Tab Overview (Ctrl+Shift+A)'],
+];
+/** Each tool's state for the current page: { disabled, on, title }. */
+function toolState(k, n) {
+  const web = !!n.url && !n.internal && /^https?:/.test(n.url);
+  switch (k) {
+    case 'copy': return { disabled: !n.url || n.url === 'ferna://newtab/' };
+    case 'reader': return { disabled: !web, on: !!n.reader };
+    case 'translate': return { disabled: !web };
+    case 'rss': return { disabled: !web || !!S.private, on: !!(n.feeds && n.feeds.subscribed), found: !!n.feeds, title: n.feeds ? (n.feeds.subscribed ? 'You follow this site’s feed' : 'This page has a feed: follow it in Ferna Feeds') : null };
+    case 'zoom': return { disabled: !!n.internal || !n.url, title: n.zoom && !n.zoom.isDefault ? `Zoom: ${n.zoom.level}% (Alt+Z)` : null };
+    case 'eq': return { disabled: !!n.internal || !n.url, on: !!(n.eq && n.eq.enabled) };
+    case 'shield': return { disabled: !/^https?:/.test(n.url || ''), off: !n.blockerOn, title: n.blockerOn ? `Tracker and ad blocking: ${n.blocked} blocked on this page` : 'Tracker and ad blocking is off for this site' };
+    case 'shot': return { disabled: !n.url };
+    case 'feeds': return { disabled: !!S.private, on: S.side === 'feeds' };
+    case 'assistant': return { on: S.side === 'assistant' };
+    default: return {};
+  }
+}
+function toolsHtml(cls) {
+  const n = S.nav;
+  return PAGE_TOOLS.map(([k, ic, title]) => {
+    const st = toolState(k, n);
+    return `<button class="${cls}${st.on ? ' on' : ''}${st.found ? ' found' : ''}${st.off ? ' off' : ''}" data-pb="${k}" title="${esc(st.title || title)}"${st.disabled ? ' disabled' : ''}>${icon(ic)}</button>`;
+  }).join('');
+}
 function pagebarHtml(vertical, collapsed = false) {
   if (!pagebarOn()) return '';
   const n = S.nav;
@@ -554,13 +592,15 @@ function pagebarHtml(vertical, collapsed = false) {
   const warn = c && (c.level === 'danger' || c.level === 'scam') ? `<button class="pb warn" data-pb="check" title="Safety warning: click for details">${icon('shield')}</button>` : '';
   if (collapsed) return `<div class="pagebar v collapsed"><button class="pb" data-pb="more" title="${esc(n.url || 'New tab')}\nAddress-bar actions">${icon('globe')}</button></div>`;
   return `<div class="pagebar${vertical ? ' v' : ''}" role="group" aria-label="Page">
+    <div class="pb-main">
     <button class="pb" data-pb="back" title="Back (Alt+Left)"${n.canBack ? '' : ' disabled'}>${icon('back')}</button>
     ${n.canForward ? `<button class="pb" data-pb="forward" title="Forward (Alt+Right)">${icon('forward')}</button>` : ''}
     <button class="pb" data-pb="reload" title="${n.loading ? 'Stop' : 'Reload (F5)'}">${icon(n.loading ? 'close' : 'reload')}</button>
     <button class="pb-url" data-pb="edit" title="${esc(n.url || 'New tab')}\nClick to edit (Ctrl+L)">${n.secure ? icon('lock') : n.internal ? icon('info') : n.url ? icon('globe') : icon('search')}<span>${esc(host || 'Search or enter address')}</span></button>
     ${warn}
     <button class="pb${n.bookmarked ? ' on' : ''}" data-pb="bookmark" title="${n.bookmarked ? 'Remove bookmark' : 'Bookmark this page'} (Ctrl+D)">${icon('star')}</button>
-    <button class="pb" data-pb="more" title="All address-bar actions">${icon('menu')}</button>
+    </div>
+    <div class="pb-tools">${toolsHtml('pb')}<button class="pb" data-pb="more" title="More: split view, picture in picture, passwords, downloads, the menu">${icon('menu')}</button></div>
   </div>`;
 }
 // Editing: a field over the site name, kept outside the strip so redrawing never interrupts typing.
@@ -568,14 +608,14 @@ const pbEdit = document.createElement('input');
 pbEdit.id = 'pb-edit'; pbEdit.type = 'text'; pbEdit.spellcheck = false; pbEdit.autocomplete = 'off'; pbEdit.hidden = true;
 pbEdit.setAttribute('aria-label', 'Address');
 document.body.append(pbEdit);
-function editInline() {
+function editInline(empty = false) {
   const chip = el.tabs.querySelector('.pb-url');
   if (!chip) return;
   const r = chip.getBoundingClientRect();
   const vertical = S.layout.position !== 'top';
   const w = vertical ? r.width : Math.max(r.width, Math.min(560, innerWidth - r.left - 16));
   Object.assign(pbEdit.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${w}px`, height: `${r.height}px` });
-  pbEdit.value = S.nav.url || '';
+  pbEdit.value = empty ? '' : S.nav.url || '';
   pbEdit.hidden = false;
   pbEdit.focus(); pbEdit.select();
 }
@@ -591,8 +631,10 @@ el.tabs.addEventListener('click', e => {
   e.stopPropagation();
   const a = b.dataset.pb;
   if (a === 'edit') editInline();
+  else if (a === 'clear') editInline(true);
   else if (a === 'more') api.cmd('menu:page-actions');
   else if (a === 'check') api.cmd('check:toggle-panel');
+  else if (PAGE_TOOLS.some(t => t[0] === a)) api.cmd('page:tool', a, rectOf(b));
   else api.cmd('page:act', a);
 }, true);
 

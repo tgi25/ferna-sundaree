@@ -186,11 +186,22 @@ function pageRowHtml(d) {
     ${n.canForward ? `<button class="pp" data-pp="forward" title="Forward">${icon('forward')}</button>` : ''}
     <button class="pp" data-pp="reload" title="${n.loading ? 'Stop' : 'Reload'}">${icon(n.loading ? 'close' : 'reload')}</button>
     <button class="pp-url" data-pp="edit" title="Edit the address (Ctrl+L)">${icon(n.secure ? 'lock' : 'globe')}<span>${esc(n.url || 'New tab')}</span></button>
-    <button class="pp" data-pp="copy" title="Copy the address">${icon('copy')}</button>
     <button class="pp${n.bookmarked ? ' on' : ''}" data-pp="bookmark" title="${n.bookmarked ? 'Remove bookmark' : 'Bookmark this page'}">${icon('star')}</button>
-    <button class="pp" data-pp="more" title="All address-bar actions">${icon('menu')}</button>
-  </div>`;
+    <button class="pp" data-pp="more" title="More: split view, picture in picture, passwords, downloads, the menu">${icon('menu')}</button>
+  </div>
+  <div class="pop-tools" role="group" aria-label="Page tools">${PAGE_TOOLS.map(([k, ic, title]) => {
+    const web = !!n.url && !n.internal && /^https?:/.test(n.url);
+    const dis = { copy: !n.url || n.url === 'ferna://newtab/', reader: !web, translate: !web, rss: !web || d.private, zoom: !!n.internal || !n.url, eq: !!n.internal || !n.url, shield: !/^https?:/.test(n.url || ''), shot: !n.url, feeds: !!d.private }[k];
+    const on = { reader: !!n.reader, rss: !!(n.feeds && n.feeds.subscribed), eq: !!(n.eq && n.eq.enabled), feeds: d.side === 'feeds', assistant: d.side === 'assistant' }[k];
+    return `<button class="pp${on ? ' on' : ''}${k === 'rss' && n.feeds ? ' found' : ''}" data-pp="${k}" title="${esc(title)}"${dis ? ' disabled' : ''}>${icon(ic)}</button>`;
+  }).join('')}</div>`;
 }
+const PAGE_TOOLS = [
+  ['copy', 'copy', 'Copy this address'], ['clear', 'close', 'Clear the address and type a new one'],
+  ['reader', 'reader', 'Reading mode'], ['translate', 'translate', 'Translate this page'], ['rss', 'rss', 'Page feed: follow this site in Ferna Feeds'],
+  ['zoom', 'zoom', 'Zoom'], ['eq', 'eq', 'Equalizer'], ['shield', 'shield', 'Tracker and ad blocking'], ['shot', 'camera', 'Screenshot'],
+  ['bookmarks', 'bookmarks', 'Bookmarks'], ['feeds', 'feeds', 'Ferna Feeds'], ['assistant', 'sparkle', 'AI assistant'], ['overview', 'grid', 'Tab Overview'],
+];
 function editPointerAddress() {
   const q = $('#pt-q');
   if (!q || !data || !data.nav) return;
@@ -231,14 +242,15 @@ function openPointer(d) {
   });
   keyHandler = pointerKeys;
   renderPointer();
-  const pr = root.querySelector('.pop-page');
-  if (pr) pr.addEventListener('click', e => {
+  for (const pr of root.querySelectorAll('.pop-page, .pop-tools')) pr.addEventListener('click', e => {
     const b = e.target.closest('[data-pp]');
     if (!b) return;
     e.stopPropagation();
     const a = b.dataset.pp;
     if (a === 'edit') editPointerAddress();
+    else if (a === 'clear') { editPointerAddress(); const q = $('#pt-q'); q.value = ''; q.dispatchEvent(new Event('input')); }
     else if (a === 'more') api.cmd('menu:page-actions');
+    else if (PAGE_TOOLS.some(t => t[0] === a)) { const r = b.getBoundingClientRect(); api.cmd('page:tool', a, { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }); }
     else api.cmd('page:act', a).then(() => { if (a === 'bookmark') b.classList.toggle('on'); });
   });
   if (d.editAddress) editPointerAddress();

@@ -1032,6 +1032,39 @@ function registerCommands() {
     }
     return true;
   });
+  // The address-bar buttons, for their copies in Ferna Tabs and the tabs list at the pointer
+  // (shown there whatever bars Ctrl+Shift+H hides). rect: where the clicked button is.
+  C('page:tool', ['string', 'object?'], ['ui', 'overlay'], (c, what, rect) => {
+    const w = senderWindow(c);
+    const a = rect && [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite) ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : undefined;
+    const go = () => {
+      const t = w.active;
+      const M = require('./menus');
+      switch (what) {
+        case 'copy': {
+          const url = t ? require('./workspaces').pageUrlOf(t.pendingUrl || t.url) : '';
+          if (url && url !== 'ferna://newtab/') { clipboard.writeText(url); w.sendUi('toast', { text: 'Address copied.' }); }
+          break;
+        }
+        case 'reader': w.run('readerMode'); break;
+        case 'translate': w.run('translatePage'); break;
+        case 'rss': if (ctx.feedsRssMenu) ctx.feedsRssMenu(w); break;
+        case 'zoom': w.openZoomPanel(a); break;
+        case 'eq': w.openEqPanel(a); break;
+        case 'shield': M.shieldMenu(w, t).popup({ window: w.win }); break;
+        case 'shot': M.shotMenu(w).popup({ window: w.win }); break;
+        case 'bookmarks': w.openBookmarksPanel(a); break;
+        case 'feeds': if (ctx.feeds && !w.private) ctx.feeds.togglePanel(w); break;
+        case 'assistant': w.run('assistant'); break;
+        case 'overview': w.run('tabOverview'); break;
+        default: return false;
+      }
+      return true;
+    };
+    // From the tabs list: close it first, then open the panel or menu where the list was.
+    if (c.host === 'overlay') { w.closeOverlay(); setTimeout(go, 60); return true; }
+    return go();
+  });
   C('ui:reveal', ['string', 'bool'], ['ui'], (c, what, on) => {
     const w = senderWindow(c);
     if (what !== 'tabs' && what !== 'toolbar') return;
@@ -1964,8 +1997,9 @@ function registerFeeds(C) {
     fx().togglePanel(w); return true;
   });
   C('feeds:open-digest', [], UI, c => { const v = fx().togglePanel(win(c), true); if (v) setTimeout(() => { try { v.webContents.send('refresh', { what: 'feeds', show: 'digest' }); } catch { /* gone */ } }, 300); return true; });
-  C('feeds:rss-menu', [], UI, c => {
-    const w = win(c); const t = w.active;
+  C('feeds:rss-menu', [], UI, c => { ctx.feedsRssMenu(win(c)); return true; });
+  ctx.feedsRssMenu = w => {
+    const t = w.active;
     const list = (t && t.feeds) || [];
     const sub = async (url, type, title) => {
       try { const f = await fx().subscribe(url, { type, title }); w.sendUi('toast', { text: `Following “${f.title}” (${require('./feeds/nlp').CAT_LABEL[f.category]})`, action: 'Open feeds', cmd: 'feeds:toggle-panel', ms: 6000 }); w.pushState(); }
@@ -1977,8 +2011,7 @@ function registerFeeds(C) {
     if (t && /^https?:/.test(t.url || '')) items.push({ type: 'separator' }, { label: list.length ? 'Follow this page itself (new links on it)' : 'Follow this page (it has no feed: new links on it become items)', click: () => sub(t.url, 'scrape', t.title) });
     items.push({ type: 'separator' }, { label: 'Open Ferna Feeds', click: () => fx().togglePanel(w, true) });
     Menu.buildFromTemplate(items).popup({ window: w.win });
-    return true;
-  });
+  };
 }
 
 function registerCheck(C) {
