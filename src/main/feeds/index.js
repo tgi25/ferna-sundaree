@@ -49,6 +49,10 @@ const STARTERS = {
 const VIEW_DEFAULTS = {
   fontSize: 15, fontFamily: 'system', readWidth: 760, density: 'cards', images: true,
   openMode: 'reader', buttonOpens: 'panel', markRead: 'scroll', cluster: true, keepUnreadSaved: false,
+  // The list: newest first, read items out of the way (the History button shows them).
+  listSort: 'new', unreadOnly: true,
+  // Today's digest: its own text size and zoom.
+  digestFont: 17, digestZoom: 100,
 };
 const VIEW_RULES = {
   fontSize: v => Number.isInteger(v) && v >= 11 && v <= 26,
@@ -60,6 +64,10 @@ const VIEW_RULES = {
   buttonOpens: v => ['panel', 'tab'].includes(v),
   markRead: v => ['scroll', 'hover', 'open'].includes(v),
   cluster: v => typeof v === 'boolean',
+  listSort: v => ['smart', 'new', 'old'].includes(v),
+  unreadOnly: v => typeof v === 'boolean',
+  digestFont: v => Number.isInteger(v) && v >= 12 && v <= 30,
+  digestZoom: v => Number.isInteger(v) && v >= 50 && v <= 200,
 };
 /** One address, however it is written: https or http, www or not, a trailing slash or not. */
 function canon(url) {
@@ -279,8 +287,10 @@ function create(ctx, { dataDir }) {
   // ---------- reading list views ----------
   /** Coverage cards: items grouped by story, best first. */
   function list(q = {}) {
-    const { category = 'all', channel = '', search = '', unreadOnly = false, saved = false, showHidden = false, feedId = '', sort = 'smart', limit = 200 } = q;
+    const { category = 'all', channel = '', search = '', unreadOnly = false, saved = false, showHidden = false, feedId = '', sort = 'smart', limit = 200, history = false } = q;
     let pool = items();
+    // Reading history: what you have read, the latest read first.
+    if (history) pool = pool.filter(it => it.read);
     if (saved) pool = pool.filter(it => it.saved);
     if (feedId) pool = pool.filter(it => it.feedId === feedId);
     if (category && category !== 'all' && !saved && !channel) pool = pool.filter(it => it.category === category);
@@ -311,6 +321,12 @@ function create(ctx, { dataDir }) {
         sources: g.map(x => ({ id: x.id, feedId: x.feedId, feed: (feedById(x.feedId) || {}).title || '', title: x.title, link: x.link, date: x.date, read: x.read })),
       };
     });
+    if (history) {
+      const at = new Map(pool.map(it => [it.id, it.readAt || 0]));
+      for (const c of cards) c.readAt = Math.max(...c.sources.map(x => at.get(x.id) || 0));
+      cards.sort((a, b) => b.readAt - a.readAt || b.date - a.date);
+      return { cards: cards.slice(0, limit), total: cards.length, hiddenCount, counts: counts(), history: true };
+    }
     if (unreadOnly) cards = cards.filter(c => !c.read);
     if (sort === 'new') cards.sort((a, b) => b.date - a.date);
     else if (sort === 'old') cards.sort((a, b) => a.date - b.date);
@@ -334,7 +350,8 @@ function create(ctx, { dataDir }) {
   function setRead(ids, read = true, { quiet = false } = {}) {
     const set = new Set(ids);
     let n = 0;
-    for (const it of items()) if (set.has(it.id) && it.read !== read) { it.read = read; n++; }
+    const now = Date.now();
+    for (const it of items()) if (set.has(it.id) && it.read !== read) { it.read = read; it.readAt = read ? now : 0; n++; }
     if (n) { itemsStore.save(); notify({ quiet }); }
     return counts();
   }
@@ -347,7 +364,8 @@ function create(ctx, { dataDir }) {
     if (olderThan) pool = pool.filter(it => (it.date || it.added || 0) < olderThan);
     if (ids) { const set = new Set(ids); pool = pool.filter(it => set.has(it.id)); }
     let n = 0;
-    for (const it of pool) if (!it.read) { it.read = true; n++; }
+    const now = Date.now();
+    for (const it of pool) if (!it.read) { it.read = true; it.readAt = now; n++; }
     itemsStore.save(); notify();
     return n;
   }
@@ -355,8 +373,10 @@ function create(ctx, { dataDir }) {
   function opened(id) {
     const it = item(id);
     if (!it) return null;
+    const now = Date.now();
     if (!it.read) { it.read = true; store.data.learned = N.learn(store.data.learned, it.vec, 0.12); store.save(); }
-    for (const x of items()) if (x.cluster && x.cluster === it.cluster) x.read = true;
+    it.readAt = now; // opened again: back to the top of the history
+    for (const x of items()) if (x.cluster && x.cluster === it.cluster && !x.read) { x.read = true; x.readAt = now; }
     itemsStore.save(); notify();
     return it;
   }

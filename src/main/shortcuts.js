@@ -69,7 +69,7 @@ const DEFAULTS = {
 };
 
 const LABELS = {
-  toggleTabBar: 'Hide/unhide tab bar', toggleBookmarksBar: 'Hide/unhide bookmarks bar',
+  toggleTabBar: 'Hide/unhide the bars (as set in Settings)', toggleBookmarksBar: 'Hide/unhide bookmarks bar',
   cycleTabPosition: 'Tab bar top / left / right', collapseTabs: 'Collapse vertical tab bar',
   focusMode: 'Focus mode (hide all bars)', favoritesOnly: 'Tab bar: only workspaces, favourites and pinned tabs', pinTab: 'Pin / unpin the tab here (workspace or All tabs)', pip: 'Picture-in-Picture (largest video)', pickElement: 'Hide an element on this page (element picker)', equalizer: 'Equalizer panel', bookmarksPanel: 'Bookmarks popup', addToCommon: 'Add / remove the tab on the common bar', workspaceNames: 'Show/hide workspace names', tabOverview: 'Tab Overview (all open pages)',
   tabsAtPointer: 'Tabs list at the pointer', nextWorkspace: 'Next workspace', prevWorkspace: 'Previous workspace',

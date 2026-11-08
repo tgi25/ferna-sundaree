@@ -24,8 +24,9 @@
     <main id="main">
       <section id="list-view">
         <div id="bar">
-          <div class="seg" id="sort"><button data-sort="smart" class="on" title="Most relevant to you first">For you</button><button data-sort="new" title="Newest first">Newest</button><button data-sort="old" title="Oldest first">Oldest</button></div>
-          <label class="chk"><input type="checkbox" id="unread"> Unread only</label>
+          <div class="seg" id="sort"><button data-sort="smart" title="Most relevant to you first">For you</button><button data-sort="new" class="on" title="Newest first">Newest</button><button data-sort="old" title="Oldest first">Oldest</button></div>
+          <label class="chk"><input type="checkbox" id="unread" checked> Unread only</label>
+          <button class="btn small" id="b-history" title="What you have read, the latest first" aria-pressed="false">History</button>
           <select class="field small" id="feed-pick" aria-label="Show one feed"></select>
           <span id="hidden-note"></span>
           <span class="grow"></span>

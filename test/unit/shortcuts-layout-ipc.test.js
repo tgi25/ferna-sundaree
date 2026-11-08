@@ -45,7 +45,7 @@ test('layout: top, hidden, vertical, collapsed, focus, find, fullscreen', () => 
   let L = computeLayout(1200, 800, base);
   assert.deepStrictEqual(L.content, { x: 0, y: 112, width: 1200, height: 688 });
   L = computeLayout(1200, 800, { ...base, tabBarHidden: true });
-  assert.ok(!L.tabs && L.edgeTabs && L.content.y === 5 + 44 + 30);
+  assert.ok(!L.tabs && !L.toolbar && !L.edgeTabs && L.content.y === 30);
   L = computeLayout(1200, 800, { ...base, position: 'left' });
   assert.deepStrictEqual(L.tabs, { x: 0, y: 74, width: 240, height: 726 });
   assert.strictEqual(L.content.x, 240);

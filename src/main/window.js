@@ -784,7 +784,7 @@ class FernaWindow {
       position: s.tabPosition, tabBarHidden: s.tabBarHidden, bookmarksHidden: s.bookmarksBarHidden,
       collapsed: s.verticalCollapsed, vwidth: s.verticalWidth, focus: this.focus, findOpen: this.findOpen,
       revealTabs: this.reveal.tabs, revealToolbar: this.reveal.toolbar, htmlFullscreen: this.htmlFullscreen || this.win.isFullScreen(),
-      hideToolbarWithTabs: !!s.hideToolbarWithTabs, appMode: !!this.appMode,
+      hideBars: s.hideBars, appMode: !!this.appMode,
     });
   }
 
@@ -820,7 +820,7 @@ class FernaWindow {
     this._revealTimer = setInterval(() => {
       if (this.win.isDestroyed() || !(this.reveal.tabs || this.reveal.toolbar)) { clearInterval(this._revealTimer); this._revealTimer = null; return; }
       const s = this.ctx.settings.data;
-      if (!s.tabBarHidden && !this.focus) { this.reveal = { tabs: false, toolbar: false }; clearInterval(this._revealTimer); this._revealTimer = null; this.relayout(); return; }
+      if (!this.focus) { this.reveal = { tabs: false, toolbar: false }; clearInterval(this._revealTimer); this._revealTimer = null; this.relayout(); return; }
       if (this.overlayMode || (this.ui.webContents.isFocused() && this.win.isFocused())) { away = 0; return; } // typing in the address bar, a menu open
       const p = screen.getCursorScreenPoint();
       const b = this.win.getContentBounds();
@@ -881,7 +881,7 @@ class FernaWindow {
       fullscreen: this.win.isFullScreen(),
       theme: ctx.ext ? ctx.ext.themeState() : null,
       settings: {
-        tabPosition: ctx.settings.data.tabPosition, tabBarHidden: ctx.settings.data.tabBarHidden,
+        tabPosition: ctx.settings.data.tabPosition, tabBarHidden: ctx.settings.data.tabBarHidden, hideBars: ctx.settings.data.hideBars || 'both',
         bookmarksBarHidden: ctx.settings.data.bookmarksBarHidden, verticalCollapsed: ctx.settings.data.verticalCollapsed,
         verticalWidth: ctx.settings.data.verticalWidth, accent: ctx.settings.data.accent, theme: ctx.settings.data.theme,
         hintShown: !!ctx.settings.data.hints.tabBarHidden,
@@ -989,9 +989,10 @@ class FernaWindow {
         for (const w of ctx.windows) w.reveal = { tabs: false, toolbar: false };
         ctx.setSetting('tabBarHidden', !s.tabBarHidden);
         for (const w of ctx.windows) w.relayout();
-        if (ctx.settings.data.tabBarHidden && !s.hints.tabBarHidden) {
-          ctx.settings.update(d => { d.hints.tabBarHidden = true; });
-          this.sendUi('toast', { text: 'Tab bar hidden. Press Ctrl+Shift+H or move the pointer to the edge to show it.' });
+        if (ctx.settings.data.tabBarHidden && !s.hints.barsHidden082) {
+          ctx.settings.update(d => { d.hints.barsHidden082 = true; d.hints.tabBarHidden = true; });
+          const which = s.hideBars || 'both';
+          this.sendUi('toast', { text: which === 'toolbar' ? 'Address bar hidden: its address and buttons are now in the tab bar. Ctrl+Shift+H shows it again.' : which === 'tabs' ? 'Tab bar hidden. Ctrl+Shift+H shows it again.' : 'Bars hidden. Ctrl+L or the tabs list at the pointer reach the address; Ctrl+Shift+H shows them again.', ms: 7000 });
         }
         break;
       case 'toggleBookmarksBar': ctx.setSetting('bookmarksBarHidden', !s.bookmarksBarHidden); break;
@@ -1072,10 +1073,19 @@ class FernaWindow {
       case 'tabLast': { const ids = this.visibleOrder(); if (ids.length) this.activate(this.tabs.find(x => x.id === ids[ids.length - 1])); break; }
       case 'newWindow': ctx.newWindow({}); break;
       case 'privateWindow': ctx.newWindow({ private: true }); break;
-      case 'focusAddress':
+      case 'focusAddress': {
         if (this.focus) { this.reveal.toolbar = true; this.relayout(); }
+        const L = this.layoutState();
+        if (!this.focus && !L.toolbar) {
+          // The address bar is hidden with Ctrl+Shift+H: the address field in the tab bar, or in
+          // the Ferna Tabs list when the tab bar is hidden too.
+          if (L.tabs) { this.ui.webContents.focus(); this.sendUi('focus-address', { inline: true }); }
+          else this.openOverlay('pointer', { ...this.pointerData(), center: true, editAddress: true });
+          break;
+        }
         this.ui.webContents.focus(); this.sendUi('focus-address', {});
         break;
+      }
       case 'find': this.openFind(); this.ui.webContents.focus(); break;
       case 'history': this.openInternal('ferna://history/'); break;
       case 'downloads': this.openInternal('ferna://downloads/'); break;

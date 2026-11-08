@@ -45,7 +45,7 @@ function appMenu(win) {
         { label: 'Left', type: 'radio', checked: s.tabPosition === 'left', click: pos('left') },
         { label: 'Right', type: 'radio', checked: s.tabPosition === 'right', click: pos('right') },
         { type: 'separator' },
-        { label: 'Show tab bar', type: 'checkbox', checked: !s.tabBarHidden, accelerator: acc(ctx, 'toggleTabBar'), registerAccelerator: false, click: run('toggleTabBar') },
+        { label: 'Show the bars', type: 'checkbox', checked: !s.tabBarHidden, accelerator: acc(ctx, 'toggleTabBar'), registerAccelerator: false, click: run('toggleTabBar') },
         { label: 'Collapse vertical tab bar', type: 'checkbox', checked: !!s.verticalCollapsed, enabled: s.tabPosition !== 'top', accelerator: acc(ctx, 'collapseTabs'), registerAccelerator: false, click: run('collapseTabs') },
         { label: 'Only workspaces, favourites and pinned tabs', type: 'checkbox', checked: !!s.stripFavoritesOnly, accelerator: acc(ctx, 'favoritesOnly'), registerAccelerator: false, click: run('favoritesOnly') },
         { label: 'Show workspace names', type: 'checkbox', checked: !!s.wsShowNames, accelerator: acc(ctx, 'workspaceNames'), registerAccelerator: false, click: run('workspaceNames') },
@@ -436,4 +436,53 @@ function pageMenu(win, tab, p) {
   return Menu.buildFromTemplate(t);
 }
 
-module.exports = { editMenu, pdfMenu, splitMenu, appMenu, tabMenu, commonMenu, pinnedMenu, workspaceMenu, bookmarkMenu, shieldMenu, shotMenu, pageMenu, folderOf };
+/**
+ * Everything on the address bar, as one menu: used from the tab bar and the Ferna Tabs list when
+ * the address bar is hidden with Ctrl+Shift+H (so no action is out of reach).
+ */
+function pageActionsMenu(win) {
+  const ctx = win.ctx;
+  const t = win.active;
+  const wc = t && t.view && !t.view.webContents.isDestroyed() ? t.view.webContents : null;
+  const web = !!(t && t.kind === 'web');
+  const http = !!(t && /^https?:/.test(t.url || ''));
+  const run = cmd => () => win.run(cmd);
+  const a = cmd => acc(ctx, cmd);
+  const bookmarked = !!(t && ctx.findBookmark(require('./workspaces').pageUrlOf(t.url)));
+  const feeds = t && Array.isArray(t.feeds) && t.feeds.length && !win.private;
+  const item = (label, click, more = {}) => ({ label, click, registerAccelerator: false, ...more });
+  return Menu.buildFromTemplate([
+    item('Back', () => wc && wc.navigationHistory.goBack(), { enabled: !!(wc && wc.navigationHistory.canGoBack()), accelerator: 'Alt+Left' }),
+    item('Forward', () => wc && wc.navigationHistory.goForward(), { enabled: !!(wc && wc.navigationHistory.canGoForward()), accelerator: 'Alt+Right' }),
+    item(t && t.loading ? 'Stop' : 'Reload', () => { if (wc) { if (t.loading) wc.stop(); else wc.reload(); } }, { accelerator: 'F5' }),
+    { type: 'separator' },
+    item('Edit address…', run('focusAddress'), { accelerator: a('focusAddress') }),
+    item('Copy address', () => { if (t) { require('electron').clipboard.writeText(require('./workspaces').pageUrlOf(t.url)); win.sendUi('toast', { text: 'Address copied' }); } }, { enabled: !!t }),
+    item(bookmarked ? 'Edit bookmark' : 'Bookmark this page', run('bookmark'), { enabled: !!(t && /^(https?|file):/i.test(require('./workspaces').pageUrlOf(t.url))), accelerator: 'Ctrl+D' }),
+    item('Reading mode', run('readerMode'), { enabled: web, accelerator: a('readerMode') }),
+    item('Translate this page', run('translatePage'), { enabled: web, accelerator: a('translatePage') }),
+    ...(feeds ? [item('Follow this site in Ferna Feeds', () => { const f = t.feeds[0]; if (f && ctx.feeds) ctx.feeds.subscribe(f.url, { title: f.title }).then(x => win.sendUi('toast', { text: `Following “${x.title}”` })).catch(e => win.sendUi('toast', { text: String(e.message || e) })); })] : []),
+    item('Safety check', () => ctx.check && ctx.check.togglePanel(win), { enabled: http }),
+    item('Saved passwords', run('passwords')),
+    { type: 'separator' },
+    item('Zoom…', () => win.openZoomPanel(), { enabled: web }),
+    item('Picture in picture', run('pip'), { enabled: !!(t && t.hasVideo) }),
+    item('Media controls', run('mediaPanel')),
+    item('Equalizer', run('equalizer'), { enabled: web }),
+    item(win.split ? 'Leave split view' : 'Split view', run('splitView'), { enabled: !!t }),
+    { label: 'Tracker and ad blocking', submenu: shieldMenu(win, t), enabled: http },
+    { label: 'Screenshot', submenu: shotMenu(win), enabled: web },
+    { type: 'separator' },
+    item('Bookmarks', run('bookmarksPanel')),
+    item('Extensions', () => ctx.ext && ctx.ext.puzzleMenu(win)),
+    item('Downloads', run('downloads'), { accelerator: 'Ctrl+J' }),
+    item('Ferna Feeds', () => ctx.feeds && ctx.feeds.togglePanel(win)),
+    item('AI assistant', run('assistant')),
+    item('Tab Overview', run('tabOverview')),
+    { type: 'separator' },
+    item('Show the hidden bars (Ctrl+Shift+H)', run('toggleTabBar'), { visible: !!ctx.settings.data.tabBarHidden }),
+    { label: 'Menu', submenu: appMenu(win) },
+  ]);
+}
+
+module.exports = { pageActionsMenu, editMenu, pdfMenu, splitMenu, appMenu, tabMenu, commonMenu, pinnedMenu, workspaceMenu, bookmarkMenu, shieldMenu, shotMenu, pageMenu, folderOf };

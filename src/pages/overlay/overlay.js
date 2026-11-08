@@ -177,16 +177,41 @@ function overviewKeys(e) {
 // =====================================================================
 let pt = { q: '', sel: 0, rows: [] };
 
+/** The page controls at the top of the list, shown while Ctrl+Shift+H hides the address bar. */
+function pageRowHtml(d) {
+  if (!d.layout || d.layout.toolbar || !d.layout.hiddenByKey || d.focus || !d.nav) return '';
+  const n = d.nav;
+  return `<div class="pop-page" role="group" aria-label="This page">
+    <button class="pp" data-pp="back" title="Back"${n.canBack ? '' : ' disabled'}>${icon('back')}</button>
+    ${n.canForward ? `<button class="pp" data-pp="forward" title="Forward">${icon('forward')}</button>` : ''}
+    <button class="pp" data-pp="reload" title="${n.loading ? 'Stop' : 'Reload'}">${icon(n.loading ? 'close' : 'reload')}</button>
+    <button class="pp-url" data-pp="edit" title="Edit the address (Ctrl+L)">${icon(n.secure ? 'lock' : 'globe')}<span>${esc(n.url || 'New tab')}</span></button>
+    <button class="pp" data-pp="copy" title="Copy the address">${icon('copy')}</button>
+    <button class="pp${n.bookmarked ? ' on' : ''}" data-pp="bookmark" title="${n.bookmarked ? 'Remove bookmark' : 'Bookmark this page'}">${icon('star')}</button>
+    <button class="pp" data-pp="more" title="All address-bar actions">${icon('menu')}</button>
+  </div>`;
+}
+function editPointerAddress() {
+  const q = $('#pt-q');
+  if (!q || !data || !data.nav) return;
+  pt.editUrl = true;
+  q.value = data.nav.url || '';
+  q.dispatchEvent(new Event('input'));
+  q.focus(); q.select();
+  q.placeholder = 'Type an address or search, Enter to go';
+}
+
 function openPointer(d) {
-  pt = { q: '', raw: '', sel: 0, rows: [], bm: [], bmv: null };
+  pt = { q: '', raw: '', sel: 0, rows: [], bm: [], bmv: null, editUrl: false };
   const W = innerWidth;
   const H = innerHeight;
-  const pw = Math.min(380, W - 16);
+  const pw = Math.min(d.center ? 520 : 380, W - 16);
   const ph = Math.min(520, H - 16);
-  const x = Math.max(8, Math.min(d.x - 24, W - pw - 8));
-  const y = Math.max(8, Math.min(d.y - 12, H - ph - 8));
+  const x = d.center ? Math.max(8, (W - pw) / 2) : Math.max(8, Math.min(d.x - 24, W - pw - 8));
+  const y = d.center ? Math.max(8, Math.min(80, H - ph - 8)) : Math.max(8, Math.min(d.y - 12, H - ph - 8));
   root.innerHTML = `<div class="backdrop clear" data-bg="1"></div>
     <div class="pop" id="pop" style="left:${x}px;top:${y}px;width:${pw}px;max-height:${ph}px" role="dialog" aria-label="Open tabs">
+      ${pageRowHtml(d)}
       <div class="pop-search">${icon('search')}<input id="pt-q" placeholder="Filter tabs, or type to search the web" aria-label="Filter tabs or search"><button class="pop-bm" id="pt-bm" title="Bookmarks (Alt+B)" aria-pressed="false">${icon('bookmarks')}</button></div>
       <div class="pop-ws" id="pt-ws"></div>
       <div class="pop-common" id="pt-common"></div>
@@ -206,6 +231,17 @@ function openPointer(d) {
   });
   keyHandler = pointerKeys;
   renderPointer();
+  const pr = root.querySelector('.pop-page');
+  if (pr) pr.addEventListener('click', e => {
+    const b = e.target.closest('[data-pp]');
+    if (!b) return;
+    e.stopPropagation();
+    const a = b.dataset.pp;
+    if (a === 'edit') editPointerAddress();
+    else if (a === 'more') api.cmd('menu:page-actions');
+    else api.cmd('page:act', a).then(() => { if (a === 'bookmark') b.classList.toggle('on'); });
+  });
+  if (d.editAddress) editPointerAddress();
 }
 
 function renderPointer() {
@@ -272,6 +308,8 @@ function pointerAct(i, alternate = false) {
   const r = pt.rows[i];
   if (!r) return;
   if (r.kind === 'pin') api.cmd('pinned:open', r.p.wsId || '', r.p.index);
+  // Editing the address of this page: Enter goes there in this tab (Shift+Enter: a new tab).
+  else if (pt.editUrl && (r.kind === 'search' || r.kind === 'go')) { if (alternate) api.cmd('overlay:web', r.kind, r.text, true); else api.cmd('page:act', 'go', r.text); }
   else if (r.kind === 'search' || r.kind === 'go') api.cmd('overlay:web', r.kind, r.text, !alternate);
   else if (r.kind === 'bm') api.cmd('overlay:web', 'go', r.b.url, !alternate);
   else api.cmd('tab:activate', r.t.id);

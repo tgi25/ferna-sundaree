@@ -258,3 +258,28 @@ body.exam #btn-check { display: none !important; }
 #toast.on:has(.toast-act) { pointer-events: auto; }
 #toast .toast-act { margin-left: 8px; border: 0; border-radius: 6px; padding: 3px 10px; font: inherit; font-weight: 600; cursor: pointer; background: rgba(255,255,255,.18); color: inherit; }
 #toast .toast-act:hover { background: rgba(255,255,255,.3); }
+
+/* ---------- The address bar inside Ferna Tabs (while Ctrl+Shift+H hides the address bar) ---------- */
+.pagebar { display: flex; align-items: center; gap: 1px; flex: none; -webkit-app-region: no-drag; }
+#tabs.h .pagebar { padding-bottom: 4px; margin-right: 4px; padding-right: 6px; border-right: 1px solid var(--line); }
+.pagebar .pb { width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--tabs-ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.pagebar .pb .icon { width: 15px; height: 15px; }
+.pagebar .pb:hover:not(:disabled) { background: var(--bg-hover); color: var(--ink); }
+.pagebar .pb:disabled { opacity: .35; cursor: default; }
+.pagebar .pb.on { color: var(--accent); }
+.pagebar .pb.on .icon { fill: currentColor; }
+.pagebar .pb.warn { color: #fff; background: #dc2626; }
+.pagebar .pb-url { display: flex; align-items: center; gap: 5px; height: 26px; max-width: 200px; min-width: 60px; padding: 0 9px; border: 1px solid var(--line); border-radius: 13px; background: var(--bg-sunken, rgba(127, 127, 127, .1)); color: var(--tabs-ink); font: inherit; font-size: 12px; cursor: text; }
+.pagebar .pb-url .icon { width: 12px; height: 12px; flex: none; opacity: .75; }
+.pagebar .pb-url span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pagebar .pb-url:hover { border-color: var(--accent); }
+#tabs.v .pagebar { width: 100%; }
+#tabs.v .pagebar .pb-url { flex: 1; max-width: none; }
+#tabs.v .pagebar.collapsed { justify-content: center; }
+#pb-edit { position: fixed; z-index: 50; box-sizing: border-box; border: 2px solid var(--accent); border-radius: 13px; padding: 0 10px; font: inherit; font-size: 13px; background: var(--bg); color: var(--ink); outline: none; box-shadow: 0 4px 16px rgba(0, 0, 0, .18); -webkit-app-region: no-drag; }
+#pb-edit[hidden] { display: none; }
+.v-ctlrow { display: flex; justify-content: flex-end; margin: -8px -6px 0; height: 32px; flex: none; -webkit-app-region: drag; }
+.v-ctlrow .winctl { -webkit-app-region: no-drag; }
+#tabs.v.collapsed .v-ctlrow { flex-direction: column; height: auto; }
+#tabs.v.collapsed .v-ctlrow .winctl { flex-direction: column; }
+#tabs.v.collapsed .v-ctlrow .winctl button { width: 100%; height: 28px; }

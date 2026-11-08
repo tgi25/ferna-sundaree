@@ -8,8 +8,8 @@ const PANEL = new URLSearchParams(location.search).has('panel');
 document.body.classList.toggle('panel', PANEL);
 
 const CAT_COLOR = { local: '#16a34a', global: '#2563eb', research: '#9333ea', tech: '#ea580c' };
-const state = { view: 'list', stream: 'all', channel: '', feedId: '', sort: 'smart', unread: false, showHidden: false, search: '', info: null, data: null, counts: null, readerId: null, focus: -1, expanded: new Set(), selected: new Set(), fromTab: false };
-const V = () => ({ fontSize: 15, fontFamily: 'system', readWidth: 760, density: 'cards', images: true, openMode: 'reader', buttonOpens: 'panel', markRead: 'scroll', cluster: true, ...((state.info && state.info.prefs.settings) || {}) });
+const state = { view: 'list', stream: 'all', channel: '', feedId: '', sort: 'new', unread: true, history: false, showHidden: false, search: '', info: null, data: null, counts: null, readerId: null, focus: -1, expanded: new Set(), selected: new Set(), fromTab: false };
+const V = () => ({ fontSize: 15, fontFamily: 'system', readWidth: 760, density: 'cards', images: true, openMode: 'reader', buttonOpens: 'panel', markRead: 'scroll', cluster: true, listSort: 'new', unreadOnly: true, digestFont: 17, digestZoom: 100, ...((state.info && state.info.prefs.settings) || {}) });
 const FONTS = {
   system: ['System', ''], serif: ['Serif', "Georgia, 'Noto Serif', 'Noto Serif Sinhala', 'Times New Roman', serif"],
   sans: ['Sans serif', "'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Sinhala', Arial, sans-serif"], sinhala: ['Sinhala-friendly', "'Noto Sans Sinhala', 'Iskoola Pota', 'Nirmala UI', 'Segoe UI', sans-serif"],
@@ -138,7 +138,7 @@ $('#feed-pick').onchange = e => pickScope({ feedId: e.target.value });
 
 // ---------- list ----------
 async function load({ keepScroll = false } = {}) {
-  const q = { category: state.stream === 'saved' || state.feedId ? 'all' : state.stream, saved: state.stream === 'saved', channel: state.channel, feedId: state.feedId, search: state.search, unreadOnly: state.unread, showHidden: state.showHidden, sort: state.sort, limit: 300 };
+  const q = { category: state.stream === 'saved' || state.feedId ? 'all' : state.stream, saved: state.stream === 'saved', channel: state.channel, feedId: state.feedId, search: state.search, unreadOnly: state.unread, showHidden: state.showHidden, sort: state.sort, limit: 300, history: state.history };
   const key = JSON.stringify(q);
   if (!state.data) { const c = await DB.get('lists', key); if (c && c.data) { state.data = c.data; render(); } } // fast first paint
   const data = await api.cmd('feeds:list', q);
@@ -161,7 +161,7 @@ function cardHtml(c, i) {
   const srcs = more > 0 && open ? srcList(c) : '';
   const readerBtn = V().openMode === 'reader' ? '' : `<button class="a" data-act="reader" title="Read it here, without clutter">${icon('book') || ''} Reader</button>`;
   return `<article class="fc${c.read ? ' read' : ''}${i === state.focus ? ' focus' : ''}" data-id="${esc(c.id)}" data-i="${i}" style="--c:${CAT_COLOR[c.category] || 'var(--ink-3)'}" tabindex="-1">
-    <div class="meta"><span class="cat">${esc(label(c.category))}</span><span class="src">${esc(c.feed || srcNames[0] || '')}</span>${more > 0 ? `<span class="cov">${c.sources.length} sources</span>` : ''}<span>${esc(ago(c.date))}</span>${c.read ? '' : '<span class="new" title="Unread">●</span>'}</div>
+    <div class="meta"><span class="cat">${esc(label(c.category))}</span><span class="src">${esc(c.feed || srcNames[0] || '')}</span>${more > 0 ? `<span class="cov">${c.sources.length} sources</span>` : ''}<span>${esc(ago(c.date))}</span>${c.read ? '' : '<span class="new" title="Unread">●</span>'}${state.history && c.readAt ? `<span class="rdat" title="${esc(new Date(c.readAt).toLocaleString())}">read ${esc(ago(c.readAt))}</span>` : ''}</div>
     <h3 data-act="read"><a href="${esc(c.link || '#')}" data-act="read" tabindex="-1">${esc(c.title)}</a></h3>
     ${c.image ? `<img class="thumb" src="${esc(c.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
     <p class="sum">${c.ai ? '<span class="ai">AI</span>' : ''}${esc(c.summary || '')}</p>
@@ -192,15 +192,18 @@ function render() {
   }
   const f = state.feedId && state.info.feeds.find(x => x.id === state.feedId);
   const sc = $('#scope');
-  sc.hidden = !f;
-  if (f) sc.innerHTML = `<b>${esc(f.title)}</b> <span class="muted">${esc(f.url)}</span>${f.lastError ? ` <span class="err">⚠ ${esc(f.lastError)}</span>` : ''}<span class="grow"></span><button class="btn small" data-scope="check">Check now</button><button class="btn small" data-scope="all">Show all feeds</button>`;
-  $('#cards').innerHTML = d.cards.length ? d.cards.map(cardHtml).join('') : `<div class="empty">${state.search ? 'Nothing matches your search.' : state.unread ? 'All read here.' : 'Nothing here yet. New items arrive as your feeds update.'}</div>`;
+  sc.hidden = !f && !state.history;
+  document.body.classList.toggle('history', state.history);
+  if (state.history) sc.innerHTML = `${icon('calendar')}<b>Reading history</b> <span class="muted">${d.total} item${d.total === 1 ? '' : 's'} you have read, the latest first${f ? ` · ${esc(f.title)}` : ''}</span><span class="grow"></span><button class="btn small" data-scope="unhistory">Back to the news</button>`;
+  else if (f) sc.innerHTML = `<b>${esc(f.title)}</b> <span class="muted">${esc(f.url)}</span>${f.lastError ? ` <span class="err">⚠ ${esc(f.lastError)}</span>` : ''}<span class="grow"></span><button class="btn small" data-scope="check">Check now</button><button class="btn small" data-scope="all">Show all feeds</button>`;
+  $('#cards').innerHTML = d.cards.length ? d.cards.map(cardHtml).join('') : `<div class="empty">${state.history ? 'Nothing read yet.' : state.search ? 'Nothing matches your search.' : state.unread ? 'All caught up here. <button class="btn small" data-scope="history">Show what you have read</button>' : 'Nothing here yet. New items arrive as your feeds update.'}</div>`;
   watchCards();
 }
 $('#scope').addEventListener('click', async e => {
   const b = e.target.closest('[data-scope]');
   if (!b) return;
   if (b.dataset.scope === 'all') pickScope({});
+  else if (b.dataset.scope === 'unhistory' || b.dataset.scope === 'history') setHistory(b.dataset.scope === 'history');
   else { b.disabled = true; b.textContent = 'Checking…'; const r = await api.cmd('feeds:poll-feeds', [state.feedId]); toast(r && r.added ? `${r.added} new` : 'No new items'); load({ keepScroll: true }); }
 });
 
@@ -258,9 +261,16 @@ $('#cards').addEventListener('mouseleave', () => clearTimeout(hoverT));
 $('#bar').addEventListener('click', e => {
   if (e.target.id === 'show-hidden') { state.showHidden = !state.showHidden; load(); }
   const s = e.target.closest('[data-sort]');
-  if (s) { state.sort = s.dataset.sort; $$('#sort button').forEach(b => b.classList.toggle('on', b === s)); load(); }
+  if (s) { state.sort = s.dataset.sort; $$('#sort button').forEach(b => b.classList.toggle('on', b === s)); load(); api.cmd('feeds:set-prefs', { listSort: state.sort }); }
 });
-$('#unread').onchange = e => { state.unread = e.target.checked; load(); };
+$('#unread').onchange = e => { state.unread = e.target.checked; load(); api.cmd('feeds:set-prefs', { unreadOnly: state.unread }); };
+/** The list as you left it: Newest and Unread only unless you chose otherwise. */
+function applyListPrefs() {
+  const v = V();
+  state.sort = v.listSort; state.unread = v.unreadOnly;
+  $$('#sort button').forEach(b => b.classList.toggle('on', b.dataset.sort === state.sort));
+  $('#unread').checked = state.unread;
+}
 const scopeQ = () => ({ feedId: state.feedId, channel: state.channel });
 $('#b-allread').onclick = async () => { const n = await api.cmd('feeds:all-read', state.stream === 'saved' || state.feedId ? 'all' : state.stream, scopeQ()); toast(`${n} marked read`); load({ keepScroll: true }); };
 $('#b-readmenu').onclick = e => { e.stopPropagation(); $('#readmenu').hidden = !$('#readmenu').hidden; };
@@ -314,6 +324,14 @@ $('#cards').addEventListener('click', async e => {
     rerenderCard(card, c);
   }
 });
+$('#cards').addEventListener('click', e => { const b = e.target.closest('[data-scope="history"]'); if (b) setHistory(true); });
+function setHistory(on) {
+  state.history = on; state.focus = -1;
+  $('#b-history').classList.toggle('on', on);
+  $('#b-history').setAttribute('aria-pressed', String(on));
+  load();
+}
+$('#b-history').onclick = () => setHistory(!state.history);
 // Middle click on a headline or a source: a background tab.
 $('#cards').addEventListener('auxclick', e => {
   if (e.button !== 1) return;
@@ -388,19 +406,52 @@ async function openDigest(fresh = false) {
   $('#digest').innerHTML = '<div class="rd dg"><p class="note">Making your digest…</p></div>';
   const d = await api.cmd('feeds:digest', fresh);
   const aiReady = state.info && state.info.prefs.aiReady;
-  const li = c => `<li><a data-id="${esc(c.id)}">${esc(c.title)}</a><div class="s">${esc(c.summary || '')}</div><div class="m">${esc(c.sources.map(s => s.feed).filter((v, i, a) => v && a.indexOf(v) === i).join(' · '))} · ${esc(ago(c.date))}${c.sources.length > 1 ? ` · ${c.sources.length} sources` : ''}</div></li>`;
+  const li = c => `<li><a data-id="${esc(c.id)}">${esc(c.title)}</a><div class="s">${esc(c.summary || '')}</div><div class="m">${esc([c.sources.map(s => s.feed).filter((v, i, a) => v && a.indexOf(v) === i).join(' · '), ago(c.date)].filter(Boolean).join(' · '))}${c.sources.length > 1 ? ` · ${c.sources.length} sources` : ''}</div></li>`;
   const sec = (title, list) => list && list.length ? `<h2>${esc(title)}</h2><ol>${list.map(li).join('')}</ol>` : '';
   const take = d.takeaways ? `<div class="box"><b>Key takeaways (AI)</b><div class="take">${esc(d.takeaways)}</div></div>` : aiReady ? '<p><button class="btn small" id="d-ai">✦ Write key takeaways with AI</button></p>' : '';
-  $('#digest').innerHTML = `<div class="rd dg"><div class="rd-top"><button class="btn small" id="d-back">← Back</button><span class="grow"></span><button class="btn small" id="d-new">Make it again</button></div>
+  const v = V();
+  $('#digest').innerHTML = `<div class="rd dg" style="--dfs:${v.digestFont}px"><div class="rd-top"><button class="btn small" id="d-back">← Back</button><span class="grow"></span>
+    <span class="dz" role="group" aria-label="Text size and zoom"><button class="btn small" data-dz="font-" title="Smaller text">A−</button><span class="dzv" id="dz-font" title="Text size">${v.digestFont}px</span><button class="btn small" data-dz="font+" title="Larger text">A+</button>
+    <span class="sep"></span><button class="btn small" data-dz="zoom-" title="Zoom out (Ctrl+−)">−</button><span class="dzv" id="dz-zoom" title="Zoom">${v.digestZoom}%</span><button class="btn small" data-dz="zoom+" title="Zoom in (Ctrl++)">+</button><button class="btn small" data-dz="reset" title="Back to normal size (Ctrl+0)">Reset</button></span>
+    <button class="btn small" id="d-new">Make it again</button></div><div class="dg-body" style="zoom:${v.digestZoom / 100}">
     <h1>Today's digest</h1><div class="by">${esc(new Date(d.made).toLocaleString())} · ${d.unread} unread</div>${take}
     ${sec('Breaking: covered by several sources', d.breaking)}${sec('Top research papers', d.research)}
     ${['local', 'global', 'tech'].map(c => sec(label(c), d.streams[c])).join('')}
-    ${!d.breaking.length && !d.research.length && !Object.values(d.streams).some(x => x.length) ? '<p class="note">Nothing new in the last day and a half. Add feeds or check back later.</p>' : ''}</div>`;
+    ${!d.breaking.length && !d.research.length && !Object.values(d.streams).some(x => x.length) ? '<p class="note">Nothing new in the last day and a half. Add feeds or check back later.</p>' : ''}</div></div>`;
   $('#d-back').onclick = () => show('list');
   $('#d-new').onclick = () => openDigest(true);
+  $('#digest .dz').onclick = e => { const b = e.target.closest('[data-dz]'); if (b) digestSize(b.dataset.dz); };
   if ($('#d-ai')) $('#d-ai').onclick = async () => { $('#d-ai').disabled = true; $('#d-ai').textContent = '✦ Writing…'; const r = await api.cmd('feeds:takeaways'); if (!r.ok) toast(r.error); openDigest(false); };
   $('#digest').onclick = e => { const a = e.target.closest('a[data-id]'); if (a) openReader(a.dataset.id); };
 }
+
+/** Today's digest: text size (A− A+) and zoom (− + Reset), kept for next time. */
+let dzT = null;
+function digestSize(how) {
+  const v = V();
+  let font = v.digestFont, zoom = v.digestZoom;
+  if (how === 'font-') font = Math.max(12, font - 1);
+  else if (how === 'font+') font = Math.min(30, font + 1);
+  else if (how === 'zoom-') zoom = Math.max(50, zoom - 10);
+  else if (how === 'zoom+') zoom = Math.min(200, zoom + 10);
+  else if (how === 'reset') { font = 17; zoom = 100; }
+  state.info.prefs.settings = { ...state.info.prefs.settings, digestFont: font, digestZoom: zoom };
+  const dg = $('#digest .dg');
+  if (dg) { dg.style.setProperty('--dfs', `${font}px`); const b = dg.querySelector('.dg-body'); if (b) b.style.zoom = zoom / 100; }
+  if ($('#dz-font')) $('#dz-font').textContent = `${font}px`;
+  if ($('#dz-zoom')) $('#dz-zoom').textContent = `${zoom}%`;
+  clearTimeout(dzT); dzT = setTimeout(() => api.cmd('feeds:set-prefs', { digestFont: font, digestZoom: zoom }), 300);
+}
+document.addEventListener('keydown', e => {
+  if (state.view !== 'digest' || !(e.ctrlKey || e.metaKey)) return;
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); e.stopPropagation(); digestSize('zoom+'); }
+  else if (e.key === '-') { e.preventDefault(); e.stopPropagation(); digestSize('zoom-'); }
+  else if (e.key === '0') { e.preventDefault(); e.stopPropagation(); digestSize('reset'); }
+}, true);
+document.addEventListener('wheel', e => {
+  if (state.view !== 'digest' || !e.ctrlKey) return;
+  e.preventDefault(); digestSize(e.deltaY < 0 ? 'zoom+' : 'zoom-');
+}, { passive: false });
 
 // ---------- manage ----------
 // The Manage view is drawn again after each change, but its event handlers are attached ONCE
@@ -708,6 +759,7 @@ api.on('refresh', m => {
 (async () => {
   state.info = await api.cmd('feeds:info');
   applyView();
+  applyListPrefs();
   const h = location.hash.slice(1);
   load(); // the streams and the list behind any other view
   if (h === 'digest') openDigest();

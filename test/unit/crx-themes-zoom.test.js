@@ -97,19 +97,31 @@ test('zoom: AutoFit fits content width within the configured range', () => {
   assert.strictEqual(zoom.autofitLevel({ vw: 1000, left: 0, right: 1000, sw: 1600 }, 100, p), 61);
 });
 
-test('layout: window controls follow the tab bar and hide with Ctrl+Shift+H', () => {
+test('layout: Ctrl+Shift+H hides the chosen bars, no edge reveal, window controls move to the bar still shown', () => {
   const base = { position: 'top', vwidth: 240 };
   assert.strictEqual(computeLayout(1200, 800, base).windowControls, 'tabs');
+  // Both (the default): nothing at the edges, the page fills the window under the bookmarks bar
   let L = computeLayout(1200, 800, { ...base, tabBarHidden: true });
-  assert.strictEqual(L.windowControls, null);
-  assert.ok(L.toolbar, 'toolbar stays by default with tabs on top');
-  L = computeLayout(1200, 800, { ...base, tabBarHidden: true, hideToolbarWithTabs: true });
-  assert.ok(!L.toolbar && L.edgeToolbar);
+  assert.ok(!L.tabs && !L.toolbar && !L.edgeTabs && !L.edgeToolbar && L.windowControls === null && L.content.y === 30);
+  // Reveal flags do nothing outside focus mode
+  L = computeLayout(1200, 800, { ...base, tabBarHidden: true, revealTabs: true, revealToolbar: true });
+  assert.ok(!L.tabs && !L.toolbar);
+  // Tab bar only: the address bar stays and takes the window controls
+  L = computeLayout(1200, 800, { ...base, tabBarHidden: true, hideBars: 'tabs' });
+  assert.ok(!L.tabs && L.toolbar && L.windowControls === 'toolbar' && !L.edgeTabs);
+  // Address bar only: the tab bar stays with the controls
+  L = computeLayout(1200, 800, { ...base, tabBarHidden: true, hideBars: 'toolbar' });
+  assert.ok(L.tabs && !L.toolbar && L.windowControls === 'tabs' && !L.edgeToolbar && L.content.y === 38 + 30);
+  // Vertical tabs
   L = computeLayout(1200, 800, { ...base, position: 'left' });
   assert.strictEqual(L.windowControls, 'toolbar');
   L = computeLayout(1200, 800, { ...base, position: 'left', tabBarHidden: true });
-  assert.ok(!L.toolbar && !L.tabs && L.windowControls === null, 'vertical: toolbar with controls hides too');
-  assert.strictEqual(L.content.x, 5);
-  L = computeLayout(1200, 800, { ...base, position: 'left', tabBarHidden: true, revealTabs: true, revealToolbar: true });
+  assert.ok(!L.toolbar && !L.tabs && L.windowControls === null && L.content.x === 0);
+  L = computeLayout(1200, 800, { ...base, position: 'left', tabBarHidden: true, hideBars: 'toolbar' });
+  assert.ok(!L.toolbar && L.tabs && L.windowControls === 'tabs' && L.content.x === 240);
+  L = computeLayout(1200, 800, { ...base, position: 'left', tabBarHidden: true, hideBars: 'tabs' });
+  assert.ok(L.toolbar && !L.tabs && L.windowControls === 'toolbar' && L.content.x === 0);
+  // Focus mode still reveals at the edge
+  L = computeLayout(1200, 800, { ...base, position: 'left', focus: true, revealTabs: true, revealToolbar: true });
   assert.ok(L.toolbar && L.tabs && L.windowControls === 'toolbar');
 });

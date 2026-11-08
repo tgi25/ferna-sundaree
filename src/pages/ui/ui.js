@@ -240,7 +240,7 @@ el.address.addEventListener('keydown', e => {
     el.address.blur();
   }
 });
-api.on('focus-address', () => { el.address.focus(); el.address.select(); });
+api.on('focus-address', m => { if ((m && m.inline) || pagebarOn()) { setTimeout(editInline, 30); return; } el.address.focus(); el.address.select(); });
 
 // Copy and clear buttons inside the address bar.
 $('#btn-copyurl').innerHTML = icon('copy');
@@ -541,6 +541,61 @@ function stripRelease() {
 el.tabs.addEventListener('pointerdown', e => { if (e.button === 0 || e.button === 1) stripPress = Date.now(); }, true);
 for (const ev of ['pointerup', 'pointercancel', 'dragend', 'drop', 'blur']) window.addEventListener(ev, stripRelease, true);
 
+// ---------- the address bar inside Ferna Tabs (while Ctrl+Shift+H hides the address bar) ----------
+// Compact: back, reload, the site (click it to edit the address), bookmark, and one ⋯ button with
+// every other address-bar action. Shown only while the address bar itself is hidden.
+const pagebarOn = () => !!(S && S.layout.hiddenByKey && !S.layout.toolbar && S.layout.tabs && !S.focus && !S.exam);
+function pagebarHtml(vertical, collapsed = false) {
+  if (!pagebarOn()) return '';
+  const n = S.nav;
+  let host = '';
+  try { const u = new URL(n.url); host = u.protocol === 'file:' ? decodeURIComponent(u.pathname.split('/').pop()) : u.protocol === 'ferna:' ? `ferna://${u.host}` : u.hostname.replace(/^www\./, ''); } catch { host = n.url || ''; }
+  const c = n.check;
+  const warn = c && (c.level === 'danger' || c.level === 'scam') ? `<button class="pb warn" data-pb="check" title="Safety warning: click for details">${icon('shield')}</button>` : '';
+  if (collapsed) return `<div class="pagebar v collapsed"><button class="pb" data-pb="more" title="${esc(n.url || 'New tab')}\nAddress-bar actions">${icon('globe')}</button></div>`;
+  return `<div class="pagebar${vertical ? ' v' : ''}" role="group" aria-label="Page">
+    <button class="pb" data-pb="back" title="Back (Alt+Left)"${n.canBack ? '' : ' disabled'}>${icon('back')}</button>
+    ${n.canForward ? `<button class="pb" data-pb="forward" title="Forward (Alt+Right)">${icon('forward')}</button>` : ''}
+    <button class="pb" data-pb="reload" title="${n.loading ? 'Stop' : 'Reload (F5)'}">${icon(n.loading ? 'close' : 'reload')}</button>
+    <button class="pb-url" data-pb="edit" title="${esc(n.url || 'New tab')}\nClick to edit (Ctrl+L)">${n.secure ? icon('lock') : n.internal ? icon('info') : n.url ? icon('globe') : icon('search')}<span>${esc(host || 'Search or enter address')}</span></button>
+    ${warn}
+    <button class="pb${n.bookmarked ? ' on' : ''}" data-pb="bookmark" title="${n.bookmarked ? 'Remove bookmark' : 'Bookmark this page'} (Ctrl+D)">${icon('star')}</button>
+    <button class="pb" data-pb="more" title="All address-bar actions">${icon('menu')}</button>
+  </div>`;
+}
+// Editing: a field over the site name, kept outside the strip so redrawing never interrupts typing.
+const pbEdit = document.createElement('input');
+pbEdit.id = 'pb-edit'; pbEdit.type = 'text'; pbEdit.spellcheck = false; pbEdit.autocomplete = 'off'; pbEdit.hidden = true;
+pbEdit.setAttribute('aria-label', 'Address');
+document.body.append(pbEdit);
+function editInline() {
+  const chip = el.tabs.querySelector('.pb-url');
+  if (!chip) return;
+  const r = chip.getBoundingClientRect();
+  const vertical = S.layout.position !== 'top';
+  const w = vertical ? r.width : Math.max(r.width, Math.min(560, innerWidth - r.left - 16));
+  Object.assign(pbEdit.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${w}px`, height: `${r.height}px` });
+  pbEdit.value = S.nav.url || '';
+  pbEdit.hidden = false;
+  pbEdit.focus(); pbEdit.select();
+}
+pbEdit.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); const v = pbEdit.value.trim(); pbEdit.hidden = true; if (v) api.cmd('page:act', 'go', v); }
+  else if (e.key === 'Escape') { e.preventDefault(); pbEdit.hidden = true; }
+});
+// Hidden when you click elsewhere (not when the window itself loses focus for a moment).
+pbEdit.addEventListener('blur', () => setTimeout(() => { if (document.hasFocus() && document.activeElement !== pbEdit) pbEdit.hidden = true; }, 150));
+el.tabs.addEventListener('click', e => {
+  const b = e.target.closest('[data-pb]');
+  if (!b) return;
+  e.stopPropagation();
+  const a = b.dataset.pb;
+  if (a === 'edit') editInline();
+  else if (a === 'more') api.cmd('menu:page-actions');
+  else if (a === 'check') api.cmd('check:toggle-panel');
+  else api.cmd('page:act', a);
+}, true);
+
 function renderTabs() { drawTabs(); try { ensureTabContrast(); } catch { /* keep the strip */ } }
 function drawTabs() {
   if (stripPress && Date.now() - stripPress < 2000) { stripPending = true; return; }
@@ -582,6 +637,7 @@ function drawTabs() {
       return `<button class="icon-btn ${cls}" ${t ? `data-id="${t.id}"` : `data-pinned="${p.index}" data-pinned-ws="${esc(p.wsId)}"`} title="${esc(p.pin.title || p.pin.url)}${t ? '' : ' (not open)'}${ws ? '' : `\nPinned in ${esc(wsName(p.wsId))}`}">${faviconHtml(p.pin.url, (t && t.favicon) || keptIcon(p.pin.url))}</button>`;
     }).join('');
     node.innerHTML = `
+      ${pagebarHtml(false)}
       <div class="group wsg">${wsChips(true)}</div>
       ${S.strip.common.length ? `<div class="group common" data-dz="common">${commonHtml()}</div>` : ''}
       ${pinnedIcons ? `<div class="group pinned" data-dz="pin">${pinnedIcons}</div>` : ''}
@@ -596,6 +652,8 @@ function drawTabs() {
   }
 
   node.innerHTML = `
+    ${S.layout.windowControls === 'tabs' ? `<div class="v-ctlrow"><div class="winctl">${winctlHtml()}</div></div>` : ''}
+    ${pagebarHtml(true, collapsed)}
     <div class="ws-bar">${wsChips(collapsed)}</div>
     ${S.strip.common.length ? `<div class="common" data-dz="common">${commonHtml()}</div>` : ''}
     <div class="scroll">

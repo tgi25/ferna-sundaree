@@ -149,7 +149,8 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
     await panel.evaluate(() => document.querySelector('#r-save').click());
     await H.until(() => panel.evaluate(i => new Promise(res => { const r = indexedDB.open('ferna-feeds', 1); r.onsuccess = () => { const g = r.result.transaction('articles').objectStore('articles').get(i); g.onsuccess = () => res(!!(g.result && g.result.html)); g.onerror = () => res(false); }; r.onerror = () => res(false); }), id), 8000, 'saved for offline');
     // Full page, digest
-    await main(() => { const w = global.__ferna.windows[0]; global.__ferna.feeds.closePanel(w); w.newTab('ferna://feeds/#digest'); });
+    // The digest covers the last day and a half: make the fixture stories recent, whatever today is.
+    await main(() => { const F = global.__ferna.feeds; for (const it of F.itemsStore.data.items) it.date = Date.now() - 3 * 3600e3; F.store.data.digests = []; const w = global.__ferna.windows[0]; F.closePanel(w); w.newTab('ferna://feeds/#digest'); });
     const full = await page('ferna://feeds/#digest');
     await H.until(() => full.evaluate(() => /Today's digest/.test(document.body.textContent) && /Breaking/.test(document.body.textContent)), 8000, 'digest with breaking story');
     await shot('v080-06-feeds-digest');
@@ -168,6 +169,9 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
     await main(() => { const F = global.__ferna.feeds; for (const f of [...F.store.data.feeds]) F.unsubscribe(f.id); F.setPrefs({ interests: '', rules: '' }); });
   });
   await step('0.8.0 scam & payment guard: fake bank login warned before typing; scam pages and messages flagged', async () => {
+    // Today's digest first, so its notice does not cover the scam notice later
+    await main(() => { const F = global.__ferna.feeds; if (F.maybeDigest) F.maybeDigest(); });
+    await H.sleep(300);
     await main(() => { const c = global.__ferna; c.setSetting('checkTrusted', []); c.__dlg = []; c.check.showDialog = async (w, o) => { c.__dlg.push(o); return { response: c.__dlgAnswer || 0 }; }; c.__dlgAnswer = 0; });
     // A page dressed as Sampath Bank on another address, asking for a password and OTP
     await freshTab(`${base}/check/fake-bank.html`);
@@ -190,8 +194,8 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
     await freshTab(`${lh()}/check/scam.html`);
     const u = await ui();
     await H.until(() => u.evaluate(() => { const b = document.querySelector('#btn-check'); return !b.hidden && b.dataset.level === 'scam'; }), 8000, 'scam level');
-    const t = await u.evaluate(() => document.querySelector('#toast').textContent);
-    assert(/scam/.test(t) && /Why\?/.test(t), t);
+    // (another notice, such as the daily digest, may be showing first)
+    await H.until(() => u.evaluate(() => /scam/.test(document.querySelector('#toast').textContent) && /Why\?/.test(document.querySelector('#toast').textContent)), 8000, 'scam notice', () => u.evaluate(() => document.querySelector('#toast').textContent));
     await shot('v080-07-scam-page');
     // Messages (SMS, WhatsApp): English, Sinhala; a bank's honest warning is not flagged
     const m = await main(() => {
@@ -286,32 +290,27 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
     await main((_, id) => { const c = global.__ferna; c.deleteWorkspace(id); const w = c.windows[0]; for (const t of [...w.tabs]) if (/\.localhost:|ferna:\/\/settings/.test(t.url)) w.closeTab(t); }, made.w.id);
     assert(await main(() => (global.__ferna.settings.data.wsSchedules || []).length === 0), 'schedule removed with its workspace');
   });
-  await step('0.8.1 Ctrl+Shift+H: a bar brought back by the window edge never keeps it on screen', async () => {
-    await main(() => global.__ferna.setSetting('tabPosition', 'top'));
-    // Hide, bring it back with the edge, show with the key, hide with the key: it must hide.
+  await step('0.8.1/0.8.3 Ctrl+Shift+H: bars stay hidden; the window edge does not bring them back', async () => {
+    await main(() => { global.__ferna.setSetting('tabPosition', 'top'); global.__ferna.setSetting('hideBars', 'both'); });
+    // An old edge reveal does not survive the key
     await main(() => global.__ferna.windows[0].run('toggleTabBar'));
     await main(() => { const w = global.__ferna.windows[0]; w.reveal.tabs = true; w.relayout(); });
     await main(() => global.__ferna.windows[0].run('toggleTabBar'));
     await main(() => global.__ferna.windows[0].run('toggleTabBar'));
     await H.sleep(200);
-    assert(!(await win()).layout.showTabs, 'hidden after the key');
-    // Brought back by the edge: goes away once the pointer is on the page (real pointer, if xdotool is here).
-    let xdo = false;
-    try { require('child_process').execSync('command -v xdotool', { stdio: 'ignore' }); xdo = true; } catch { xdo = false; }
-    if (xdo) {
-      const disp = await main(() => process.env.DISPLAY);
-      const mv = (x, y) => require('child_process').execSync(`DISPLAY=${disp} xdotool mousemove ${x} ${y}`);
-      const b = await main(() => global.__ferna.windows[0].win.getContentBounds());
-      mv(b.x + 300, b.y + 5);
-      await main(() => { const w = global.__ferna.windows[0]; w.reveal.tabs = true; w.relayout(); });
-      await H.sleep(1000);
-      assert((await win()).layout.showTabs, 'stays while the pointer is on the bars');
-      mv(b.x + 500, b.y + 500);
-      await H.until(async () => !(await win()).layout.showTabs, 3000, 'hides once the pointer is on the page');
-    }
+    let L = (await win()).layout;
+    assert(!L.showTabs && !L.showToolbar && !L.edgeTabs && !L.edgeToolbar, `hidden, no edges: ${JSON.stringify(L)}`);
+    // The UI asking to reveal (pointer at the edge) changes nothing
+    const u = await ui();
+    await u.evaluate(() => window.ferna.cmd('ui:reveal', 'tabs', true));
+    await H.sleep(300);
+    L = (await win()).layout;
+    assert(!L.showTabs && !L.showToolbar, 'edge reveal ignored');
     await main(() => global.__ferna.windows[0].run('toggleTabBar'));
-    assert((await win()).layout.showTabs, 'shown again');
+    L = (await win()).layout;
+    assert(L.showTabs && L.showToolbar, 'shown again');
   });
+
   await step('0.8.2 feeds: Remove works on the first click and Add ticked never adds a feed twice (however often Manage was opened)', async () => {
     const r0 = await main(async (_, b) => {
       const F = global.__ferna.feeds;
@@ -361,7 +360,7 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
       const F = global.__ferna.feeds;
       for (const n of ['many', 'lanka', 'world']) await F.subscribe(`${b}/feeds/${n}.xml`);
       await F.poll({ force: true });
-      F.setPrefs({ markRead: 'scroll', openMode: 'reader', density: 'cards', fontSize: 15, cluster: true });
+      F.setPrefs({ markRead: 'scroll', openMode: 'reader', density: 'cards', fontSize: 15, cluster: true, unreadOnly: false, listSort: 'smart' });
     }, lh());
     await main(() => { const w = global.__ferna.windows[0]; for (const t of [...w.tabs]) if (/^ferna:\/\/feeds\//.test(t.url || '')) w.closeTab(t); w.newTab('ferna://feeds/?scrolltest'); });
     await H.sleep(600);
@@ -431,5 +430,107 @@ module.exports = async function v080({ step, assert, main, win, page, H, base, s
     });
     assert(ex.r.added === 3 && ex.again.added === 0 && ex.feeds === 3 && ex.interests === 'machine learning' && ex.fs === 17 && ex.ch === 1 && ex.chFeedOk, JSON.stringify(ex));
     await main(() => { const F = global.__ferna.feeds; F.unsubscribe(F.store.data.feeds.map(f => f.id)); F.setPrefs({ interests: '', fontSize: 15, channels: [] }); });
+  });
+  await step('0.8.3 Ctrl+Shift+H choices; the address bar inside Ferna Tabs and the tabs list; Ctrl+L goes there', async () => {
+    const C = (cmd) => main((_, c) => global.__ferna.windows[0].run(c), cmd);
+    await main(() => { const c = global.__ferna; c.setSetting('tabPosition', 'top'); c.setSetting('tabBarHidden', false); c.setSetting('hideBars', 'toolbar'); });
+    await freshTab(`${base}/long.html?one`);
+    await main((_, b) => global.__ferna.windows[0].navigate(global.__ferna.windows[0].active, `${b}/long.html?two`), base);
+    await H.until(async () => /two/.test(await evalActive('location.href')), 5000, 'second page');
+    // Only the address bar: the tab bar stays, with the window controls and the page controls
+    await C('toggleTabBar');
+    await H.sleep(300);
+    let L = (await win()).layout;
+    assert(L.showTabs && !L.showToolbar && L.windowControls === 'tabs' && !L.edgeToolbar, JSON.stringify(L));
+    const u = await ui();
+    await H.until(() => u.evaluate(() => !!document.querySelector('#tabs .pagebar .pb-url')), 4000, 'page bar in the tab strip');
+    const pb = await u.evaluate(() => ({ host: document.querySelector('#tabs .pagebar .pb-url').textContent.trim(), btns: [...document.querySelectorAll('#tabs .pagebar [data-pb]')].map(b => b.dataset.pb) }));
+    assert(/localhost|127\.0\.0\.1/.test(pb.host) && ['back', 'reload', 'edit', 'bookmark', 'more'].every(x => pb.btns.includes(x)), JSON.stringify(pb));
+    await shot('v083-01-pagebar-top');
+    // Back from the strip
+    await u.evaluate(() => document.querySelector('#tabs .pagebar [data-pb="back"]').click());
+    await H.until(async () => /one/.test(await evalActive('location.href')), 5000, 'went back');
+    // Ctrl+L edits the address in the strip; Enter goes there in this tab
+    const n0 = await main(() => global.__ferna.windows[0].tabs.length);
+    await C('focusAddress');
+    await H.until(() => u.evaluate(() => !document.querySelector('#pb-edit').hidden && document.activeElement.id === 'pb-edit'), 3000, 'inline address field', async () => JSON.stringify(await u.evaluate(() => ({ hidden: document.querySelector('#pb-edit').hidden, ae: document.activeElement && (document.activeElement.id || document.activeElement.tagName), chip: !!document.querySelector('#tabs .pb-url') }))));
+    await shot('v083-02-pagebar-edit');
+    await u.evaluate(b => { const i = document.querySelector('#pb-edit'); i.value = `${b}/long.html?three`; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); }, base);
+    await H.until(async () => /three/.test(await evalActive('location.href')), 5000, 'navigated from the strip');
+    assert(await main((_, a) => global.__ferna.windows[0].tabs.length === a, n0), 'same tab');
+    // The ⋯ menu holds every address-bar action
+    const labels = await main(() => global.__ferna._menus.pageActionsMenu(global.__ferna.windows[0]).items.map(i => i.label));
+    for (const l of ['Back', 'Reload', 'Copy address', 'Bookmark this page', 'Reading mode', 'Translate this page', 'Safety check', 'Zoom…', 'Split view', 'Tracker and ad blocking', 'Screenshot', 'Downloads', 'Ferna Feeds', 'AI assistant', 'Menu']) assert(labels.includes(l), `menu has ${l}: ${labels.join(', ')}`);
+    // Vertical tabs, address bar hidden: the window controls and the page controls on the side strip
+    await main(() => global.__ferna.setSetting('tabPosition', 'left'));
+    await H.sleep(400);
+    L = (await win()).layout;
+    assert(L.tabs && !L.toolbar && L.windowControls === 'tabs', JSON.stringify(L));
+    await H.until(() => u.evaluate(() => !!document.querySelector('#tabs.v .v-ctlrow .winctl') && !!document.querySelector('#tabs.v .pagebar .pb-url')), 3000, 'vertical controls');
+    await shot('v083-03-pagebar-vertical');
+    await main(() => global.__ferna.setSetting('tabPosition', 'top'));
+    // Only the tab bar: the address bar stays and takes the window controls
+    await main(() => global.__ferna.setSetting('hideBars', 'tabs'));
+    await H.sleep(300);
+    L = (await win()).layout;
+    assert(!L.showTabs && L.showToolbar && L.windowControls === 'toolbar', JSON.stringify(L));
+    // Both: Ctrl+L opens the tabs list at the pointer with the page controls and the address ready to edit
+    await main(() => global.__ferna.setSetting('hideBars', 'both'));
+    await H.sleep(300);
+    await C('focusAddress');
+    const ov = await page('ferna://overlay/');
+    await H.until(() => ov.evaluate(() => !!document.querySelector('.pop-page') && /three/.test(document.querySelector('#pt-q').value)), 4000, 'tabs list with the address');
+    await shot('v083-04-tabslist-page');
+    await ov.evaluate(b => { const q = document.querySelector('#pt-q'); q.value = `${b}/long.html?four`; q.dispatchEvent(new Event('input')); }, base);
+    await H.sleep(200);
+    await ov.keyboard.press('Enter');
+    await H.until(async () => /four/.test(await evalActive('location.href')), 5000, 'navigated from the tabs list');
+    assert(await main((_, a) => global.__ferna.windows[0].tabs.length === a, n0), 'same tab from the list');
+    await C('toggleTabBar');
+    L = (await win()).layout;
+    assert(L.showTabs && L.showToolbar, 'all back');
+  });
+
+  await step('0.8.3 feeds: Newest and Unread only by default; reading history; digest text size and zoom', async () => {
+    await main(async (_, b) => {
+      const F = global.__ferna.feeds;
+      for (const f of [...F.store.data.feeds]) F.unsubscribe(f.id);
+      F.setPrefs({ listSort: 'new', unreadOnly: true, digestFont: 17, digestZoom: 100 });
+      for (const n of ['many', 'lanka']) await F.subscribe(`${b}/feeds/${n}.xml`);
+      await F.poll({ force: true });
+      for (const it of F.itemsStore.data.items) { it.read = false; it.readAt = 0; }
+      const ids = F.itemsStore.data.items.filter(i => /Tea exports|Rupee steady/.test(i.title)).map(i => i.id);
+      F.setRead([ids[0]], true); await new Promise(r => setTimeout(r, 20)); F.setRead([ids[1]], true);
+      const w = global.__ferna.windows[0];
+      for (const t of [...w.tabs]) if (/^ferna:\/\/feeds\//.test(t.url || '')) w.closeTab(t);
+      w.newTab('ferna://feeds/?defaults');
+    }, lh());
+    await H.sleep(600);
+    const p = await page('ferna://feeds/?defaults');
+    await H.until(() => p.evaluate(() => document.querySelectorAll('.fc').length > 5), 6000, 'cards');
+    const d = await p.evaluate(() => ({ sort: document.querySelector('#sort .on').dataset.sort, unread: document.querySelector('#unread').checked, tea: [...document.querySelectorAll('.fc h3')].some(h => /Tea exports/.test(h.textContent)), anyRead: document.querySelectorAll('.fc.read').length }));
+    assert(d.sort === 'new' && d.unread && !d.tea && d.anyRead === 0, JSON.stringify(d));
+    // History: the read ones, latest read first
+    await p.evaluate(() => document.querySelector('#b-history').click());
+    await H.until(() => p.evaluate(() => document.body.classList.contains('history') && document.querySelectorAll('.fc').length === 2), 4000, 'history list');
+    const h = await p.evaluate(() => ({ titles: [...document.querySelectorAll('.fc h3')].map(x => x.textContent.trim()), banner: document.querySelector('#scope').textContent, readAt: !!document.querySelector('.fc .rdat') }));
+    assert(/Rupee/.test(h.titles[0]) && /Tea/.test(h.titles[1]) && /Reading history/.test(h.banner) && h.readAt, JSON.stringify(h));
+    await shot('v083-05-feeds-history');
+    await p.evaluate(() => document.querySelector('[data-scope="unhistory"]').click());
+    await H.until(() => p.evaluate(() => !document.body.classList.contains('history')), 3000, 'back');
+    // The choice is remembered
+    await p.evaluate(() => document.querySelector('#sort [data-sort="smart"]').click());
+    await H.until(() => main(() => global.__ferna.feeds.prefs().settings.listSort === 'smart'), 3000, 'sort saved');
+    await main(() => global.__ferna.feeds.setPrefs({ listSort: 'new' }));
+    // Digest: A+ and zoom in, kept for next time
+    await p.evaluate(() => document.querySelector('#b-digest').click());
+    await H.until(() => p.evaluate(() => !!document.querySelector('#digest .dz')), 6000, 'digest');
+    await p.evaluate(() => { for (let i = 0; i < 3; i++) document.querySelector('[data-dz="font+"]').click(); for (let i = 0; i < 2; i++) document.querySelector('[data-dz="zoom+"]').click(); });
+    const z = await p.evaluate(() => ({ fs: getComputedStyle(document.querySelector('#digest .dg')).fontSize, zoom: document.querySelector('#digest .dg-body').style.zoom, shown: document.querySelector('#dz-zoom').textContent }));
+    assert(z.fs === '20px' && Number(z.zoom) === 1.2 && z.shown === '120%', JSON.stringify(z));
+    await shot('v083-06-digest-zoom');
+    await H.until(() => main(() => { const s = global.__ferna.feeds.prefs().settings; return s.digestFont === 20 && s.digestZoom === 120; }), 3000, 'digest size saved');
+    await p.evaluate(() => document.querySelector('[data-dz="reset"]').click());
+    await main(async () => { const F = global.__ferna.feeds; await new Promise(r => setTimeout(r, 400)); F.unsubscribe(F.store.data.feeds.map(f => f.id)); });
   });
 };

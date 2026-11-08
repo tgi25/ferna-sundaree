@@ -73,7 +73,7 @@ const DEFAULT_SETTINGS = {
   httpsFirst: true, httpsExceptions: [], dohMode: 'automatic', dohProvider: 'cloudflare',
   blocker: true, blockerAllow: [], permissions: {}, shortcuts: {},
   pdfDefault: true, bookmarkFolder: '',
-  zoomPrefs: {}, zoomSites: {}, hideToolbarWithTabs: false,
+  zoomPrefs: {}, zoomSites: {}, hideToolbarWithTabs: false, hideBars: 'both',
   wsShowNames: false, stripFavoritesOnly: false,
   safeBrowsing: true, customFilters: '', filterLists: [],
   autoUpdate: true,
@@ -1008,12 +1008,36 @@ function registerCommands() {
   C('menu:app', [], ['ui'], c => { const w = senderWindow(c); require('./menus').appMenu(w).popup({ window: w.win }); });
   C('menu:split', [], ['ui'], c => { const w = senderWindow(c); const m = require('./menus').splitMenu(w); if (m) m.popup({ window: w.win }); });
   C('menu:shield', [], ['ui'], c => { const w = senderWindow(c); require('./menus').shieldMenu(w, w.active).popup({ window: w.win }); });
+  // Every address-bar action in one menu: used by the tab bar and the Ferna Tabs list while the
+  // address bar is hidden with Ctrl+Shift+H.
+  C('menu:page-actions', [], ['ui', 'overlay'], c => { const w = senderWindow(c); if (c.host === 'overlay') w.closeOverlay(); setTimeout(() => require('./menus').pageActionsMenu(w).popup({ window: w.win }), c.host === 'overlay' ? 60 : 0); });
+  C('page:act', ['string', 'string?'], ['ui', 'overlay'], (c, what, text) => {
+    const w = senderWindow(c);
+    const t = w.active;
+    const wc = t && t.view && !t.view.webContents.isDestroyed() ? t.view.webContents : null;
+    switch (what) {
+      case 'back': if (wc && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); break;
+      case 'forward': if (wc && wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward(); break;
+      case 'reload': if (wc) { if (t.loading) wc.stop(); else wc.reload(); } break;
+      case 'bookmark': w.run('bookmark'); break;
+      case 'copy': if (t) { const u = require('./workspaces').pageUrlOf(t.url); if (/^(https?|file|ferna):/i.test(u)) { require('electron').clipboard.writeText(u); w.sendUi('toast', { text: 'Address copied' }); } } break;
+      case 'go': {
+        const url = typeof text === 'string' ? policy.normalizeInput(text.trim().slice(0, 4000), ctx.settings.data.searchEngine) : '';
+        if (!url) return false;
+        if (c.host === 'overlay') w.closeOverlay();
+        if (t) w.navigate(t, url); else w.newTab(url);
+        break;
+      }
+      default: return false;
+    }
+    return true;
+  });
   C('ui:reveal', ['string', 'bool'], ['ui'], (c, what, on) => {
     const w = senderWindow(c);
     if (what !== 'tabs' && what !== 'toolbar') return;
-    const linked = ctx.settings.data.tabBarHidden && (ctx.settings.data.tabPosition !== 'top' || ctx.settings.data.hideToolbarWithTabs);
-    if ((w.focus || linked) && on) w.reveal = { tabs: true, toolbar: true };
-    else if (linked && !on) w.reveal = { tabs: false, toolbar: false };
+    // Bars hidden with Ctrl+Shift+H stay hidden; only focus mode shows them at the window edge.
+    if (!w.focus) { if (w.reveal.tabs || w.reveal.toolbar) { w.reveal = { tabs: false, toolbar: false }; w.relayout(); } return; }
+    if (on) w.reveal = { tabs: true, toolbar: true };
     else w.reveal[what] = on;
     if (!on && w.focus) w.reveal = { tabs: false, toolbar: false };
     w.relayout();
@@ -1144,7 +1168,7 @@ function registerCommands() {
     historyDays: v => Number.isInteger(v) && v >= 1 && v <= 3650,
     pdfDefault: v => typeof v === 'boolean',
     bookmarkFolder: v => typeof v === 'string' && v.length <= 80,
-    hideToolbarWithTabs: v => typeof v === 'boolean',
+    hideToolbarWithTabs: v => typeof v === 'boolean', hideBars: v => ['both', 'tabs', 'toolbar'].includes(v),
     wsShowNames: v => typeof v === 'boolean',
     stripFavoritesOnly: v => typeof v === 'boolean',
     selectionMenu: v => typeof v === 'boolean', popupBlocker: v => typeof v === 'boolean',

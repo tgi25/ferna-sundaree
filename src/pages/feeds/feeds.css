@@ -194,3 +194,23 @@ body.panel .fl .acts-r [data-view], body.panel .fl .acts-r [data-rename] { displ
 .confirm { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 8px; border-radius: 8px; background: rgba(220, 38, 38, .08); border: 1px solid rgba(220, 38, 38, .35); font-size: 12.5px; white-space: normal; text-align: left; }
 #m-confirm .confirm { margin: 0 0 8px; }
 .bulk select.field { width: auto; }
+/* ---------- 0.8.3: reading history, digest text size and zoom ---------- */
+#b-history.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+body.history #sort, body.history label.chk:has(#unread) { opacity: .45; pointer-events: none; }
+#scope > .icon { width: 15px; height: 15px; color: var(--accent); }
+.fc .meta .rdat { color: var(--accent); }
+.empty .btn { margin-left: 8px; }
+.dg { font-size: var(--dfs, 17px); }
+.dg h1 { font-size: 1.6em; }
+.dg h2 { font-size: 1em !important; }
+.dg .by { font-size: .75em !important; }
+.dg .take { font-size: .85em !important; }
+.dg li a { font-size: 1em; }
+.dg li .s { font-size: .8em !important; }
+.dg li .m { font-size: .7em !important; }
+.dg .dz { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; margin-right: 8px; }
+.dg .dz .btn { min-width: 30px; padding: 0 8px; }
+.dg .dzv { min-width: 40px; text-align: center; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.dg .dz .sep { width: 1px; height: 18px; background: var(--line-strong); margin: 0 4px; }
+.dg .rd-top { font-size: 13px; }
+body.panel .dg .dz .dzv { display: none; }

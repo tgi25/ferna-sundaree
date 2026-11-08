@@ -189,3 +189,16 @@ html, body { background: transparent !important; height: 100%; overflow: hidden;
 #eq-presets .user { border-style: dashed; }
 .eq-save { display: flex; gap: 6px; margin: 8px 0 2px; }
 .eq-save input { flex: 1; padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--bg); }
+
+/* Page controls at the top of the Ferna Tabs list (address bar hidden with Ctrl+Shift+H) */
+.pop-page { display: flex; align-items: center; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--line); background: var(--bg-sunken, rgba(127, 127, 127, .06)); }
+.pop-page .pp { width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-2); display: grid; place-items: center; cursor: pointer; padding: 0; flex: none; }
+.pop-page .pp .icon { width: 15px; height: 15px; }
+.pop-page .pp:hover:not(:disabled) { background: var(--bg-hover); color: var(--ink); }
+.pop-page .pp:disabled { opacity: .35; cursor: default; }
+.pop-page .pp.on { color: var(--accent); }
+.pop-page .pp.on .icon { fill: currentColor; }
+.pop-page .pp-url { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--ink-2); font: inherit; font-size: 12px; cursor: text; }
+.pop-page .pp-url span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pop-page .pp-url .icon { width: 12px; height: 12px; flex: none; }
+.pop-page .pp-url:hover { border-color: var(--accent); color: var(--ink); }

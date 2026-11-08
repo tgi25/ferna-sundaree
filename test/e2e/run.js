@@ -74,14 +74,15 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
   await step('req 1: Ctrl+Shift+H hides and shows the tab bar', async () => {
     await main(() => global.__ferna.windows[0].run('toggleTabBar'));
     let s = await win();
-    assert(!s.layout.showTabs && s.layout.edgeTabs, 'tab bar should be hidden with a reveal edge');
-    assert(s.layout.content.y === 5 + 44 + 30, `content y ${s.layout.content.y}`);
-    await shot('03-tabbar-hidden');
-    // the reveal edge brings it back temporarily
-    await main(() => { const w = global.__ferna.windows[0]; w.reveal.tabs = true; w.relayout(); });
-    s = await win();
-    assert(s.layout.showTabs, 'reveal should show the strip');
-    await main(() => { const w = global.__ferna.windows[0]; w.reveal.tabs = false; w.run('toggleTabBar'); });
+    try {
+      // 0.8.3: both bars by default, and no reveal edge (they stay hidden until the key)
+      assert(!s.layout.showTabs && !s.layout.showToolbar && !s.layout.edgeTabs, 'bars should be hidden, without a reveal edge');
+      assert(s.layout.content.y === 30, `content y ${s.layout.content.y}`);
+      await shot('03-tabbar-hidden');
+      await main(() => { const w = global.__ferna.windows[0]; w.reveal.tabs = true; w.relayout(); });
+      s = await win();
+      assert(!s.layout.showTabs, 'an edge reveal does not show the strip');
+    } finally { await main(() => { const w = global.__ferna.windows[0]; w.reveal.tabs = false; w.run('toggleTabBar'); }); }
     s = await win();
     assert(s.layout.showTabs && !s.layout.edgeTabs, 'tab bar should be back');
   });
@@ -406,7 +407,7 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
     await shot('20-vertical-one-bar');
     await main(() => global.__ferna.windows[0].run('toggleTabBar'));
     s = await win();
-    assert(!s.layout.toolbar && !s.layout.tabs && s.layout.edgeToolbar, 'vertical: toolbar with controls hides together with tabs');
+    assert(!s.layout.toolbar && !s.layout.tabs && !s.layout.edgeToolbar, 'vertical: both bars hide, no edge');
     await shot('21-vertical-hidden');
     await main(() => { global.__ferna.windows[0].run('toggleTabBar'); global.__ferna.setSetting('tabPosition', 'top'); });
     const isMax0 = await main(() => global.__ferna.windows[0].win.isMaximized());
