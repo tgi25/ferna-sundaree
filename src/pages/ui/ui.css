@@ -284,3 +284,10 @@ body.exam #btn-check { display: none !important; }
 #tabs.v.collapsed .v-ctlrow { flex-direction: column; height: auto; }
 #tabs.v.collapsed .v-ctlrow .winctl { flex-direction: column; }
 #tabs.v.collapsed .v-ctlrow .winctl button { width: 100%; height: 28px; }
+
+/* Extension buttons pinned to Ferna Tabs (in its address strip while the address bar is hidden) */
+.pagebar .pb-ext { display: inline-flex; align-items: center; gap: 1px; margin: 0 2px; padding: 0 2px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+#tabs.v .pagebar .pb-ext { flex-wrap: wrap; border: 0; margin: 0; padding: 0; }
+.pagebar .pbx { position: relative; }
+.pagebar .pbx img { width: 16px; height: 16px; object-fit: contain; }
+.pagebar .pbx .xb { position: absolute; right: -1px; bottom: 0; max-width: 26px; overflow: hidden; height: 12px; padding: 0 2px; border-radius: 4px; font-size: 8.5px; line-height: 12px; font-weight: 700; color: #fff; background: #d32f2f; white-space: nowrap; }

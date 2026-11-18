@@ -27,7 +27,7 @@ async function load() {
         ${x.warnings.length ? `<details><summary>Permissions (${x.warnings.length})</summary><ul>${x.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></details>` : '<div class="meta">No special permissions</div>'}
         ${x.error ? `<div class="err">Could not load: ${esc(x.error)}</div>` : ''}
         <div class="acts">
-          ${x.hasAction ? `<label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" data-a="pin" ${x.pinned ? 'checked' : ''}>Show in toolbar</label>` : ''}
+          ${x.hasAction ? `<label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" data-a="pin" ${x.pinned ? 'checked' : ''}>Show in toolbar</label><label style="display:flex;gap:6px;align-items:center;font-size:12px" title="In the address strip inside Ferna Tabs and the tabs list at the pointer, so it stays at hand while Ctrl+Shift+H hides the bars"><input type="checkbox" data-a="tabspin" ${x.tabsPinned ? 'checked' : ''}>Show in Ferna Tabs</label>` : ''}
           <span class="grow"></span>
           ${x.optionsUrl && x.enabled ? '<button class="btn small" data-a="options">Options</button>' : ''}
           ${x.source === 'store' ? '<button class="btn small" data-a="page">Store page</button>' : ''}
@@ -49,6 +49,7 @@ document.addEventListener('change', async e => {
   const id = e.target.closest('[data-id]').dataset.id;
   if (a === 'enable') await api.cmd('ext:enable', id, e.target.checked).catch(err => alert(err.message));
   if (a === 'pin') await api.cmd('ext:pin', id, e.target.checked);
+  if (a === 'tabspin') await api.cmd('ext:tabsPin', id, e.target.checked);
   load();
 });
 document.addEventListener('click', async e => {

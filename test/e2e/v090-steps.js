@@ -335,6 +335,59 @@ module.exports = async function v090({ step, assert, main, win, page, H, base, s
     await main(() => global.__ferna.windows[0].run('zoomReset'));
   });
 
+  await step('0.9.1 extension buttons pinned to Ferna Tabs: in its address strip and the tabs list while the bars are hidden; popup opens; menu pins and unpins', async () => {
+    const id = ids['ferna-zoom'];
+    const popupUrl = () => main(electron => electron.BrowserWindow.getAllWindows().map(w => w.webContents.getURL()).find(u => /^chrome-extension:\/\/.*popup\.html/.test(u)) || null);
+    const closePopups = () => main(electron => { for (const w of electron.BrowserWindow.getAllWindows()) if (/^chrome-extension:\/\/.*popup\.html/.test(w.webContents.getURL())) w.close(); });
+    await main((_, i) => { const e = global.__ferna.ext; e.setPinned(i, false); e.setTabsPinned(i, true); }, id);
+    await main(() => { const c = global.__ferna; c.windows[0].switchWorkspace(null); c.setSetting('tabPosition', 'top'); c.setSetting('tabBarHidden', false); c.setSetting('hideBars', 'toolbar'); });
+    await freshTab(`${base}/article.html?xt`);
+    // Only the address bar hidden: the button is in Ferna Tabs' address strip (and not in the toolbar)
+    await main(() => global.__ferna.windows[0].run('toggleTabBar'));
+    const u = await ui();
+    await H.until(() => u.evaluate(i => !!document.querySelector(`#tabs .pagebar .pb-ext [data-pbx="${i}"] img`), id), 5000, 'button in the Ferna Tabs strip');
+    assert(!(await u.evaluate(i => !!document.querySelector(`#ext-actions [data-ext="${i}"]`), id)), 'not pinned to the toolbar');
+    await shot('v091-01-ext-in-ferna-tabs');
+    await u.evaluate(i => document.querySelector(`#tabs .pagebar [data-pbx="${i}"]`).click(), id);
+    await H.until(popupUrl, 5000, 'popup from the strip');
+    await closePopups();
+    // Both bars hidden: the tabs list at the pointer has the extensions row
+    await main(() => global.__ferna.setSetting('hideBars', 'both'));
+    await H.sleep(300);
+    const L = (await main(() => global.__ferna.windows[0].layoutState()));
+    assert(!L.showTabs && !L.showToolbar, JSON.stringify(L));
+    await main(() => { const w = global.__ferna.windows[0]; if (w.overlayMode) w.closeOverlay(); w.run('tabsAtPointer'); });
+    const ov = await page('ferna://overlay/');
+    await H.until(() => ov.evaluate(i => { const b = document.querySelector(`#pt-ext [data-px="${i}"] img`); return !!b && !document.querySelector('#pt-ext').hidden; }, id), 5000, 'extensions row in the tabs list');
+    await shot('v091-02-ext-in-tabs-list');
+    await ov.evaluate(i => document.querySelector(`#pt-ext [data-px="${i}"]`).click(), id);
+    await H.until(async () => (await main(() => global.__ferna.windows[0].overlayMode)) === null && !!(await popupUrl()), 5000, 'list closed, popup opened');
+    await closePopups();
+    // Right-click menu: both pins, the extension's options, move when there are several
+    const labels = await main(({ Menu }, i) => {
+      const c = global.__ferna, w = c.windows[0];
+      const orig = Menu.prototype.popup;
+      let got = null;
+      Menu.prototype.popup = function () { got = this.items.map(x => ({ l: x.label, c: x.checked, e: x.enabled })); };
+      try { c.ext.contextMenu(w, i, { x: 10, y: 10, width: 20, height: 20, place: 'tabs' }); } finally { Menu.prototype.popup = orig; }
+      return got;
+    }, id).catch(e => String(e));
+    assert(Array.isArray(labels), `menu: ${labels}`);
+    const it = l => labels.find(x => x.l === l);
+    assert(it('Pin to Ferna Tabs') && it('Pin to Ferna Tabs').c === true && it('Pin to the toolbar') && it('Pin to the toolbar').c === false && it('Options'), JSON.stringify(labels));
+    // The list's own settings can hide the row
+    await main(() => { const c = global.__ferna; c.setSetting('tabsList', { ...(c.settings.data.tabsList || {}), extensions: false }); c.windows[0].closeOverlay(); c.windows[0].run('tabsAtPointer'); });
+    const ov2 = await page('ferna://overlay/');
+    await H.until(() => ov2.evaluate(() => !!document.querySelector('#pop')), 4000, 'list');
+    assert(!(await ov2.evaluate(() => !!document.querySelector('#pt-ext'))), 'row hidden by the setting');
+    // Unpinned: gone from Ferna Tabs, back to the toolbar
+    await main((_, i) => { const c = global.__ferna; c.setSetting('tabsList', { ...(c.settings.data.tabsList || {}), extensions: true }); c.windows[0].closeOverlay(); c.ext.setTabsPinned(i, false); c.ext.setPinned(i, true); c.setSetting('hideBars', 'toolbar'); }, id);
+    await H.until(() => u.evaluate(i => !document.querySelector(`#tabs [data-pbx="${i}"]`), id), 4000, 'unpinned from the strip');
+    await main(() => global.__ferna.windows[0].run('toggleTabBar'));
+    await H.until(async () => { const L2 = await main(() => global.__ferna.windows[0].layoutState()); return L2.showTabs && L2.showToolbar; }, 3000, 'bars back');
+    await H.until(() => u.evaluate(i => !!document.querySelector(`#ext-actions [data-ext="${i}"]`), id), 4000, 'back in the toolbar');
+  });
+
   await step('0.9 Ferna Equalizer extension: Alt+Shift+Q turns it on (keyboard shortcut of an extension), badge shows it', async () => {
     await freshTab(`${base}/video.html?eq`);
     await main(() => { const wc = global.__ferna.windows[0].active.view.webContents; wc.focus(); for (const type of ['keyDown', 'keyUp']) wc.sendInputEvent({ type, keyCode: 'Q', modifiers: ['alt', 'shift'] }); });

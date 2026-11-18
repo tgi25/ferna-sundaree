@@ -1129,9 +1129,15 @@ function registerCommands() {
     else if (what === 'fullscreen-exit') w.win.setFullScreen(false);
     return w.win.isMaximized();
   });
-  C('ext:toolbar', [], ['ui'], c => ctx.ext ? ctx.ext.toolbarState(senderWindow(c)) : { ready: false, actions: [] });
-  C('ext:click', ['string', 'object'], ['ui'], (c, id, rect) => ctx.ext && ctx.ext.click(senderWindow(c), id, rect));
-  C('ext:actionMenu', ['string', 'object'], ['ui'], (c, id, rect) => ctx.ext && ctx.ext.contextMenu(senderWindow(c), id, rect));
+  C('ext:toolbar', [], ['ui', 'overlay'], c => ctx.ext ? ctx.ext.toolbarState(senderWindow(c)) : { ready: false, actions: [], tabsActions: [] });
+  // Extension buttons: in the toolbar, in Ferna Tabs, or in the tabs list at the pointer (which
+  // closes first; the popup opens where the button was).
+  const extRect = r => (r && [r.x, r.y, r.width, r.height].every(Number.isFinite) ? { x: r.x, y: r.y, width: r.width, height: r.height } : { x: 0, y: 0, width: 0, height: 0 });
+  const fromList = (c, f) => { const w = senderWindow(c); if (c.host === 'overlay') { w.closeOverlay(); setTimeout(() => f(w), 60); } else f(w); return true; };
+  C('ext:click', ['string', 'object'], ['ui', 'overlay'], (c, id, rect) => ctx.ext && fromList(c, w => ctx.ext.click(w, id, extRect(rect))));
+  C('ext:actionMenu', ['string', 'object'], ['ui', 'overlay'], (c, id, rect) => ctx.ext && ctx.ext.contextMenu(senderWindow(c), id, { ...extRect(rect), place: rect && rect.place === 'tabs' ? 'tabs' : 'toolbar' }));
+  C('ext:tabsPin', ['string', 'bool'], ['ui', 'overlay', 'extensions'], (c, id, on) => { if (ctx.ext) ctx.ext.setTabsPinned(id, on); return true; });
+  C('ext:tabsMove', ['string', 'string?'], ['ui', 'overlay'], (c, id, before) => { if (ctx.ext) ctx.ext.moveTabsPinned(id, before || null); return true; });
   C('ext:puzzle', [], ['ui'], c => ctx.ext && ctx.ext.puzzleMenu(senderWindow(c)));
   C('zoom:panel', ['object?'], ['ui'], (c, rect) => senderWindow(c).openZoomPanel(rect || undefined));
   C('zoom:act', ['string', 'num?'], ['ui', 'overlay'], async (c, action, value) => {

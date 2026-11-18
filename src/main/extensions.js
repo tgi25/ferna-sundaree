@@ -8,7 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { dialog, nativeImage, Menu } = require('electron');
+const { dialog, nativeImage, Menu, MenuItem } = require('electron');
 const crx = require('./crx');
 const { themeFromManifest } = require('./themes');
 const { JsonStore } = require('./store');
@@ -29,7 +29,7 @@ class ExtensionManager {
     this.storeDir = path.join(dataDir, 'Extensions');
     this.unpackedDir = path.join(dataDir, 'Extensions-unpacked');
     this.themesDir = path.join(dataDir, 'Themes');
-    this.reg = new JsonStore(path.join(dataDir, 'extensions.json'), { disabled: [], pinned: [], unpacked: [], theme: null, known: {} });
+    this.reg = new JsonStore(path.join(dataDir, 'extensions.json'), { disabled: [], pinned: [], tabsPinned: [], unpacked: [], theme: null, known: {} });
     this.lib = null;
     this.ready = false;
     this.iconCache = new Map();
@@ -363,6 +363,7 @@ class ExtensionManager {
     delete this.reg.data.known[id];
     this.reg.data.disabled = this.reg.data.disabled.filter(x => x !== id);
     this.reg.data.pinned = this.reg.data.pinned.filter(x => x !== id);
+    this.reg.data.tabsPinned = (this.reg.data.tabsPinned || []).filter(x => x !== id);
     // A later reinstall starts fresh (pinned to the toolbar again, like a first install).
     this.reg.data.everPinned = (this.reg.data.everPinned || []).filter(x => x !== id);
     this.reg.save();
@@ -392,6 +393,27 @@ class ExtensionManager {
     const p = this.reg.data.pinned.filter(x => x !== id);
     if (on) p.push(id);
     this.reg.data.pinned = p;
+    this.reg.save();
+    this.scheduleToolbar();
+  }
+
+  /** Extensions pinned to Ferna Tabs' action area (the address strip inside Ferna Tabs and the
+   *  tabs list at the pointer), so they stay at hand while Ctrl+Shift+H hides the bars. */
+  tabsPinnedList() { return Array.isArray(this.reg.data.tabsPinned) ? this.reg.data.tabsPinned : (this.reg.data.tabsPinned = []); }
+  setTabsPinned(id, on) {
+    const p = this.tabsPinnedList().filter(x => x !== id);
+    if (on) p.push(id);
+    this.reg.data.tabsPinned = p;
+    this.reg.save();
+    this.scheduleToolbar();
+  }
+  /** Move a Ferna Tabs button before another one (or to the end). */
+  moveTabsPinned(id, beforeId) {
+    const p = this.tabsPinnedList().filter(x => x !== id);
+    if (p.length === this.tabsPinnedList().length) return;
+    const i = beforeId ? p.indexOf(beforeId) : -1;
+    p.splice(i < 0 ? p.length : i, 0, id);
+    this.reg.data.tabsPinned = p;
     this.reg.save();
     this.scheduleToolbar();
   }
@@ -427,7 +449,7 @@ class ExtensionManager {
         name: crx.localized(dir, manifest, manifest.name), version: manifest.version,
         description: crx.localized(dir, manifest, manifest.description || ''),
         icon: await this.iconDataUrl({ manifest, path: dir }),
-        warnings: crx.permissionWarnings(manifest), pinned: this.reg.data.pinned.includes(id),
+        warnings: crx.permissionWarnings(manifest), pinned: this.reg.data.pinned.includes(id), tabsPinned: this.tabsPinnedList().includes(id),
         hasAction: !!(manifest.action || manifest.browser_action), optionsUrl: opt ? `chrome-extension://${id}/${opt.replace(/^\//, '')}` : null,
         mv: manifest.manifest_version, error: this.errors[id] || null,
         allSites: crx.permissionWarnings(manifest).some(w => /all your data on all websites/.test(w)),
@@ -466,11 +488,12 @@ class ExtensionManager {
     const tabId = t && t.view && t.kind === 'web' && (t.view.webContents && !(!t.view.webContents || t.view.webContents.isDestroyed())) ? t.view.webContents?.id : null;
     const map = this.lib.api.browserAction.actionMap;
     const pinned = this.reg.data.pinned;
+    const tabsPinned = this.tabsPinnedList();
     const loaded = this.api.getAllExtensions();
     const actions = [];
     for (const ext of loaded) {
       const a = map.get(ext.id);
-      if (!a || !pinned.includes(ext.id)) continue;
+      if (!a || (!pinned.includes(ext.id) && !tabsPinned.includes(ext.id))) continue;
       const tabA = (tabId && a.tabs[tabId]) || {};
       const pick = k => (tabA[k] !== undefined ? tabA[k] : a[k]);
       const color = pick('color');
@@ -478,15 +501,21 @@ class ExtensionManager {
         id: ext.id, title: pick('title') || ext.name, text: pick('text') || '',
         color: Array.isArray(color) ? `rgba(${color.slice(0, 3).join(',')},${(color[3] ?? 255) / 255})` : (typeof color === 'string' ? color : ''),
         icon: await this.iconFor(ext.id, tabId, a), order: pinned.indexOf(ext.id),
+        toolbar: pinned.includes(ext.id), tabs: tabsPinned.includes(ext.id), tabsOrder: tabsPinned.indexOf(ext.id),
       });
     }
     actions.sort((x, y) => x.order - y.order);
-    return { ready: true, actions, all: loaded.length, tabId };
+    // The toolbar shows its own pins; Ferna Tabs shows `tabsActions`, in its own order.
+    const tabsActions = actions.filter(x => x.tabs).sort((x, y) => x.tabsOrder - y.tabsOrder);
+    return { ready: true, actions: actions.filter(x => x.toolbar), tabsActions, all: loaded.length, tabId };
   }
 
   async pushToolbar(win) {
     if (win.win.isDestroyed() || win.ui.webContents.isDestroyed()) return;
-    win.ui.webContents.send('extensions', await this.toolbarState(win));
+    const st = await this.toolbarState(win);
+    win.ui.webContents.send('extensions', st);
+    // The tabs list at the pointer shows the Ferna Tabs buttons too.
+    if (win.overlayMode === 'pointer' && win.overlay && !win.overlay.webContents.isDestroyed()) win.overlay.webContents.send('extensions', st);
   }
 
   click(win, id, rect) {
@@ -498,23 +527,50 @@ class ExtensionManager {
     this.lib.api.browserAction.activateClick({ eventType: 'click', extensionId: id, tabId, anchorRect: rect, alignment: 'bottom left' });
   }
 
+  /** Right-click on an extension button (toolbar or Ferna Tabs): the extension's own menu items,
+   *  Options, and where its button is shown. */
   contextMenu(win, id, rect) {
-    const items = [];
-    try {
-      this.lib.api.browserAction.activateContextMenu({ extensionId: id, anchorRect: rect });
-      return;
-    } catch { /* fall through to our own menu */ }
-    items.push({ label: 'Manage extension', click: () => win.openInternal('ferna://extensions/') });
-    Menu.buildFromTemplate(items).popup({ window: win.win });
+    const ext = this.api.getExtension(id);
+    const menu = new Menu();
+    const add = o => menu.append(new MenuItem(o));
+    if (ext) {
+      const m = ext.manifest || {};
+      add({ label: ext.name, click: () => win.newTab(m.homepage_url || `https://chromewebstore.google.com/detail/${id}`) });
+      add({ type: 'separator' });
+      let own = [];
+      try { own = this.lib.ctx.store.buildMenuItems(id, 'browser_action') || []; } catch { /* none */ }
+      if (own.length) { own.forEach(i => menu.append(i)); add({ type: 'separator' }); }
+      const opt = m.options_page || (m.options_ui && m.options_ui.page);
+      add({ label: 'Options', enabled: !!opt, click: () => opt && win.newTab(`chrome-extension://${id}/${String(opt).replace(/^\//, '')}`) });
+      add({ type: 'separator' });
+    }
+    const onBar = this.reg.data.pinned.includes(id), onTabs = this.tabsPinnedList().includes(id);
+    add({ label: 'Pin to the toolbar', type: 'checkbox', checked: onBar, click: () => this.setPinned(id, !onBar) });
+    add({ label: 'Pin to Ferna Tabs', sublabel: 'Stays at hand while the bars are hidden (Ctrl+Shift+H)', type: 'checkbox', checked: onTabs, click: () => this.setTabsPinned(id, !onTabs) });
+    // Order of the Ferna Tabs buttons, from their own menu.
+    const list = this.tabsPinnedList(), at = list.indexOf(id);
+    if (onTabs && rect && rect.place === 'tabs' && list.length > 1) {
+      add({ label: 'Move left', enabled: at > 0, click: () => this.moveTabsPinned(id, list[at - 1]) });
+      add({ label: 'Move right', enabled: at < list.length - 1, click: () => this.moveTabsPinned(id, list[at + 2] || null) });
+    }
+    add({ type: 'separator' });
+    add({ label: 'Manage extension', click: () => win.openInternal('ferna://extensions/') });
+    const r = rect && Number.isFinite(rect.x) ? rect : null;
+    menu.popup(r ? { window: win.win, x: Math.floor(r.x), y: Math.floor(r.y + (r.height || 0)) } : { window: win.win });
   }
 
   /** Puzzle-button menu: every loaded extension with pin toggles. */
   puzzleMenu(win) {
     const loaded = this.api.getAllExtensions().sort((a, b) => a.name.localeCompare(b.name));
-    const items = loaded.length ? loaded.map(e => ({
-      label: e.name, type: 'checkbox', checked: this.reg.data.pinned.includes(e.id),
-      sublabel: 'Show in toolbar', click: () => this.setPinned(e.id, !this.reg.data.pinned.includes(e.id)),
-    })) : [{ label: 'No extensions installed', enabled: false }];
+    // Each extension can be pinned to the toolbar, to Ferna Tabs (shown while the bars are
+    // hidden), or both.
+    const items = loaded.length ? [
+      { label: 'Pin to the toolbar', enabled: false },
+      ...loaded.map(e => ({ label: e.name, type: 'checkbox', checked: this.reg.data.pinned.includes(e.id), click: () => this.setPinned(e.id, !this.reg.data.pinned.includes(e.id)) })),
+      { type: 'separator' },
+      { label: 'Pin to Ferna Tabs (stays at hand while the bars are hidden)', enabled: false },
+      ...loaded.map(e => ({ label: e.name, type: 'checkbox', checked: this.tabsPinnedList().includes(e.id), click: () => this.setTabsPinned(e.id, !this.tabsPinnedList().includes(e.id)) })),
+    ] : [{ label: 'No extensions installed', enabled: false }];
     items.push(
       { type: 'separator' },
       { label: 'Manage extensions', click: () => win.openInternal('ferna://extensions/') },

@@ -87,4 +87,8 @@ test('Ferna Tabs 1.16: duplicates (query and #part ignored, the tab in use kept)
   assert.strictEqual(M.parkedLabel(new Date(2026, 10, 12, 10).getTime()), 'Parked 12 Nov');
   const c = M.cleanListSettings({ width: 5000, rows: 'huge', font: 'Comic Sans', fontSize: 15, icons: 20, pageRow: false, forgetDays: 3 });
   assert.deepStrictEqual([c.width, c.rows, c.font, c.fontSize, c.icons, c.pageRow, c.forgetDays], [900, 'normal', '', 15, 20, false, 3]);
+  // 0.9.1: the row of extensions pinned to Ferna Tabs, on unless turned off
+  assert.strictEqual(M.cleanListSettings({}).extensions, true);
+  assert.strictEqual(M.cleanListSettings({ extensions: false }).extensions, false);
+  assert.strictEqual(M.cleanListSettings({ extensions: 'no' }).extensions, true);
 });

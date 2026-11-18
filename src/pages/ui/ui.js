@@ -77,8 +77,14 @@ window.addEventListener('blur', () => document.body.classList.add('blur'));
 window.addEventListener('focus', () => document.body.classList.remove('blur'));
 
 // ---------- extension buttons ----------
+let extTabs = []; // extensions pinned to Ferna Tabs (shown in its address strip)
+let extTabsKey = '';
 function renderExt(st) {
   const box = $('#ext-actions');
+  // Ferna Tabs' own buttons: redraw the strip only when they changed.
+  const tabsList = st && st.ready ? st.tabsActions || [] : [];
+  const key = JSON.stringify(tabsList);
+  if (key !== extTabsKey) { extTabsKey = key; extTabs = tabsList; if (S) renderTabs(); }
   if (!st || !st.ready) { box.innerHTML = ''; return; }
   box.innerHTML = st.actions.map(a => `<button class="xa" data-ext="${esc(a.id)}" title="${esc(a.title)}">${a.icon ? `<img src="${esc(a.icon)}" alt="">` : icon('puzzle')}${a.text ? `<span class="xb" style="${a.color ? `background:${esc(a.color)}` : ''}">${esc(a.text)}</span>` : ''}</button>`).join('');
 }
@@ -555,6 +561,11 @@ function toolsHtml(cls) {
     return `<button class="${cls}${st.on ? ' on' : ''}${st.found ? ' found' : ''}${st.off ? ' off' : ''}" data-pb="${k}" title="${esc(st.title || title)}"${st.disabled ? ' disabled' : ''}>${icon(ic)}</button>`;
   }).join('');
 }
+/** Extension buttons pinned to Ferna Tabs (puzzle menu or right-click → Pin to Ferna Tabs). */
+function extTabsHtml() {
+  if (!extTabs.length) return '';
+  return `<span class="pb-ext" role="group" aria-label="Extensions">${extTabs.map(a => `<button class="pb pbx" data-pbx="${esc(a.id)}" title="${esc(a.title)}">${a.icon ? `<img src="${esc(a.icon)}" alt="">` : icon('puzzle')}${a.text ? `<span class="xb" style="${a.color ? `background:${esc(a.color)}` : ''}">${esc(a.text)}</span>` : ''}</button>`).join('')}</span>`;
+}
 function pagebarHtml(vertical, collapsed = false) {
   if (!pagebarOn()) return '';
   const n = S.nav;
@@ -572,7 +583,7 @@ function pagebarHtml(vertical, collapsed = false) {
     ${warn}
     <button class="pb${n.bookmarked ? ' on' : ''}" data-pb="bookmark" title="${n.bookmarked ? 'Remove bookmark' : 'Bookmark this page'} (Ctrl+D)">${icon('star')}</button>
     </div>
-    <div class="pb-tools">${toolsHtml('pb')}<button class="pb" data-pb="more" title="More: split view, picture in picture, passwords, downloads, the menu">${icon('menu')}</button></div>
+    <div class="pb-tools">${toolsHtml('pb')}${extTabsHtml()}<button class="pb" data-pb="more" title="More: split view, picture in picture, passwords, downloads, the menu">${icon('menu')}</button></div>
   </div>`;
 }
 // Editing: a field over the site name, kept outside the strip so redrawing never interrupts typing.
@@ -597,6 +608,20 @@ pbEdit.addEventListener('keydown', e => {
 });
 // Hidden when you click elsewhere (not when the window itself loses focus for a moment).
 pbEdit.addEventListener('blur', () => setTimeout(() => { if (document.hasFocus() && document.activeElement !== pbEdit) pbEdit.hidden = true; }, 150));
+// Extension buttons in Ferna Tabs: click runs the extension (its popup opens by the button),
+// right-click gives its menu (options, pin or unpin, move).
+el.tabs.addEventListener('click', e => {
+  const x = e.target.closest('[data-pbx]');
+  if (!x) return;
+  e.stopPropagation();
+  api.cmd('ext:click', x.dataset.pbx, rectOf(x));
+}, true);
+el.tabs.addEventListener('contextmenu', e => {
+  const x = e.target.closest('[data-pbx]');
+  if (!x) return;
+  e.preventDefault(); e.stopPropagation();
+  api.cmd('ext:actionMenu', x.dataset.pbx, { ...rectOf(x), place: 'tabs' });
+}, true);
 el.tabs.addEventListener('click', e => {
   const b = e.target.closest('[data-pb]');
   if (!b) return;

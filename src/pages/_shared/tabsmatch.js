@@ -100,7 +100,7 @@
   function parkedLabel(ts) { const d = new Date(ts); return `Parked ${d.getDate()} ${MONTHS[d.getMonth()]}`; }
 
   // Settings of the list itself (its size, rows, font …), with their limits.
-  const LIST_DEFAULTS = { width: 380, height: 520, rows: 'normal', font: '', fontSize: 13, icons: 16, position: 'pointer', pageRow: true, common: true, closed: true, offers: true, hints: true, forgetDays: 7 };
+  const LIST_DEFAULTS = { width: 380, height: 520, rows: 'normal', font: '', fontSize: 13, icons: 16, position: 'pointer', pageRow: true, extensions: true, common: true, closed: true, offers: true, hints: true, forgetDays: 7 };
   const FONTS = ['', 'Segoe UI', 'Arial', 'Verdana', 'Tahoma', 'Calibri', 'Georgia', 'Cambria', 'Consolas', 'Iskoola Pota', 'Noto Sans Sinhala', 'Nirmala UI'];
   function cleanListSettings(v) {
     const o = { ...LIST_DEFAULTS };
@@ -113,7 +113,7 @@
     o.fontSize = n(v.fontSize, 10, 22, o.fontSize);
     o.icons = [14, 16, 20, 24].includes(v.icons) ? v.icons : o.icons;
     o.position = ['pointer', 'center'].includes(v.position) ? v.position : o.position;
-    for (const k of ['pageRow', 'common', 'closed', 'offers', 'hints']) if (typeof v[k] === 'boolean') o[k] = v[k];
+    for (const k of ['pageRow', 'extensions', 'common', 'closed', 'offers', 'hints']) if (typeof v[k] === 'boolean') o[k] = v[k];
     o.forgetDays = [1, 3, 7, 14, 30].includes(v.forgetDays) ? v.forgetDays : o.forgetDays;
     return o;
   }

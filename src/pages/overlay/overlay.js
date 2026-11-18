@@ -239,6 +239,7 @@ function openPointer(d) {
   root.innerHTML = `<div class="backdrop clear" data-bg="1"></div>
     <div class="pop" id="pop" role="dialog" aria-label="Open tabs">
       ${tl.pageRow ? pageRowHtml(d) : ''}
+      ${tl.extensions ? '<div class="pop-ext" id="pt-ext" role="group" aria-label="Extensions pinned to Ferna Tabs" hidden></div>' : ''}
       <div class="pop-search">${icon('search')}<input id="pt-q" placeholder="Filter tabs and bookmarks, or type to search the web" aria-label="Filter tabs and bookmarks or search"><button class="pop-bm" id="pt-bm" title="Bookmarks (Alt+B)" aria-pressed="false">${icon('bookmarks')}</button><button class="pop-bm" id="pt-set" title="Settings of this list: size, rows, font" aria-pressed="false">${icon('settings')}</button></div>
       <div class="pop-ws" id="pt-ws"></div>
       <div class="pop-wsmenu" id="pt-wsmenu" role="menu" hidden></div>
@@ -274,8 +275,28 @@ function openPointer(d) {
     else api.cmd('page:act', a).then(() => { if (a === 'bookmark') b.classList.toggle('on'); });
   });
   wirePointerDrag();
+  wirePointerExt();
   if (d.editAddress) editPointerAddress();
 }
+
+// Extensions pinned to Ferna Tabs (puzzle menu, or right-click an extension → Pin to Ferna Tabs):
+// a row of their buttons, so they stay at hand while the toolbar and the tab bar are hidden.
+function drawPointerExt(st) {
+  const box = $('#pt-ext');
+  if (!box) return;
+  const list = st && st.ready ? st.tabsActions || [] : [];
+  box.hidden = !list.length;
+  box.innerHTML = '<span class="px-label">Extensions</span>' + list.map(a => `<button class="pp px" data-px="${esc(a.id)}" title="${esc(a.title)}">${a.icon ? `<img src="${esc(a.icon)}" alt="">` : icon('puzzle')}${a.text ? `<span class="xb" style="${a.color ? `background:${esc(a.color)}` : ''}">${esc(a.text)}</span>` : ''}</button>`).join('');
+}
+function wirePointerExt() {
+  const box = $('#pt-ext');
+  if (!box) return;
+  const rect = b => { const r = b.getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }; };
+  box.addEventListener('click', e => { const b = e.target.closest('[data-px]'); if (b) { e.stopPropagation(); api.cmd('ext:click', b.dataset.px, rect(b)); } });
+  box.addEventListener('contextmenu', e => { const b = e.target.closest('[data-px]'); if (b) { e.preventDefault(); e.stopPropagation(); api.cmd('ext:actionMenu', b.dataset.px, { ...rect(b), place: 'tabs' }); } });
+  api.cmd('ext:toolbar').then(drawPointerExt).catch(() => {});
+}
+api.on('extensions', st => { if (mode === 'pointer') drawPointerExt(st); });
 
 const FOOT_HINTS = '<span><kbd>Enter</kbd> switch · <kbd>Del</kbd> close · <kbd>Ctrl+Z</kbd> reopen · <kbd>Alt+P</kbd> park</span><span><kbd>Alt+S</kbd> pin · <kbd>Alt+Shift+S</kbd> common · <kbd>Alt+1…9</kbd> workspace</span>';
 function setFoot(html) { const f = $('#pt-foot'); if (f) f.innerHTML = html == null ? FOOT_HINTS : html; }
@@ -557,6 +578,7 @@ function drawPointerSettings() {
       <div class="ps-row"><span>Font size</span>${num('fontSize', 10, 22, 1, 'px')}</div>
       <div class="pop-label">Show</div>
       ${chk('pageRow', 'The page controls while the bars are hidden (Ctrl+Shift+H)')}
+      ${chk('extensions', 'Extensions pinned to Ferna Tabs')}
       ${chk('common', 'The common bar')}
       ${chk('closed', 'Recently closed tabs')}
       ${chk('offers', 'Offers to close duplicates and forgotten tabs')}
@@ -570,7 +592,7 @@ function drawPointerSettings() {
     if (!el) return;
     const k = el.dataset.ps;
     const v = el.type === 'checkbox' ? el.checked : (el.type === 'number' || el.dataset.num) ? Number(el.value) : el.value;
-    saveListPrefs({ ...listPrefs(data), [k]: v }, k === 'pageRow');
+    saveListPrefs({ ...listPrefs(data), [k]: v }, k === 'pageRow' || k === 'extensions');
   });
   box.addEventListener('click', e => {
     if (e.target.closest('[data-ps-reset]')) saveListPrefs({ ...TabsMatch.LIST_DEFAULTS }, true);
