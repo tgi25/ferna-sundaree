@@ -1,0 +1,11 @@
+/* Ferna Feeds (extension): what differs from the page inside Ferna Sundaree. */
+/* The browser decides the side panel's width (drag its edge). */
+.dsp label:has(> .lh #v-pw) { display: none; }
+#follow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 14px; background: #fff7ed; border-bottom: 1px solid #fed7aa; font-size: 13px; color: #9a3412; }
+#follow[hidden] { display: none; }
+#follow .ic { display: grid; color: #ea580c; }
+#follow .ic svg { width: 18px; height: 18px; }
+#follow .t { flex: 1; min-width: 120px; }
+#follow .btn.primary { background: #ea580c; border-color: #ea580c; color: #fff; }
+#follow .x { width: 24px; height: 24px; }
+@media (prefers-color-scheme: dark) { #follow { background: #431407; border-color: #7c2d12; color: #fed7aa; } }

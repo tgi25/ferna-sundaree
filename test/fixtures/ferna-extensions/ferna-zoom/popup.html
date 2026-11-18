@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ferna Zoom</title>
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header>
+  <img src="icons/icon48.png" alt="">
+  <div><h1>Ferna Zoom</h1><p class="muted" id="scope">&nbsp;</p></div>
+  <span class="grow"></span>
+  <div class="big" id="big" aria-live="polite"></div>
+</header>
+<main id="main">
+  <div class="cols">
+    <section class="font" id="font" title="Scroll here to change the minimum font size">
+      <div class="lbl">Minimum font</div>
+      <select id="min" aria-label="Minimum font size"></select>
+      <button class="btn small" data-z="fontReset" title="Back to the default minimum font size">Font reset</button>
+    </section>
+    <section class="zoom" id="zoom" title="Scroll here to zoom; Shift for small steps">
+      <div class="type" role="radiogroup" aria-label="Zoom type">
+        <button data-type="full" role="radio" title="Zoom everything, like the browser's zoom">Full</button>
+        <button data-type="text" role="radio" title="Zoom only the text; pictures and layout stay">Text</button>
+      </div>
+      <div class="row">
+        <button class="zbtn" data-z="out" title="Zoom out; Shift = small step">−</button>
+        <select id="level" aria-label="Zoom level"></select>
+        <button class="zbtn" data-z="in" title="Zoom in; Shift = small step">+</button>
+      </div>
+      <div class="row">
+        <button class="btn small" data-z="autofit" title="Fit the page width to the window">AutoFit</button>
+        <button class="btn small" data-z="reset" title="Default type and level. Ctrl+click: make the current zoom the default">Reset</button>
+      </div>
+    </section>
+  </div>
+  <p class="note" id="note" hidden></p>
+</main>
+<p class="off" id="off" hidden>Ferna Zoom works on web pages and local files. Browser pages and the Chrome Web Store cannot be changed by extensions.</p>
+<footer>
+  <span class="muted keys">Keys: <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> <kbd>T</kbd> <kbd>A</kbd></span>
+  <span class="grow"></span>
+  <a href="#" id="settings">Settings</a>
+</footer>
+<script type="module" src="popup.js"></script>
+</body>
+</html>

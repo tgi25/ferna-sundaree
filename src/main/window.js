@@ -1,7 +1,7 @@
 'use strict';
 // One browser window: a UI view (drawn behind everything), one sandboxed view per
 // tab (only the active one attached), and an overlay view for the Ferna Tabs list,
-// Tab Overview, command palette and screenshot region picker.
+// Tab Overview, command palette, screen-sharing picker and small prompts.
 
 const path = require('path');
 const { BaseWindow, WebContentsView, screen, dialog, nativeImage } = require('electron');
@@ -9,7 +9,6 @@ const { computeLayout } = require('./layout');
 const { buildStrip, workspaceOfTab, hostOf, folderOf, pageUrlOf } = require('./workspaces');
 const { registerInternal } = require('./ipc');
 const menus = require('./menus');
-const capture = require('./capture');
 
 const PRELOAD = path.join(__dirname, '..', 'preload', 'internal.js');
 let nextTabId = 1;
@@ -83,7 +82,7 @@ class FernaWindow {
 
     // Restore or open the first tab(s).
     if (opts.restore && opts.restore.tabs && opts.restore.tabs.length) {
-      opts.restore.tabs.forEach((t, i) => this.newTab(t.url, { activate: false, lazy: i !== opts.restore.active, wsOverride: t.wsOverride, title: t.title }));
+      opts.restore.tabs.forEach((t, i) => { const nt = this.newTab(t.url, { activate: false, lazy: i !== opts.restore.active, wsOverride: t.wsOverride, title: t.title }); if (nt && Number.isFinite(t.lastActive)) nt.lastActive = t.lastActive; });
       const act = this.tabs[opts.restore.active] || this.tabs[0];
       if (act) act.noRoutine = true; // loading it at start-up is not you opening it (smart workspaces)
       this.activate(act);
@@ -214,7 +213,7 @@ class FernaWindow {
     });
     wc.on('did-start-loading', () => { tab.loading = true; changed(); });
     wc.on('did-stop-loading', () => { tab.loading = false; changed(); if (tab.id === this.activeId && this.ctx.sampleTabColour) setTimeout(() => this.ctx.sampleTabColour(this, tab), 400); });
-    wc.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) { tab.blocked = 0; tab.blockedPopups = []; tab.cosmeticKey = null; tab.feeds = null; tab.check = null; tab.checkGen = (tab.checkGen || 0) + 1; if (tab.favicon && !sameSite(tab.url, d.url)) tab.favicon = ''; tab.hasVideo = false; tab.hasMedia = false; tab.pipOn = false; tab.autoPip = false; tab.pwGen = (tab.pwGen || 0) + 1; tab.pwCount = 0; tab.readerOn = false; tab.speaking = false; } });
+    wc.on('did-start-navigation', d => { if (d.isMainFrame && !d.isSameDocument) { tab.blocked = 0; tab.blockedPopups = []; tab.cosmeticKey = null; tab.check = null; tab.checkGen = (tab.checkGen || 0) + 1; if (tab.favicon && !sameSite(tab.url, d.url)) tab.favicon = ''; tab.hasVideo = false; tab.hasMedia = false; tab.pipOn = false; tab.autoPip = false; tab.pwGen = (tab.pwGen || 0) + 1; tab.pwCount = 0; tab.readerOn = false; tab.speaking = false; } });
     wc.on('media-started-playing', () => {
       tab.hasMedia = true;
       ctx.pageFx.mediaStarted(this, tab);
@@ -224,7 +223,7 @@ class FernaWindow {
     wc.on('did-navigate', (e, url) => {
       tab.url = url; tab.crashed = false;
       if (!isInternal(url)) tab.lastGoodUrl = url;
-      ctx.zoomOnNavigate(this, tab);
+      if (kind === 'web') ctx.zoomOnNavigate(this, tab);
       if (!this.private && kind === 'web') ctx.addHistory(url, wc.getTitle());
       if (!this.private && kind === 'web' && ctx.bmSvc) ctx.bmSvc.markVisited(url);
       changed();
@@ -286,12 +285,9 @@ class FernaWindow {
       }
       menus.pageMenu(this, tab, params).popup({ window: this.win });
     });
-    wc.on('dom-ready', () => { if (kind === 'web') { ctx.zoomOnDomReady(this, tab); ctx.pageFx.domReady(this, tab); } });
+    wc.on('dom-ready', () => { if (kind === 'web') ctx.pageFx.domReady(this, tab); });
     wc.on('did-finish-load', () => {
       if (kind !== 'web') return;
-      ctx.zoomOnLoad(this, tab);
-      // Feeds this page announces: the RSS button in the address bar.
-      if (ctx.feeds && !this.private) ctx.feeds.discoverInTab(tab).then(f => { tab.feeds = f; if (tab.id === this.activeId) this.pushState(); }).catch(() => {});
       // Safety check: fake bank pages, scam wording, news articles (the fact-check bubble).
       if (ctx.check) ctx.check.scanTab(this, tab).catch(() => {});
       // Smart workspaces: the first time today you opened this site.
@@ -385,7 +381,7 @@ class FernaWindow {
   newTab(url, o = {}) {
     url = url || (o.adopt ? 'about:blank' : NEWTAB);
     if (!o.adopt) url = this.ctx.pdfViewerFor(url) || url;
-    const tab = {
+    const tab = { created: Date.now(),
       id: nextTabId++, url, title: o.title || '', favicon: '', loading: false, audible: false, muted: false,
       crashed: false, blocked: 0, thumb: null, keepLoaded: false, wsOverride: o.wsOverride || null,
       kind: isInternal(url) ? 'internal' : 'web', view: null, pendingUrl: null, lastGoodUrl: null,
@@ -430,6 +426,20 @@ class FernaWindow {
 
   get active() { return this.tabs.find(t => t.id === this.activeId) || null; }
 
+  /**
+   * A tab shared in a video call (screen sharing) must keep drawing when it is not the one shown:
+   * its view stays in the window, under the browser's own bars, until sharing ends.
+   */
+  setSharing(tab, on) {
+    tab._sharing = Math.max(0, (tab._sharing || 0) + (on ? 1 : -1));
+    if (!tab.view || this.win.isDestroyed() || tab === this.active || (this.split && this.inSplit(tab.id) && this.inSplit(this.activeId))) return;
+    if (tab._sharing) {
+      this.win.contentView.addChildView(tab.view, 0);
+      const c = this.layoutState().content;
+      tab.view.setBounds({ x: c.x, y: c.y, width: c.width, height: c.height });
+    } else this.win.contentView.removeChildView(tab.view);
+  }
+
   activate(tab) {
     if (!tab) return;
     const prev = this.active;
@@ -439,7 +449,7 @@ class FernaWindow {
       this.prevTabId = prev.id; // Ctrl+Tab goes back here
       if (!bothInSplit) {
         this.autoPipOnLeave(prev);
-        if (prev.view) { this.snapshot(prev); this.win.contentView.removeChildView(prev.view); }
+        if (prev.view) { this.snapshot(prev); if (prev._sharing) this.win.contentView.addChildView(prev.view, 0); else this.win.contentView.removeChildView(prev.view); }
         const mate = this.splitPartner(prev);
         if (mate && mate !== tab && mate.view) { mate.lastActive = Date.now(); this.win.contentView.removeChildView(mate.view); }
       }
@@ -646,8 +656,65 @@ class FernaWindow {
     const p = list && list[index];
     if (!p) return;
     const row = this.strip().pinned.find(r => r.index === index && (r.wsId || '') === (wsId || ''));
+    // A parked page opened again is no longer parked (the date would not be true any more).
+    if (p.parked) { delete p.parked; this.ctx.ws.save(); this.ctx.broadcast(); }
     if (row && row.tabId) this.activate(this.tabs.find(t => t.id === row.tabId));
     else this.newTab(p.url, wsId ? { wsOverride: wsId } : {});
+  }
+
+  /** Ferna Tabs 1.16 "Park": close the tab but keep its page pinned in its workspace, dated. */
+  parkTab(tab) {
+    const ctx = this.ctx;
+    const url = tab ? pageUrlOf(tab.url) : '';
+    if (!tab || !/^(https?|file):/i.test(url)) { this.sendUi('toast', { text: 'Only web pages and files can be parked.' }); return false; }
+    // Kept with the pinned sites you are looking at (the workspace shown, or all workspaces),
+    // so the parked page is right there in the list.
+    const wsId = this.currentWs || '';
+    let i = ctx.findPin(wsId, url);
+    if (i < 0) { if (!ctx.pinSite(wsId, url, tab.title)) { this.sendUi('toast', { text: 'This workspace has no room for another pinned site.' }); return false; } i = ctx.findPin(wsId, url); }
+    const list = ctx.pinnedList(wsId);
+    if (list && list[i]) { list[i].parked = Date.now(); ctx.ws.save(); }
+    this.closeTab(tab);
+    ctx.broadcast();
+    return true;
+  }
+
+  /** Reopen a recently closed tab (n = 0 is the newest). */
+  reopenClosed(n = 0) {
+    const k = this.closed.length - 1 - n;
+    if (k < 0) return false;
+    const [c] = this.closed.splice(k, 1);
+    this.newTab(c.url, { index: Math.min(c.index, this.tabs.length), wsOverride: c.wsOverride });
+    return true;
+  }
+
+  /** Ferna Tabs 1.16: the whole workspace acts on its tabs. */
+  workspaceAction(wsId, action) {
+    const ctx = this.ctx;
+    const inWs = t => (this.tabWorkspace(t) || '') === (wsId || '');
+    if (action === 'openAll') {
+      const strip = buildStrip(this.tabs, ctx.ws.data.workspaces, ctx.ws.data.common, wsId || null, { allPinned: false, allTabsPinned: ctx.ws.data.allPinned });
+      const missing = strip.pinned.filter(r => !r.tabId && (r.wsId || '') === (wsId || ''));
+      for (const r of missing) { if (r.pin.parked) delete r.pin.parked; this.newTab(r.pin.url, { activate: false, ...(wsId ? { wsOverride: wsId } : {}) }); }
+      if (missing.length) ctx.ws.save();
+      return missing.length;
+    }
+    if (action === 'close') { const list = this.tabs.filter(inWs); list.forEach(t => this.closeTab(t)); return list.length; }
+    if (action === 'sleep') { const list = this.tabs.filter(t => inWs(t) && t.id !== this.activeId && t.view && t.kind === 'web'); list.forEach(t => this.sleepTab(t)); return list.length; }
+    if (action === 'gather') {
+      let n = 0;
+      for (const w of ctx.windows) {
+        if (w === this || w.private !== this.private || w.exam) continue;
+        for (const t of [...w.tabs]) {
+          if ((w.tabWorkspace(t) || '') !== (wsId || '') || !/^(https?|file):/i.test(t.url || '')) continue;
+          this.newTab(t.url, { activate: false, ...(wsId ? { wsOverride: wsId } : {}) });
+          w.closeTab(t);
+          n++;
+        }
+      }
+      return n;
+    }
+    return 0;
   }
 
   /** Add the tab's page to the common bar, or take it off if it is there. */
@@ -704,6 +771,8 @@ class FernaWindow {
   }
 
   closeOverlay() {
+    // Closing the screen-sharing picker without a choice shares nothing.
+    if (this._share && this.overlayMode === 'share') { const sh = this._share; this._share = null; sh.resolve(null); }
     if (!this.overlayMode) return;
     if (this.overlayMode === 'peek') this.closePeek();
     this.overlayMode = null;
@@ -738,14 +807,6 @@ class FernaWindow {
   defaultAnchor(id, fromRight = 280) {
     const L = this.layoutState();
     return L.toolbar ? { x: L.toolbar.x + L.toolbar.width - fromRight, y: L.toolbar.y + 6, width: 32, height: 32, id } : { x: L.W - fromRight - 40, y: 8, width: 32, height: 32, id };
-  }
-
-  async openEqPanel(anchor) {
-    const t = this.active;
-    if (this.overlayMode === 'eq') { this.closeOverlay(); return; }
-    const fx = this.ctx.pageFx;
-    const status = t ? await fx.eqStatus(t) : null;
-    this.openOverlay('eq', { anchor: anchor || this.defaultAnchor('eq', 300), cfg: fx.eqCfg(), presets: fx.EQ.PRESETS, bands: fx.EQ.BANDS, auto: fx.EQ.AUTO_GENRES, status, web: !!(t && t.kind === 'web'), user: fx.EQ.cleanUserPresets(this.ctx.settings.data.eqPresets) });
   }
 
   openBookmarksPanel(anchor, folder) {
@@ -837,8 +898,8 @@ class FernaWindow {
   /** The page area once the side panel (assistant) takes its share on the right. */
   sideLayout(content) {
     if (!this.side) return content;
-    const w = this.side.kind === 'feeds'
-      ? Math.max(320, Math.min(900, Number(this.ctx.settings.data.feedsPanelWidth) || 420))
+    const w = this.side.kind === 'ext'
+      ? Math.max(320, Math.min(900, Number(this.ctx.settings.data.extPanelWidth) || 420))
       : Math.max(300, Math.min(560, Number(this.ctx.settings.data.sideWidth) || 380));
     const width = Math.max(200, content.width - w);
     this.side.view.setBounds({ x: content.x + width, y: content.y, width: content.width - width, height: content.height });
@@ -886,14 +947,18 @@ class FernaWindow {
         verticalWidth: ctx.settings.data.verticalWidth, accent: ctx.settings.data.accent, theme: ctx.settings.data.theme,
         hintShown: !!ctx.settings.data.hints.tabBarHidden,
         wsShowNames: !!ctx.settings.data.wsShowNames, stripFavoritesOnly: !!ctx.settings.data.stripFavoritesOnly, depth3d: ctx.settings.data.depth3d !== false,
+        tabsList: require('../pages/_shared/tabsmatch').cleanListSettings(ctx.settings.data.tabsList),
       },
       shortcutKeys: Object.fromEntries(['favoritesOnly', 'pinTab', 'addToCommon'].map(k => [k, (ctx.shortcuts.map[k] && ctx.shortcuts.map[k].raw && ctx.shortcuts.map[k].raw[0]) || ''])),
       dark: ctx.isDark(),
       focus: this.focus,
       tabs: this.tabs.map(x => ({
         id: x.id, title: x.title, url: x.pendingUrl || x.url, favicon: this.iconFor(x), loading: x.loading, audible: x.audible,
-        muted: x.muted, crashed: x.crashed, sleeping: !x.view, ws: this.tabWorkspace(x), wsOverride: x.wsOverride,
+        muted: x.muted, crashed: x.crashed, sleeping: !x.view, ws: this.tabWorkspace(x), wsOverride: x.wsOverride, lastActive: x.lastActive || x.created || 0,
       })),
+      // Ferna Tabs 1.16: the last tabs closed (newest first), other windows (to gather tabs from).
+      closed: this.private ? [] : this.closed.slice(-5).reverse().map((c, i) => ({ i, url: c.url, title: c.title || c.url })),
+      windowCount: ctx.windows.filter(w => !w.private && !w.exam).length,
       activeId: this.activeId,
       strip: this.strip(),
       icons: this.stripIcons(),
@@ -909,11 +974,9 @@ class FernaWindow {
         internal: isInternal(url), pdf: pageUrlOf(url) !== url,
         zoom: ctx.zoomDisplay(this, t),
         hasVideo: !!(t && t.hasVideo), hasMedia: !!(t && (t.hasMedia || t.hasVideo)), pipOn: !!(t && t.pipOn),
-        eq: ctx.pageFx.eqDisplay(t),
         bookmarked: !!ctx.findBookmark(pageUrlOf(url)),
         split: !!(t && this.inSplit(t.id)), reader: !!(t && t.readerOn), speaking: !!(t && t.speaking),
         passwords: t ? (t.pwCount || 0) : 0, container: t ? ctx.containerOf(this, t) : null,
-        feeds: t && t.feeds && t.feeds.length && !this.private ? { count: t.feeds.length, subscribed: t.feeds.some(f => ctx.feeds && ctx.feeds.isSubscribed(f.url)) } : null,
         check: t && t.check ? { level: t.check.danger || t.check.insecure ? 'danger' : t.check.scam.length ? 'scam' : t.check.claim.length ? 'warn' : t.check.article ? 'article' : '', article: t.check.article, cov: t.check.cov, danger: !!t.check.danger, scam: t.check.scam.length, claim: t.check.claim.length } : null,
         blocked: t ? t.blocked : 0,
         blockerOn: !!ctx.settings.data.blocker && !ctx.settings.data.blockerAllow.includes(hostOf(url)),
@@ -924,7 +987,6 @@ class FernaWindow {
       split: this.split && t && this.inSplit(t.id) ? (() => { const c = this.sideLayout(this.layoutState().content); return { ...this.split, activeId: t.id, content: c, divider: this.splitRects(c).divider }; })() : null,
       media: this.mediaCount(),
       side: this.side ? this.side.kind : null,
-      feedsUnread: ctx.feeds && !this.private ? ctx.feeds.unreadCount() : 0,
       app: this.appMode ? { name: this.appMode.name, origin: this.appMode.origin } : null,
       ctxTheme: ctx.ctxTheme ? ctx.ctxTheme(this) : null,
       highContrast: ctx.settings.data.highContrastToolbar !== false,
@@ -955,7 +1017,12 @@ class FernaWindow {
   onKey(e, input, wc) {
     const cmd = this.ctx.shortcuts.commandFor(input);
     if (this.exam && this.ctx.examKey && wc !== this.overlay.webContents && this.ctx.examKey(this, e, input, cmd)) return;
-    if (!cmd) return;
+    if (!cmd) {
+      // An extension's keyboard shortcut (its manifest's suggested_key), as in Chrome.
+      const x = !this.exam && wc !== this.overlay.webContents && this.ctx.ext && this.ctx.ext.commandFor ? this.ctx.ext.commandFor(input) : null;
+      if (x) { e.preventDefault(); this.ctx.ext.runCommand(this, x); }
+      return;
+    }
     if (wc === this.overlay.webContents) {
       // The overlay handles its own keys except the toggles that open/close it.
       if (!['tabOverview', 'tabsAtPointer', 'commandPalette', 'zoomPanel'].includes(cmd)) return;
@@ -1021,7 +1088,6 @@ class FernaWindow {
       case 'readingList': this.openInternal('ferna://bookmarks/#reading'); break;
       case 'addToReadingList': if (t && /^https?:/.test(t.url || '')) { ctx.bmSvc.addToReadingList(t.url, t.title); this.sendUi('toast', { text: 'Added to your reading list.' }); } break;
       case 'pickElement': if (t && t.kind === 'web') ctx.pageFx.pickElement(this, t); break;
-      case 'equalizer': this.openEqPanel(); break;
       case 'bookmarksPanel': this.openBookmarksPanel(); break;
       case 'pinTab': if (t) this.togglePin(t); break;
       case 'addToCommon': if (t) this.toggleCommon(t); break;
@@ -1039,7 +1105,6 @@ class FernaWindow {
         break;
       case 'nextWorkspace': this.rotateWorkspace(1); break;
       case 'prevWorkspace': this.rotateWorkspace(-1); break;
-      case 'shotVisible': case 'shotFull': case 'shotRegion': case 'shotElement': this.screenshot(cmd); break;
       case 'newTab': this.newTab(NEWTAB); this.sendUi('focus-address', {}); break;
       case 'closeTab': if (t) this.closeTab(t); break;
       case 'reopenTab': {
@@ -1091,8 +1156,8 @@ class FernaWindow {
       case 'downloads': this.openInternal('ferna://downloads/'); break;
       case 'bookmarkManager': this.openInternal('ferna://bookmarks/'); break;
       case 'bookmark': { const pu = t ? pageUrlOf(t.url) : ''; if (t && /^(https?|file):/i.test(pu)) ctx.toggleBookmark(pu, t.title); break; }
-      case 'zoomIn': case 'zoomOut': case 'zoomReset': case 'zoomType': case 'zoomAutoFit': case 'fontReset':
-        if (t && t.view && t.kind === 'web') ctx.zoomAct(this, t, { zoomIn: 'in', zoomOut: 'out', zoomReset: 'reset', zoomType: 'type', zoomAutoFit: 'autofit', fontReset: 'fontReset' }[cmd]);
+      case 'zoomIn': case 'zoomOut': case 'zoomReset':
+        if (t && t.view && t.kind === 'web') ctx.zoomAct(this, t, { zoomIn: 'in', zoomOut: 'out', zoomReset: 'reset' }[cmd]);
         break;
       case 'zoomPanel': this.openZoomPanel(); break;
       case 'extensions': this.openInternal('ferna://extensions/'); break;
@@ -1131,67 +1196,6 @@ class FernaWindow {
     await t.view.webContents.savePage(r.filePath, r.filePath.endsWith('.mhtml') ? 'MHTML' : 'HTMLComplete').catch(() => {});
   }
 
-  // ---------- screenshots ----------
-
-  async screenshot(cmd) {
-    const t = this.active;
-    if (!t || t.kind !== 'web' || !liveWc(t.view)) {
-      this.sendUi('toast', { text: 'Screenshots work on web pages.' });
-      return;
-    }
-    const wc = t.view.webContents;
-    const meta = { url: t.url, title: t.title, time: new Date().toISOString(), windowId: this.id };
-    const st = this.ctx.shotSettings();
-    const fullOpts = { maxHeight: st.maxHeight, cssPixels: st.resolution === 'css' };
-    const wait = async () => {
-      if (!st.delay) return;
-      this.sendUi('toast', { text: `Capturing in ${st.delay} s…` });
-      await new Promise(r => setTimeout(r, st.delay * 1000));
-    };
-    try {
-      if (cmd === 'shotVisible') {
-        await wait();
-        const img = await capture.captureVisible(wc);
-        const m = await capture.pageMetrics(wc).catch(() => null);
-        this.ctx.openShot(this, img, { ...meta, mode: 'visible', cssWidth: m ? m.vw : undefined });
-      } else if (cmd === 'shotFull') {
-        await wait();
-        this.sendUi('toast', { text: 'Capturing the entire page…' });
-        const r = await capture.captureFull(wc, fullOpts);
-        this.ctx.openShot(this, r.image, { ...meta, mode: 'full', cssWidth: r.cssWidth, truncated: r.partial });
-        if (r.partial) this.sendUi('toast', { text: `The page is very long; the first ${st.maxHeight.toLocaleString()} px were captured.` });
-      } else if (cmd === 'shotElement') {
-        this.sendUi('toast', { text: 'Click an element to capture it. Esc cancels.' });
-        wc.focus();
-        const rect = await capture.pickElement(wc);
-        if (!rect || rect.width < 1 || rect.height < 1) return;
-        const r = await capture.captureFull(wc, { ...fullOpts, maxHeight: Math.max(st.maxHeight, Math.ceil(rect.y + rect.height)) });
-        this.ctx.openShot(this, capture.cropCss(r.image, rect, r.cssWidth), { ...meta, mode: 'element', cssWidth: rect.width });
-      } else if (cmd === 'shotRegion') {
-        const [r, m] = await Promise.all([capture.captureFull(wc, fullOpts), capture.pageMetrics(wc).catch(() => ({ scrollX: 0, scrollY: 0 }))]);
-        const id = this.ctx.storeShot(r.image, { ...meta, mode: 'region' });
-        this._region = { id, image: r.image, cssWidth: r.cssWidth || r.image.getSize().width, meta };
-        const L = this.layoutState();
-        this.openOverlay('region', {
-          id, cssWidth: this._region.cssWidth, size: r.image.getSize(), scrollX: m.scrollX, scrollY: m.scrollY,
-          content: L.content,
-        });
-      }
-    } catch (err) {
-      this.sendUi('toast', { text: `Screenshot failed: ${err.message}` });
-    }
-  }
-
-  finishRegion(rect) {
-    const reg = this._region;
-    this._region = null;
-    this.closeOverlay();
-    if (!reg || !rect) return;
-    const img = capture.cropCss(reg.image, rect, reg.cssWidth);
-    this.ctx.dropShot(reg.id);
-    this.ctx.openShot(this, img, { ...reg.meta, mode: 'region', cssWidth: rect.width });
-  }
-
   // ---------- session ----------
 
   serialize() {
@@ -1199,7 +1203,7 @@ class FernaWindow {
     return {
       bounds: b, maximized: this.win.isMaximized(), currentWs: this.currentWs,
       active: Math.max(0, this.tabs.indexOf(this.active)),
-      tabs: this.tabs.filter(t => t.url && !/^ferna:\/\/(interstitial|shot)/.test(t.url)).map(t => ({ url: t.pendingUrl || t.url, wsOverride: t.wsOverride, title: t.title })),
+      tabs: this.tabs.filter(t => t.url && !/^ferna:\/\/(interstitial|shots)/.test(t.url)).map(t => ({ url: t.pendingUrl || t.url, wsOverride: t.wsOverride, title: t.title, lastActive: t.lastActive || t.created || 0 })),
     };
   }
 

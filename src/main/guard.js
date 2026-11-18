@@ -14,7 +14,7 @@
 // 2026). Pages and messages using the patterns of common Sri Lankan SMS/WhatsApp scams (courier
 // "customs fee", prize or lottery wins, OTP requests, account-blocking threats) are flagged too.
 
-const N = require('./feeds/nlp');
+const N = require('./textkit/nlp');
 
 // ---------- organisations and their official websites ----------
 // [name, pattern that names it, official registrable domains]
@@ -187,7 +187,7 @@ function newsSearchUrl(q, { factCheck = false } = {}) {
 async function coverage(headline, { fetchText, selfHost = '' } = {}) {
   const q = queryFor(headline);
   if (!q || q.split(' ').length < 2) return { query: q, results: [], factChecks: [], reliable: 0 };
-  const P = require('./feeds/parse');
+  const P = require('./textkit/parse');
   const parse = async url => {
     const body = await fetchText(url);
     const items = [];

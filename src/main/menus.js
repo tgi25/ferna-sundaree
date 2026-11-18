@@ -36,7 +36,6 @@ function appMenu(win) {
     { label: 'Media controls', accelerator: acc(ctx, 'mediaPanel'), registerAccelerator: false, click: run('mediaPanel') },
     { label: 'Task manager', accelerator: acc(ctx, 'taskManager'), registerAccelerator: false, click: run('taskManager') },
     { label: 'Picture-in-Picture', accelerator: acc(ctx, 'pip'), registerAccelerator: false, click: run('pip') },
-    { label: 'Equalizer', accelerator: acc(ctx, 'equalizer'), registerAccelerator: false, click: run('equalizer') },
     { label: 'Tabs list at pointer', accelerator: acc(ctx, 'tabsAtPointer'), registerAccelerator: false, click: run('tabsAtPointer') },
     { label: 'Command palette', accelerator: acc(ctx, 'commandPalette'), registerAccelerator: false, click: run('commandPalette') },
     {
@@ -54,18 +53,6 @@ function appMenu(win) {
     { label: 'Show bookmarks bar', type: 'checkbox', checked: !s.bookmarksBarHidden, accelerator: acc(ctx, 'toggleBookmarksBar'), registerAccelerator: false, click: run('toggleBookmarksBar') },
     { label: 'Focus mode', type: 'checkbox', checked: !!win.focus, accelerator: acc(ctx, 'focusMode'), registerAccelerator: false, click: run('focusMode') },
     { type: 'separator' },
-    {
-      label: 'Screenshot', submenu: [
-        { label: 'Visible area', accelerator: acc(ctx, 'shotVisible'), registerAccelerator: false, click: run('shotVisible') },
-        { label: 'Entire page', accelerator: acc(ctx, 'shotFull'), registerAccelerator: false, click: run('shotFull') },
-        { label: 'Select region', accelerator: acc(ctx, 'shotRegion'), registerAccelerator: false, click: run('shotRegion') },
-        { label: 'Select element', accelerator: acc(ctx, 'shotElement'), registerAccelerator: false, click: run('shotElement') },
-        { type: 'separator' },
-        { label: 'Screenshot history', click: () => win.openInternal('ferna://shots/history.html') },
-        { label: 'Open screenshots folder', click: () => shell.openPath(ctx.screenshotDir()) },
-        { label: 'Screenshot settings…', click: () => win.openInternal('ferna://shots/options.html') },
-      ],
-    },
     { label: 'Find in page…', accelerator: acc(ctx, 'find'), registerAccelerator: false, click: run('find') },
     { label: 'Zoom', submenu: zoomItems(win) },
     { label: 'Full screen', accelerator: 'F11', registerAccelerator: false, click: run('fullscreen') },
@@ -92,17 +79,14 @@ function zoomItems(win) {
   const ctx = win.ctx;
   const run = cmd => () => win.run(cmd);
   const t = win.active;
-  const z = t ? ctx.zoomDisplay(win, t) : { type: 'full' };
+  const z = t ? ctx.zoomDisplay(win, t) : { level: 100 };
   return [
-    { label: 'Zoom panel…', accelerator: acc(ctx, 'zoomPanel'), registerAccelerator: false, click: run('zoomPanel') },
-    { type: 'separator' },
+    { label: `Zoom: ${z.level}%`, enabled: false },
     { label: 'Zoom in', accelerator: acc(ctx, 'zoomIn'), registerAccelerator: false, click: run('zoomIn') },
     { label: 'Zoom out', accelerator: acc(ctx, 'zoomOut'), registerAccelerator: false, click: run('zoomOut') },
     { label: 'Reset zoom', accelerator: acc(ctx, 'zoomReset'), registerAccelerator: false, click: run('zoomReset') },
     { type: 'separator' },
-    { label: 'Zoom text only', type: 'checkbox', checked: z.type === 'text', accelerator: acc(ctx, 'zoomType'), registerAccelerator: false, click: run('zoomType') },
-    { label: 'AutoFit (fit to width)', accelerator: acc(ctx, 'zoomAutoFit'), registerAccelerator: false, click: run('zoomAutoFit') },
-    { label: 'Reset minimum font size', accelerator: acc(ctx, 'fontReset'), registerAccelerator: false, click: run('fontReset') },
+    { label: 'Zoom panel…', accelerator: acc(ctx, 'zoomPanel'), registerAccelerator: false, click: run('zoomPanel') },
   ];
 }
 
@@ -294,21 +278,6 @@ function shieldMenu(win, tab) {
   ]);
 }
 
-function shotMenu(win) {
-  const ctx = win.ctx;
-  const run = cmd => () => win.run(cmd);
-  return Menu.buildFromTemplate([
-    { label: 'Visible area', accelerator: acc(ctx, 'shotVisible'), registerAccelerator: false, click: run('shotVisible') },
-    { label: 'Entire page', accelerator: acc(ctx, 'shotFull'), registerAccelerator: false, click: run('shotFull') },
-    { label: 'Select region', accelerator: acc(ctx, 'shotRegion'), registerAccelerator: false, click: run('shotRegion') },
-    { label: 'Select element', accelerator: acc(ctx, 'shotElement'), registerAccelerator: false, click: run('shotElement') },
-    { type: 'separator' },
-    { label: 'Screenshot history', click: () => win.openInternal('ferna://shots/history.html') },
-    { label: 'Open screenshots folder', click: () => shell.openPath(ctx.screenshotDir()) },
-    { label: 'Screenshot settings…', click: () => win.openInternal('ferna://shots/options.html') },
-  ]);
-}
-
 /**
  * Right-click menu for text boxes and selected text on Ferna's own pages (the address bar, the
  * find bar, Settings and the other internal pages). goText: set for the address bar, adds
@@ -375,9 +344,7 @@ function pageMenu(win, tab, p) {
   }
   if (p.mediaType === 'video' || p.mediaType === 'audio') {
     t.push(
-      ...(p.mediaType === 'video' ? [{ label: 'Picture-in-Picture', accelerator: acc(win.ctx, 'pip'), registerAccelerator: false, click: () => win.run('pip') }] : []),
-      { label: 'Equalizer…', accelerator: acc(win.ctx, 'equalizer'), registerAccelerator: false, click: () => win.run('equalizer') },
-      { type: 'separator' },
+      ...(p.mediaType === 'video' ? [{ label: 'Picture-in-Picture', accelerator: acc(win.ctx, 'pip'), registerAccelerator: false, click: () => win.run('pip') }, { type: 'separator' }] : []),
     );
   }
   if (p.isEditable) {
@@ -412,10 +379,6 @@ function pageMenu(win, tab, p) {
       { type: 'separator' },
       ...pinAndCommonItems(win, tab),
       { type: 'separator' },
-      { label: 'Screenshot of visible area', click: () => win.run('shotVisible') },
-      { label: 'Screenshot of entire page', click: () => win.run('shotFull') },
-      { label: 'Select region to capture', click: () => win.run('shotRegion') },
-      { type: 'separator' },
       { label: 'Reading mode', accelerator: acc(win.ctx, 'readerMode'), registerAccelerator: false, enabled: /^https?:/.test(tab.url), click: () => win.run('readerMode') },
       { label: 'Read aloud', accelerator: acc(win.ctx, 'readAloud'), registerAccelerator: false, enabled: /^https?:/.test(tab.url), click: () => win.run('readAloud') },
       { label: 'Translate this page', accelerator: acc(win.ctx, 'translatePage'), registerAccelerator: false, enabled: /^https?:/.test(tab.url), click: () => win.run('translatePage') },
@@ -449,7 +412,6 @@ function pageActionsMenu(win) {
   const run = cmd => () => win.run(cmd);
   const a = cmd => acc(ctx, cmd);
   const bookmarked = !!(t && ctx.findBookmark(require('./workspaces').pageUrlOf(t.url)));
-  const feeds = t && Array.isArray(t.feeds) && t.feeds.length && !win.private;
   const item = (label, click, more = {}) => ({ label, click, registerAccelerator: false, ...more });
   return Menu.buildFromTemplate([
     item('Back', () => wc && wc.navigationHistory.goBack(), { enabled: !!(wc && wc.navigationHistory.canGoBack()), accelerator: 'Alt+Left' }),
@@ -461,22 +423,18 @@ function pageActionsMenu(win) {
     item(bookmarked ? 'Edit bookmark' : 'Bookmark this page', run('bookmark'), { enabled: !!(t && /^(https?|file):/i.test(require('./workspaces').pageUrlOf(t.url))), accelerator: 'Ctrl+D' }),
     item('Reading mode', run('readerMode'), { enabled: web, accelerator: a('readerMode') }),
     item('Translate this page', run('translatePage'), { enabled: web, accelerator: a('translatePage') }),
-    ...(feeds ? [item('Follow this site in Ferna Feeds', () => { const f = t.feeds[0]; if (f && ctx.feeds) ctx.feeds.subscribe(f.url, { title: f.title }).then(x => win.sendUi('toast', { text: `Following “${x.title}”` })).catch(e => win.sendUi('toast', { text: String(e.message || e) })); })] : []),
     item('Safety check', () => ctx.check && ctx.check.togglePanel(win), { enabled: http }),
     item('Saved passwords', run('passwords')),
     { type: 'separator' },
     item('Zoom…', () => win.openZoomPanel(), { enabled: web }),
     item('Picture in picture', run('pip'), { enabled: !!(t && t.hasVideo) }),
     item('Media controls', run('mediaPanel')),
-    item('Equalizer', run('equalizer'), { enabled: web }),
     item(win.split ? 'Leave split view' : 'Split view', run('splitView'), { enabled: !!t }),
     { label: 'Tracker and ad blocking', submenu: shieldMenu(win, t), enabled: http },
-    { label: 'Screenshot', submenu: shotMenu(win), enabled: web },
     { type: 'separator' },
     item('Bookmarks', run('bookmarksPanel')),
     item('Extensions', () => ctx.ext && ctx.ext.puzzleMenu(win)),
     item('Downloads', run('downloads'), { accelerator: 'Ctrl+J' }),
-    item('Ferna Feeds', () => ctx.feeds && ctx.feeds.togglePanel(win)),
     item('AI assistant', run('assistant')),
     item('Tab Overview', run('tabOverview')),
     { type: 'separator' },
@@ -485,4 +443,4 @@ function pageActionsMenu(win) {
   ]);
 }
 
-module.exports = { pageActionsMenu, editMenu, pdfMenu, splitMenu, appMenu, tabMenu, commonMenu, pinnedMenu, workspaceMenu, bookmarkMenu, shieldMenu, shotMenu, pageMenu, folderOf };
+module.exports = { pageActionsMenu, editMenu, pdfMenu, splitMenu, appMenu, tabMenu, commonMenu, pinnedMenu, workspaceMenu, bookmarkMenu, shieldMenu, pageMenu, folderOf };

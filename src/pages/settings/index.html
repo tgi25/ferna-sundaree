@@ -62,7 +62,7 @@
     <a href="#profiles">Profiles and apps</a>
     <a href="#privacy">Privacy and security</a>
     <a href="#filters">My filters</a>
-    <a href="#features">PDF and screenshots</a>
+    <a href="#features">PDF and page tools</a>
     <a href="#shortcuts">Shortcuts</a>
     <a href="#about">About</a>
   </nav>
@@ -102,7 +102,7 @@
       <div class="row"><div class="grow">Adaptive colour<div class="hint">Outside a workspace, the bars take the main colour of the site you are on.</div></div><label class="switch"><input type="checkbox" data-k="adaptiveTheme"><span></span></label></div>
       <div class="row"><div class="grow">Dark mode on a schedule<div class="hint">Switches to dark and back to light at the times you choose (overrides the theme above).</div></div>
         <span class="muted">dark from</span><input class="field" type="time" id="sch-dark" style="width:110px"><span class="muted">light from</span><input class="field" type="time" id="sch-light" style="width:110px"><label class="switch"><input type="checkbox" id="sch-on"><span></span></label></div>
-      <div class="row"><div class="grow">High-contrast toolbar buttons<div class="hint">Icons and text always keep at least a 4.5 : 1 contrast with the bar behind them (WCAG AA), whatever the theme; buttons that are on (equalizer, Picture-in-Picture, split view …) get a solid highlight and glow; hover and keyboard focus are outlined.</div></div><label class="switch"><input type="checkbox" data-k="highContrastToolbar"><span></span></label></div>
+      <div class="row"><div class="grow">High-contrast toolbar buttons<div class="hint">Icons and text always keep at least a 4.5 : 1 contrast with the bar behind them (WCAG AA), whatever the theme; buttons that are on (Picture-in-Picture, split view …) get a solid highlight and glow; hover and keyboard focus are outlined.</div></div><label class="switch"><input type="checkbox" data-k="highContrastToolbar"><span></span></label></div>
       <div class="row"><div class="grow">3D look<div class="hint">The tab bar and top bar are lit with depth. Tabs and buttons are flat until you point at one: it then lifts and tilts after the pointer, and clicking presses it in. The current tab, workspace and pinned site, and buttons that are on, stay raised. Turn off for a completely flat look.</div></div><label class="switch"><input type="checkbox" data-k="depth3d"><span></span></label></div>
       <div class="row"><div class="grow">Show workspace names<div class="hint">Off: workspaces appear as icons only, as in Ferna Tabs. Hover an icon to see its name.</div></div><label class="switch"><input type="checkbox" data-k="wsShowNames"><span></span></label></div>
       <div class="row"><div class="grow">Tab bar shows only workspaces, favourites and pinned tabs<div class="hint">Same as the filter button on the workspaces bar (<kbd>Alt+Shift+P</kbd>). Other tabs stay open; use Tab Overview or the list at the pointer to reach them.</div></div><label class="switch"><input type="checkbox" data-k="stripFavoritesOnly"><span></span></label></div>
@@ -110,19 +110,9 @@
 
     <section id="zoom" class="card">
       <h2>Zoom</h2>
-      <p class="muted" style="margin-top:-4px">Full zoom scales everything; text zoom scales only the text. Open the zoom panel with <kbd>Alt+Z</kbd> or the magnifier in the toolbar.</p>
-      <div class="row"><div class="grow">Remember zoom<div class="hint">Per site: every page of a site shares its zoom. Per tab: each tab keeps its own (uses CSS zoom).</div></div><select class="field" data-z="mode"><option value="site">Per site</option><option value="tab">Per tab</option></select></div>
-      <div class="row"><div class="grow">Treat sub-domains as separate sites<div class="hint">Off: mail.example.com and www.example.com share a zoom.</div></div><label class="switch"><input type="checkbox" data-z="subdomainsSeparate"><span></span></label></div>
-      <div class="row"><div class="grow">Default zoom type</div><select class="field" data-z="defaultType"><option value="full">Full</option><option value="text">Text only</option></select></div>
-      <div class="row"><div class="grow">Default full zoom</div><input class="field" type="number" min="25" max="500" step="1" data-z="defaultFull" style="width:90px"> %</div>
-      <div class="row"><div class="grow">Default text zoom / non-text zoom<div class="hint">In text mode, images and layout use the non-text level.</div></div><input class="field" type="number" min="25" max="500" data-z="defaultText" style="width:80px"> % <input class="field" type="number" min="25" max="500" data-z="defaultNonText" style="width:80px"> %</div>
-      <div class="row"><div class="grow">Zoom levels<div class="hint">Used by zoom in and out, comma separated.</div></div><input class="field" data-z="levels" style="width:340px"></div>
-      <div class="row"><div class="grow">Zoom in and out by</div><select class="field" data-z="stepMode"><option value="levels">Next level in the list</option><option value="fixed">Fixed step</option></select><input class="field" type="number" min="1" max="100" data-z="step" style="width:70px"> %</div>
-      <div class="row"><div class="grow">Minimum font size<div class="hint">Small text is enlarged to at least this size, in full and text zoom.</div></div><select class="field" data-z="minFont" data-num="1"><option value="0">Off</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>16</option><option>18</option><option>20</option></select></div>
-      <div class="row"><div class="grow">Line spacing with text zoom</div><select class="field" data-z="lineSpacing" data-num="1"><option value="1">Normal</option><option value="1.1">1.1×</option><option value="1.2">1.2×</option><option value="1.35">1.35×</option></select></div>
-      <div class="row"><div class="grow">AutoFit range<div class="hint">Fit-to-width never zooms below or above these levels.</div></div><input class="field" type="number" min="25" max="500" data-z="autofitMin" style="width:80px"> – <input class="field" type="number" min="25" max="500" data-z="autofitMax" style="width:80px"> %</div>
-      <div class="row"><div class="grow">AutoFit pages automatically<div class="hint">When a site has no saved zoom (per-site mode).</div></div><label class="switch"><input type="checkbox" data-z="autofitOnLoad"><span></span></label></div>
-      <div class="row"><div class="grow">Saved site zoom<div class="chips" id="zoom-sites"></div></div><button class="btn small danger" id="zoom-clear">Clear all</button></div>
+      <p class="muted" style="margin-top:-4px">Page zoom works as in Chrome: <kbd>Ctrl</kbd> + <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd>, <kbd>Ctrl</kbd> + mouse wheel, or the magnifier in the address bar (<kbd>Alt+Z</kbd>). Each site keeps its own zoom. For text-only zoom, AutoFit and a minimum font size, install the <b>Ferna Zoom</b> extension.</p>
+      <div class="row"><div class="grow">Default zoom<div class="hint">For sites you have not zoomed.</div></div><select class="field" id="zoom-default"></select></div>
+      <div class="row"><div class="grow">Sites with their own zoom<div class="chips" id="zoom-sites"></div></div><button class="btn small danger" id="zoom-clear">Clear all</button></div>
     </section>
 
     <section id="workspaces" class="card">
@@ -247,13 +237,12 @@
     </section>
 
     <section id="features" class="card">
-      <h2>Built-in Ferna PDF Reader and Ferna Screenshots</h2>
+      <h2>Built-in Ferna PDF Reader and page tools</h2>
       <div class="row"><div class="grow">Text selection menu<div class="hint">Select text on a page to get Copy, Search and (for an address) Open, as in SelectON.</div></div><label class="switch"><input type="checkbox" data-k="selectionMenu"><span></span></label></div>
       <div class="row"><div class="grow">Picture-in-Picture<div class="hint">Pop the largest video into a floating, always-on-top window: <kbd>Alt+P</kbd>, the toolbar button, or right-click a video.</div></div></div>
-      <div class="row"><div class="grow">Equalizer and Auto-EQ<div class="hint">10 bands, genre presets, and Auto-EQ that reads the page and listens to the sound to pick a preset: <kbd>Alt+Q</kbd> or the toolbar button while media plays.</div></div></div>
       <div class="row"><div class="grow">Open PDFs in Ferna PDF Reader<div class="hint">Annotations, stylus, OCR, bookmarks, merge and the AI assistant. Save overwrites local files directly; no save helper needed.</div></div><label class="switch"><input type="checkbox" data-k="pdfDefault"><span></span></label></div>
+      <div class="row"><div class="grow">Feeds, equalizer, screenshots and text zoom<div class="hint">Since 0.9.0 these are extensions: <b>Ferna Feeds</b>, <b>Ferna Equalizer</b>, <b>Ferna Screenshot</b> and <b>Ferna Zoom</b>. Install them from the Chrome Web Store or a zip on the Extensions page; they run here as in Chrome.</div></div><button class="btn" data-open="ferna://extensions/">Extensions</button></div>
       <div class="row"><div class="grow">PDF Reader settings and manual</div><button class="btn" data-open="ferna://pdf/viewer/viewer.html">Open PDF Reader</button><button class="btn" data-open="ferna://pdf/Ferna-PDF-Reader-Manual.pdf">Manual</button></div>
-      <div class="row"><div class="grow">Screenshots: stamp, file names, format, “save immediately”<div class="hint">Capture with <kbd>Alt+Shift+V</kbd> visible, <kbd>Alt+Shift+F</kbd> entire page, <kbd>Alt+Shift+R</kbd> region, <kbd>Alt+Shift+E</kbd> element.</div></div><button class="btn" data-open="ferna://shots/options.html">Screenshot settings</button><button class="btn" data-open="ferna://shots/history.html">History</button></div>
     </section>
 
     <section id="shortcuts" class="card">

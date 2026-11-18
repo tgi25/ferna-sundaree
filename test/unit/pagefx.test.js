@@ -39,14 +39,6 @@ test('YouTube shield: does nothing on other sites', () => {
   assert.equal(called, false);
 });
 
-test('equalizer: presets are 10-band, config is clamped, script compiles', () => {
-  const eq = require('../../src/main/pagefx/eq');
-  for (const [k, p] of Object.entries(eq.PRESETS)) assert.equal(p.gains.length, 10, k);
-  assert.deepEqual(eq.clean({ enabled: 1, preset: 'zzz', gains: [99, -99, 1.26, 0, 0, 0, 0, 0, 0, 0] }), { enabled: true, auto: false, preset: 'flat', gains: [12, -12, 1.5, 0, 0, 0, 0, 0, 0, 0] });
-  assert.doesNotThrow(() => new vm.Script(eq.SCRIPT));
-  for (const g of eq.AUTO_GENRES) assert.ok(eq.PRESETS[g] && eq.KEYWORDS[g], g);
-});
-
 test('selection menu and PiP scripts compile', () => {
   assert.doesNotThrow(() => new vm.Script(require('../../src/main/pagefx/selection').SCRIPT));
   assert.doesNotThrow(() => new vm.Script(require('../../src/main/pagefx/pip').TOGGLE));

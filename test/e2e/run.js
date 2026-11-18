@@ -36,7 +36,7 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'ferna-e2e-'));
   const downloads = path.join(profile, 'Downloads');
   fs.mkdirSync(downloads, { recursive: true });
-  const { app, display } = await H.launch(profile, { FERNA_TEST_YT_HOST: 'localhost', FERNA_TEST_POLICY: JSON.stringify({ PopupBlocker: 1, TorWindowsAllowed: 0 }) });
+  const { app, display } = await H.launch(profile, { FERNA_TEST_FAKE_MEDIA: '1', FERNA_TEST_YT_HOST: 'localhost', FERNA_TEST_POLICY: JSON.stringify({ PopupBlocker: 1, TorWindowsAllowed: 0 }) });
   afterFailure = () => app.evaluate(() => {
     const ctx = global.__ferna;
     if (ctx.examWin) ctx.exam.finish(ctx.examWin, 'test');
@@ -268,43 +268,8 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
     assert(hasOpener, 'opener lost its child window handle');
   });
 
-  await step('screenshot: entire page in one capture, opened in the Ferna Screenshots editor', async () => {
-    await main(() => { const w = global.__ferna.windows[0]; w.activate(w.tabs.find(t => /long\.html$/.test(t.url))); });
-    await H.sleep(600);
-    await main(() => global.__ferna.windows[0].run('shotFull'));
-    const ed = await page('ferna://shots/editor.html');
-    await ed.waitForLoadState('load');
-    await H.until(() => ed.evaluate(() => !!document.querySelector('canvas#view') && document.title.includes('Long test page')), 10000, 'editor loaded the capture');
-    const size = await main(() => [...global.__ferna.shots.values()].pop().image.getSize());
-    assert(size.height >= 3000 && size.height <= 3200, `full page height ${size.height}`);
-    await H.sleep(800);
-    await shot('10-screenshot-editor');
-  });
 
-  await step('screenshot: editor saves the stamped PNG into Downloads/Ferna Screenshots', async () => {
-    const ed = await page('ferna://shots/editor.html');
-    const btn = await ed.$('#savePng, [data-format="png"], #save');
-    assert(btn, 'save button present');
-    await btn.click();
-    const dir = path.join(downloads, 'Ferna Screenshots');
-    await H.until(() => fs.existsSync(dir) && fs.readdirSync(dir).some(f => f.endsWith('.png')), 8000, 'png saved');
-    const f = fs.readdirSync(dir).find(x => x.endsWith('.png'));
-    results.push(`       saved ${f} (${fs.statSync(path.join(dir, f)).size} bytes)`);
-  });
 
-  await step('screenshot: region picker spans the whole page', async () => {
-    await main(() => { const w = global.__ferna.windows[0]; w.activate(w.tabs.find(t => /long\.html$/.test(t.url))); });
-    await H.sleep(400);
-    await main(() => global.__ferna.windows[0].run('shotRegion'));
-    const ov = await page('ferna://overlay/');
-    await H.until(() => ov.evaluate(() => { const i = document.querySelector('#reg-img'); return i && i.complete && i.naturalWidth > 0; }), 8000, 'region image');
-    await shot('11-region-picker');
-    const before = (await win()).tabs.length;
-    await main(() => global.__ferna.windows[0].finishRegion({ x: 0, y: 500, width: 400, height: 1400 }));
-    await H.until(async () => (await win()).tabs.length === before + 1, 5000, 'region editor tab');
-    const size = await main(() => [...global.__ferna.shots.values()].pop().image.getSize());
-    assert(size.height === 1400 && size.width === 400, `region ${size.width}×${size.height}`);
-  });
 
   await step('PDF: web PDF opens in the built-in Ferna PDF Reader and renders', async () => {
     await main((_, b) => global.__ferna.windows[0].newTab(`${b}/test.pdf`), base);
@@ -418,78 +383,9 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
     if (isMax1) await ui.click('#tabs .winctl [data-win="maximize"]');
   });
 
-  await step('zoom: full zoom per site, shared by tabs of the same site', async () => {
-    await freshTab(`${base}/zoom.html`);
-    await main(() => global.__ferna.windows[0].run('zoomIn'));
-    await H.sleep(300);
-    let f = await main(() => global.__ferna.windows[0].active.view.webContents.getZoomFactor());
-    assert(Math.abs(f - 1.1) < 0.001, `zoom factor ${f}`);
-    await freshTab(`${base}/long.html?same-site`);
-    await H.sleep(400);
-    f = await main(() => global.__ferna.windows[0].active.view.webContents.getZoomFactor());
-    assert(Math.abs(f - 1.1) < 0.001, `second tab of the site follows (${f})`);
-    await main(() => global.__ferna.windows[0].run('zoomReset'));
-    await H.sleep(300);
-    f = await main(() => global.__ferna.windows[0].active.view.webContents.getZoomFactor());
-    assert(Math.abs(f - 1) < 0.001, 'reset to 100 %');
-  });
 
-  await step('zoom: text-only zoom scales text, not images, and follows late content', async () => {
-    await freshTab(`${base}/zoom.html?text`);
-    const before = await evalActive(`({ p: getComputedStyle(document.getElementById('p')).fontSize, em: getComputedStyle(document.getElementById('em')).fontSize, inner: getComputedStyle(document.getElementById('inner')).fontSize, img: document.getElementById('img').getBoundingClientRect().width })`);
-    await main(async () => { const w = global.__ferna.windows[0]; await global.__ferna.zoomAct(w, w.active, 'setType', 'text'); await global.__ferna.zoomAct(w, w.active, 'set', 150); });
-    await H.sleep(400);
-    const after = await evalActive(`({ p: getComputedStyle(document.getElementById('p')).fontSize, em: getComputedStyle(document.getElementById('em')).fontSize, inner: getComputedStyle(document.getElementById('inner')).fontSize, img: document.getElementById('img').getBoundingClientRect().width, zoom: devicePixelRatio })`);
-    assert(parseFloat(after.p) === parseFloat(before.p) * 1.5, `p ${before.p} → ${after.p}`);
-    assert(parseFloat(after.em) === parseFloat(before.em) * 1.5, `em ${before.em} → ${after.em}`);
-    assert(parseFloat(after.inner) === parseFloat(before.inner) * 1.5, `nested ${before.inner} → ${after.inner} (no compounding)`);
-    assert(after.img === before.img, `image width must not change (${before.img} → ${after.img})`);
-    await H.sleep(1600);
-    const late = await evalActive(`getComputedStyle(document.getElementById('late')).fontSize`);
-    assert(parseFloat(late) === 18, `late content 12px → ${late}`);
-    await shot('22-text-zoom');
-    // page script cannot see the zoom code
-    const leak = await evalActive('typeof window.__fernaTZ');
-    assert(leak === 'undefined', 'text-zoom code must live in an isolated world');
-  });
 
-  await step('zoom: minimum font size, reset, panel and AutoFit', async () => {
-    await main(async () => { const w = global.__ferna.windows[0]; await global.__ferna.zoomAct(w, w.active, 'reset'); await global.__ferna.zoomAct(w, w.active, 'minFont', 16); });
-    await H.sleep(400);
-    let small = await evalActive(`[getComputedStyle(document.getElementById('small')).fontSize, getComputedStyle(document.getElementById('p')).fontSize]`);
-    assert(small[0] === '16px' && small[1] === '16px', `min font: ${small}`);
-    await main(async () => { const w = global.__ferna.windows[0]; await global.__ferna.zoomAct(w, w.active, 'fontReset'); });
-    await H.sleep(300);
-    small = await evalActive(`getComputedStyle(document.getElementById('small')).fontSize`);
-    assert(small === '12px', `font reset: ${small}`);
-    await main(() => global.__ferna.windows[0].run('zoomPanel'));
-    const ov = await page('ferna://overlay/');
-    await ov.waitForSelector('#zpanel');
-    await ov.click('[data-type="1"]');
-    await H.until(async () => (await main(() => { const w = global.__ferna.windows[0]; return global.__ferna.zoomState(w, w.active).type; })) === 'text', 3000, 'panel switched to text');
-    await ov.click('[data-z="in"]');
-    await H.sleep(300);
-    await shot('23-zoom-panel');
-    await ov.click('[data-type="0"]');
-    await ov.click('[data-z="autofit"]');
-    await H.sleep(500);
-    const st = await main(() => { const w = global.__ferna.windows[0]; return global.__ferna.zoomState(w, w.active); });
-    assert(st.type === 'full' && st.full > 100, `AutoFit widened a 600 px page: ${JSON.stringify(st)}`);
-    await ov.keyboard.press('Escape');
-    await main(async () => { const w = global.__ferna.windows[0]; await global.__ferna.zoomAct(w, w.active, 'reset'); });
-  });
 
-  await step('zoom: per-tab mode uses CSS zoom and leaves other tabs alone', async () => {
-    await main(() => global.__ferna.settings.set('zoomPrefs', { ...global.__ferna.zoomPrefs(), mode: 'tab' }));
-    await freshTab(`${base}/zoom.html?tab1`);
-    await main(async () => { const w = global.__ferna.windows[0]; await global.__ferna.zoomAct(w, w.active, 'set', 133); });
-    await H.sleep(300);
-    const z1 = await evalActive(`getComputedStyle(document.documentElement).zoom`);
-    await freshTab(`${base}/zoom.html?tab2`);
-    const z2 = await evalActive(`getComputedStyle(document.documentElement).zoom`);
-    assert(Math.abs(parseFloat(z1) - 1.33) < 0.01 && parseFloat(z2) === 1, `tab zoom ${z1} vs ${z2}`);
-    await main(() => global.__ferna.settings.set('zoomPrefs', { ...global.__ferna.zoomPrefs(), mode: 'site' }));
-  });
 
   await step('tabs: star adds to the common bar, pin works in All tabs and in a workspace, Alt+S', async () => {
     const ui = await page('ferna://ui/');
@@ -615,26 +511,6 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
     await H.until(() => evalActive(`document.title === 'PIP-OUT' && !document.pictureInPictureElement`), 5000, 'out of PiP');
   });
 
-  await step('equalizer: preset reaches the page; Auto-EQ picks Classical from the page and sound', async () => {
-    let r = await main(async () => {
-      const c = global.__ferna; const w = c.windows[0]; const t = w.active;
-      c.pageFx.setEq({ enabled: true, auto: false, preset: 'rock' });
-      await c.pageFx.EQ.apply(t.view.webContents, c.pageFx.eqCfg());
-      await new Promise(res => setTimeout(res, 800));
-      return c.pageFx.eqStatus(t);
-    });
-    assert(r && r.enabled && r.attached === 1 && r.gains[0] === 5 && r.gains[9] === 5, `rock ${JSON.stringify(r)}`);
-    assert(await evalActive(`!document.getElementById('v').paused`), 'still playing through the equalizer');
-    await main(() => global.__ferna.pageFx.setEq({ auto: true }));
-    r = await H.until(async () => { const st = await main(() => global.__ferna.pageFx.eqStatus(global.__ferna.windows[0].active)); return st && st.applied === 'classical' ? st : null; }, 12000, 'auto genre');
-    assert(/symphony|orchestra/.test(r.reason), `reason ${r.reason}`);
-    await main(() => global.__ferna.windows[0].run('equalizer'));
-    const ov = await overlayPage();
-    await ov.waitForSelector('#eqp');
-    await H.until(() => ov.evaluate(() => /Classical/.test(document.querySelector('#eq-detect').textContent)), 4000, 'panel shows detection');
-    await shot('35-equalizer');
-    await main(() => { const c = global.__ferna; c.windows[0].closeOverlay(); c.pageFx.setEq({ enabled: false, auto: false, preset: 'flat' }); });
-  });
 
   await step('YouTube: ad schedule removed before the player, ad slot hidden, ad skipped; pop-up blocked', async () => {
     const port = new URL(base).port;
@@ -875,6 +751,7 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assertion failed'); }
   await require('./v063-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile });
   await require('./v064-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile, app });
   await require('./v080-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile, app });
+  await require('./v090-steps')({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile, app });
 
   // An exam window cannot be closed: end any left over by a failed step.
   await main(() => { const ctx = global.__ferna; if (ctx.examWin) ctx.exam.finish(ctx.examWin, 'test'); }).catch(() => {});

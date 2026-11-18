@@ -22,7 +22,7 @@ body.hc .tb:focus-visible { outline: 2px solid var(--tb-on-bg, var(--accent)); o
 body.hc .tb.on { background: var(--tb-on-bg, var(--accent)); color: var(--tb-on-ink, #fff); box-shadow: 0 0 0 2px color-mix(in srgb, var(--tb-on-bg, var(--accent)) 35%, transparent), 0 0 10px color-mix(in srgb, var(--tb-on-bg, var(--accent)) 45%, transparent); }
 body.hc .tb .icon svg { stroke-width: 2.1; }
 /* Exam window: no way out from the bar */
-body.exam .winctl, body.exam #btn-menu, body.exam #btn-shot, body.exam #btn-assistant, body.exam #btn-split, body.exam #btn-key, body.exam #btn-translate, body.exam #btn-reader, body.exam #btn-zoom, body.exam #btn-shield, body.exam #btn-eq, body.exam #btn-pip, body.exam #btn-media, body.exam #btn-downloads, body.exam #btn-feeds, body.exam #btn-rss, body.exam #omni-container { display: none !important; }
+body.exam .winctl, body.exam #btn-menu, body.exam #btn-assistant, body.exam #btn-split, body.exam #btn-key, body.exam #btn-translate, body.exam #btn-reader, body.exam #btn-zoom, body.exam #btn-shield, body.exam #btn-pip, body.exam #btn-media, body.exam #btn-downloads, body.exam #omni-container { display: none !important; }
 #exam-bar { display: none; align-items: center; gap: 10px; flex: none; padding: 0 6px; font-weight: 600; }
 body.exam #exam-bar { display: flex; }
 #exam-bar .timer { font-variant-numeric: tabular-nums; background: var(--tb-on-bg, var(--accent)); color: var(--tb-on-ink, #fff); border-radius: 999px; padding: 2px 10px; }
@@ -219,10 +219,6 @@ body.blur .winctl button { opacity: .55; }
 #btn-zoom { width: auto; min-width: 32px; padding: 0 6px; gap: 2px; display: flex; }
 #btn-zoom .zl { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 #btn-zoom .zl:empty { display: none; }
-#btn-zoom.text .zl::before { content: "T "; color: var(--accent); }
-#btn-eq { position: relative; }
-#btn-eq.on::after { content: ""; position: absolute; right: 6px; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-#btn-eq .eq-dot { display: none; }
 .bm-folder .icon { width: 15px; height: 15px; color: #d97706; }
 
 /* 0.5: split view divider */
@@ -231,7 +227,7 @@ body.blur .winctl button { opacity: .55; }
 #split-divider:hover span, #split-divider.drag span { background: var(--accent); height: 60px; }
 
 /* installed web app window */
-body.app #omnibox, body.app #btn-bookmarks, body.app #btn-overview, body.app #btn-split, body.app #btn-assistant, body.app #ext-actions, body.app #btn-puzzle, body.app #btn-shot, body.app #btn-forward { display: none !important; }
+body.app #omnibox, body.app #btn-bookmarks, body.app #btn-overview, body.app #btn-split, body.app #btn-assistant, body.app #ext-actions, body.app #btn-puzzle, body.app #btn-forward { display: none !important; }
 #app-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; padding: 0 8px; -webkit-app-region: drag; }
 #omni-container { font-size: 11px; font-weight: 600; color: #fff; background: var(--c); border-radius: 999px; padding: 1px 8px; margin-right: 4px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; flex: none; }
 #tabs.v.collapsed .tab .lacts { display: none; }
@@ -244,10 +240,6 @@ body.app #omnibox, body.app #btn-bookmarks, body.app #btn-overview, body.app #bt
 #tabs.tab-dragging [data-dz]:not(.dz) { outline-color: var(--border, #cbd5e1); }
 #tabs [data-dz].dz-over { outline-color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); border-color: var(--accent); }
 
-/* Feeds: the address-bar RSS button (orange like feed icons; filled when you follow the feed). */
-#btn-rss { color: var(--ink-2); }
-#btn-rss.found { color: #ea580c; }
-#btn-rss.on { color: #fff; background: #ea580c; }
 /* Safety check (fact-check bubble, scam & payment guard) */
 #btn-check { position: relative; color: var(--ink-2); }
 #btn-check[data-level="article"] { color: #2563eb; }
@@ -265,7 +257,6 @@ body.exam #btn-check { display: none !important; }
 .pagebar .pb-main, .pagebar .pb-tools { display: flex; align-items: center; gap: 1px; }
 #tabs.h .pagebar .pb-tools { margin-left: 4px; padding-left: 4px; border-left: 1px solid var(--line); }
 #tabs.h .pagebar .pb-tools .pb { width: 24px; }
-.pagebar .pb.found { color: #ea580c; }
 .pagebar .pb.off { opacity: .6; }
 .pagebar .pb.on:not([data-pb="bookmark"]) { background: var(--accent-soft, rgba(37, 99, 235, .12)); }
 #tabs.v .pagebar { flex-direction: column; align-items: stretch; gap: 4px; }

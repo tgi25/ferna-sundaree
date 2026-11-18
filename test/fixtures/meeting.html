@@ -1,0 +1,8 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Meeting test</title></head>
+<body><h1>Meeting test</h1><p>Camera, microphone, speakers and screen sharing, as a video-call site uses them.</p>
+<script>
+window.devices = async () => (await navigator.mediaDevices.enumerateDevices()).map(d => ({ kind: d.kind, label: d.label, id: d.deviceId ? 'yes' : '' }));
+window.join = async () => { const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: true }); window.stream = s; return s.getTracks().map(t => t.kind + ':' + t.label); };
+window.speaker = async () => { const a = new Audio(); try { await a.setSinkId('default'); return 'ok'; } catch (e) { return e.name + ': ' + e.message; } };
+window.share = async () => { try { const s = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }); window.shared = s; return s.getVideoTracks().map(t => t.label || 'video'); } catch (e) { return e.name; } };
+</script></body></html>

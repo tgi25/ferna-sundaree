@@ -1,5 +1,5 @@
 // Ferna Sundaree — overlay: Tab Overview, Ferna Tabs list at the pointer,
-// command palette, screenshot region picker and small prompts.
+// command palette, screen-sharing picker and small prompts.
 'use strict';
 
 const { icon, esc, faviconHtml, wsIconHtml, hostOf, $ } = FK;
@@ -18,13 +18,13 @@ api.on('overlay', msg => {
   keyHandler = null;
   root.innerHTML = '';
   if (!mode) return;
-  ({ overview: openOverview, pointer: openPointer, palette: openPalette, region: openRegion, prompt: openPrompt, zoom: openZoom, bookmarks: openBookmarks, eq: openEq, peek: openPeek, media: openMedia, pwsave: openPwSave, exampw: openExamPw, parentpw: openParentPw })[mode](data);
+  ({ overview: openOverview, pointer: openPointer, palette: openPalette, prompt: openPrompt, zoom: openZoom, bookmarks: openBookmarks, peek: openPeek, media: openMedia, pwsave: openPwSave, share: openShare, exampw: openExamPw, parentpw: openParentPw })[mode](data);
 });
 api.on('state', s => { if (mode === 'pointer') { data = { ...data, ...s }; if (!pt.bmv) renderPointer(); } });
 
 document.addEventListener('keydown', e => {
   if (keyHandler && keyHandler(e) === true) return;
-  if (e.key === 'Escape') { e.preventDefault(); if (mode === 'region') api.cmd('overlay:region', null); else close(); }
+  if (e.key === 'Escape') { e.preventDefault(); close(); }
 });
 
 // =====================================================================
@@ -191,16 +191,16 @@ function pageRowHtml(d) {
   </div>
   <div class="pop-tools" role="group" aria-label="Page tools">${PAGE_TOOLS.map(([k, ic, title]) => {
     const web = !!n.url && !n.internal && /^https?:/.test(n.url);
-    const dis = { copy: !n.url || n.url === 'ferna://newtab/', reader: !web, translate: !web, rss: !web || d.private, zoom: !!n.internal || !n.url, eq: !!n.internal || !n.url, shield: !/^https?:/.test(n.url || ''), shot: !n.url, feeds: !!d.private }[k];
-    const on = { reader: !!n.reader, rss: !!(n.feeds && n.feeds.subscribed), eq: !!(n.eq && n.eq.enabled), feeds: d.side === 'feeds', assistant: d.side === 'assistant' }[k];
-    return `<button class="pp${on ? ' on' : ''}${k === 'rss' && n.feeds ? ' found' : ''}" data-pp="${k}" title="${esc(title)}"${dis ? ' disabled' : ''}>${icon(ic)}</button>`;
+    const dis = { copy: !n.url || n.url === 'ferna://newtab/', reader: !web, translate: !web, zoom: !!n.internal || !n.url, shield: !/^https?:/.test(n.url || '') }[k];
+    const on = { reader: !!n.reader, assistant: d.side === 'assistant' }[k];
+    return `<button class="pp${on ? ' on' : ''}" data-pp="${k}" title="${esc(title)}"${dis ? ' disabled' : ''}>${icon(ic)}</button>`;
   }).join('')}</div>`;
 }
 const PAGE_TOOLS = [
   ['copy', 'copy', 'Copy this address'], ['clear', 'close', 'Clear the address and type a new one'],
-  ['reader', 'reader', 'Reading mode'], ['translate', 'translate', 'Translate this page'], ['rss', 'rss', 'Page feed: follow this site in Ferna Feeds'],
-  ['zoom', 'zoom', 'Zoom'], ['eq', 'eq', 'Equalizer'], ['shield', 'shield', 'Tracker and ad blocking'], ['shot', 'camera', 'Screenshot'],
-  ['bookmarks', 'bookmarks', 'Bookmarks'], ['feeds', 'feeds', 'Ferna Feeds'], ['assistant', 'sparkle', 'AI assistant'], ['overview', 'grid', 'Tab Overview'],
+  ['reader', 'reader', 'Reading mode'], ['translate', 'translate', 'Translate this page'],
+  ['zoom', 'zoom', 'Zoom'], ['shield', 'shield', 'Tracker and ad blocking'],
+  ['bookmarks', 'bookmarks', 'Bookmarks'], ['assistant', 'sparkle', 'AI assistant'], ['overview', 'grid', 'Tab Overview'],
 ];
 function editPointerAddress() {
   const q = $('#pt-q');
@@ -212,30 +212,50 @@ function editPointerAddress() {
   q.placeholder = 'Type an address or search, Enter to go';
 }
 
+function listPrefs(d) { return (d && d.settings && d.settings.tabsList) || TabsMatch.cleanListSettings(null); }
+
+/** Size, position and look of the list from its settings (Ferna Tabs 1.16 settings panel). */
+function placePointer(d) {
+  const pop = $('#pop');
+  if (!pop) return;
+  const tl = listPrefs(d);
+  const W = innerWidth, H = innerHeight;
+  const center = d.center || tl.position === 'center';
+  const pw = Math.min(Math.max(tl.width, center && d.center ? Math.max(tl.width, 520) : tl.width), W - 16);
+  const ph = Math.min(tl.height, H - 16);
+  const x = center ? Math.max(8, (W - pw) / 2) : Math.max(8, Math.min(d.x - 24, W - pw - 8));
+  const y = center ? Math.max(8, Math.min(80, H - ph - 8)) : Math.max(8, Math.min(d.y - 12, H - ph - 8));
+  Object.assign(pop.style, { left: `${x}px`, top: `${y}px`, width: `${pw}px`, maxHeight: `${ph}px`, height: pt.view === 'settings' ? `${ph}px` : '' });
+  pop.style.setProperty('--pt-row', `${{ compact: 26, normal: 34, large: 44 }[tl.rows]}px`);
+  pop.style.setProperty('--pt-fs', `${tl.fontSize}px`);
+  pop.style.setProperty('--pt-ic', `${tl.icons}px`);
+  pop.style.setProperty('--pt-font', tl.font ? `"${tl.font}", system-ui, sans-serif` : 'inherit');
+  pop.classList.toggle('no-hints', !tl.hints);
+}
+
 function openPointer(d) {
-  pt = { q: '', raw: '', sel: 0, rows: [], bm: [], bmv: null, editUrl: false };
-  const W = innerWidth;
-  const H = innerHeight;
-  const pw = Math.min(d.center ? 520 : 380, W - 16);
-  const ph = Math.min(520, H - 16);
-  const x = d.center ? Math.max(8, (W - pw) / 2) : Math.max(8, Math.min(d.x - 24, W - pw - 8));
-  const y = d.center ? Math.max(8, Math.min(80, H - ph - 8)) : Math.max(8, Math.min(d.y - 12, H - ph - 8));
+  pt = { q: '', raw: '', sel: 0, rows: [], bm: [], bmv: null, editUrl: false, view: 'list', review: null, wsMenu: false, drag: null, dismissed: pt.dismissed || false };
+  const tl = listPrefs(d);
   root.innerHTML = `<div class="backdrop clear" data-bg="1"></div>
-    <div class="pop" id="pop" style="left:${x}px;top:${y}px;width:${pw}px;max-height:${ph}px" role="dialog" aria-label="Open tabs">
-      ${pageRowHtml(d)}
-      <div class="pop-search">${icon('search')}<input id="pt-q" placeholder="Filter tabs, or type to search the web" aria-label="Filter tabs or search"><button class="pop-bm" id="pt-bm" title="Bookmarks (Alt+B)" aria-pressed="false">${icon('bookmarks')}</button></div>
+    <div class="pop" id="pop" role="dialog" aria-label="Open tabs">
+      ${tl.pageRow ? pageRowHtml(d) : ''}
+      <div class="pop-search">${icon('search')}<input id="pt-q" placeholder="Filter tabs and bookmarks, or type to search the web" aria-label="Filter tabs and bookmarks or search"><button class="pop-bm" id="pt-bm" title="Bookmarks (Alt+B)" aria-pressed="false">${icon('bookmarks')}</button><button class="pop-bm" id="pt-set" title="Settings of this list: size, rows, font" aria-pressed="false">${icon('settings')}</button></div>
       <div class="pop-ws" id="pt-ws"></div>
+      <div class="pop-wsmenu" id="pt-wsmenu" role="menu" hidden></div>
       <div class="pop-common" id="pt-common"></div>
+      <div class="pop-offer" id="pt-offer" hidden></div>
       <div class="pop-list" id="pt-list" role="listbox"></div>
-      <div class="pop-foot"><span><kbd>Enter</kbd> switch · <kbd>Del</kbd> close · <kbd>Alt+1…9</kbd> workspace · <kbd>Alt+B</kbd> bookmarks</span><span><kbd>Alt+S</kbd> pin · <kbd>Alt+Shift+S</kbd> common · <kbd>Alt+Shift+1…9</kbd> move</span></div>
+      <div class="pop-foot" id="pt-foot"></div>
     </div>`;
+  placePointer(d);
   root.querySelector('[data-bg]').onclick = close;
   const q = $('#pt-q');
   q.focus();
   $('#pt-bm').onclick = () => togglePointerBookmarks();
+  $('#pt-set').onclick = () => togglePointerSettings();
   q.addEventListener('input', () => {
     if (pt.bmv) { pt.bmv.setQuery(q.value); return; }
-    pt.raw = q.value; pt.q = q.value.toLowerCase().trim(); pt.sel = 0; pt.bm = [];
+    pt.raw = q.value; pt.q = q.value.toLowerCase().trim(); pt.sel = 0; pt.bm = []; pt.review = null;
     renderPointer();
     const asked = pt.q;
     if (asked) api.cmd('overlay:bookmarks', asked).then(list => { if (pt.q === asked) { pt.bm = list.filter(b => b.url); renderPointer(); } }).catch(() => {});
@@ -248,34 +268,54 @@ function openPointer(d) {
     e.stopPropagation();
     const a = b.dataset.pp;
     if (a === 'edit') editPointerAddress();
-    else if (a === 'clear') { editPointerAddress(); const q = $('#pt-q'); q.value = ''; q.dispatchEvent(new Event('input')); }
+    else if (a === 'clear') { editPointerAddress(); const qq = $('#pt-q'); qq.value = ''; qq.dispatchEvent(new Event('input')); }
     else if (a === 'more') api.cmd('menu:page-actions');
     else if (PAGE_TOOLS.some(t => t[0] === a)) { const r = b.getBoundingClientRect(); api.cmd('page:tool', a, { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }); }
     else api.cmd('page:act', a).then(() => { if (a === 'bookmark') b.classList.toggle('on'); });
   });
+  wirePointerDrag();
   if (d.editAddress) editPointerAddress();
 }
+
+const FOOT_HINTS = '<span><kbd>Enter</kbd> switch · <kbd>Del</kbd> close · <kbd>Ctrl+Z</kbd> reopen · <kbd>Alt+P</kbd> park</span><span><kbd>Alt+S</kbd> pin · <kbd>Alt+Shift+S</kbd> common · <kbd>Alt+1…9</kbd> workspace</span>';
+function setFoot(html) { const f = $('#pt-foot'); if (f) f.innerHTML = html == null ? FOOT_HINTS : html; }
 
 function renderPointer() {
   const d = data;
   if (!d || !$('#pop')) return;
+  placePointer(d);
+  if (pt.view === 'settings') return;
+  const tl = listPrefs(d);
   const tabById = id => d.tabs.find(t => t.id === id);
   const names = !!(d.settings && d.settings.wsShowNames);
   $('#pt-ws').innerHTML = [null, ...d.workspaces].map((w, i) => {
     const id = w ? w.id : '';
     const name = w ? w.name : 'All tabs';
-    return `<button class="${(d.currentWs || '') === id ? 'on' : ''}${names ? '' : ' ico'}" data-ws="${esc(id)}" title="${esc(name)} (Alt+${i})" aria-label="${esc(name)}" style="--c:${w ? esc(w.color) : '#94a3b8'}"><span class="wsi">${w ? wsIconHtml(w) : icon('grid')}</span>${names ? esc(name) : ''}</button>`;
+    const cur = (d.currentWs || '') === id;
+    return `<button class="${cur ? 'on' : ''}${names ? '' : ' ico'}" data-ws="${esc(id)}" title="${esc(name)} (Alt+${i})${cur ? ' — click for this workspace’s actions' : ''}" aria-label="${esc(name)}" style="--c:${w ? esc(w.color) : '#94a3b8'}"><span class="wsi">${w ? wsIconHtml(w) : icon('grid')}</span>${names ? esc(name) : ''}</button>`;
   }).join('');
-  $('#pt-common').innerHTML = d.strip.common.map(c => `<button class="${c.tabId ? '' : 'closed'}" data-common="${c.index}" title="${esc(c.entry.title || c.entry.url)}">${faviconHtml(c.entry.url, (c.tabId && (tabById(c.tabId) || {}).favicon) || (d.icons || {})[c.entry.url] || '')}${c.badge ? `<span class="badge">${esc(c.badge)}</span>` : ''}</button>`).join('');
-  $('#pt-common').style.display = d.strip.common.length ? '' : 'none';
-  const match = (title, url) => !pt.q || (title || '').toLowerCase().includes(pt.q) || (url || '').toLowerCase().includes(pt.q);
+  const commonOpen = new Set(d.strip.common.filter(c => c.tabId).map(c => c.tabId));
+  $('#pt-common').innerHTML = d.strip.common.map(c => `<button class="${c.tabId ? '' : 'closed'}" data-common="${c.index}" title="${esc(c.entry.title || c.entry.url)}">${faviconHtml(c.entry.url, (c.tabId && (tabById(c.tabId) || {}).favicon) || (d.icons || {})[c.entry.url] || '')}${c.badge ? `<span class="badge">${esc(c.badge)}</span>` : ''}</button>`).join('') ||
+    '<span class="pop-common-empty">Drag a tab here, or click its ☆, to keep it on the common bar</span>';
+  $('#pt-common').style.display = tl.common && !pt.q ? '' : 'none';
+  // One offer at a time: duplicate tabs, else tabs you have not used for days.
+  const offer = $('#pt-offer');
+  const dups = TabsMatch.duplicates(d.tabs, d.activeId);
+  const old = TabsMatch.forgotten(d.tabs, tl.forgetDays, d.activeId);
+  const copies = dups.reduce((n, g) => n + g.close.length, 0);
+  if (tl.offers && !pt.q && !pt.review && !pt.dismissed && (copies || old.length)) {
+    offer.hidden = false;
+    offer.innerHTML = copies
+      ? `<span>${copies} duplicate tab${copies === 1 ? '' : 's'} (the same page open twice)</span><button class="btn small" data-offer="dups">Close the copies</button><button class="x" data-offer="dismiss" title="Not now">${icon('close')}</button>`
+      : `<span>${old.length} tab${old.length === 1 ? '' : 's'} not used for ${tl.forgetDays}+ day${tl.forgetDays === 1 ? '' : 's'}</span><button class="btn small" data-offer="review">Review</button><button class="x" data-offer="dismiss" title="Not now">${icon('close')}</button>`;
+  } else offer.hidden = true;
+
   const rows = [];
-  // While filtering, search every tab; otherwise follow the three-part split.
-  if (pt.q) {
-    // Smart fallback (as in Ferna Tabs): open tabs first, then bookmarks; an address gets
-    // "Go to" at the top; other text gets "Search the web", at the top when nothing matched.
-    d.tabs.filter(t => match(t.title, t.url)).forEach(t => rows.push({ kind: 'tab', t }));
-    (pt.bm || []).filter(b => !rows.some(r => r.t && r.t.url === b.url)).forEach(b => rows.push({ kind: 'bm', b }));
+  if (pt.review) {
+    pt.review.map(tabById).filter(Boolean).forEach(t => rows.push({ kind: 'tab', t, old: true }));
+  } else if (pt.q) {
+    // One ranked list of tabs and bookmarks (initials and gaps match; recent tabs first among equals).
+    TabsMatch.rank(pt.raw, d.tabs, pt.bm).forEach(r => rows.push(r.kind === 'tab' ? { kind: 'tab', t: r.item } : { kind: 'bm', b: r.item }));
     const text = pt.raw.trim();
     const search = { kind: 'search', text };
     if (looksLikeAddress(text)) { rows.unshift({ kind: 'go', text }); rows.push(search); }
@@ -287,44 +327,82 @@ function renderPointer() {
       rows.push(t ? { kind: 'tab', t, pinned: p } : { kind: 'pin', p });
     });
     d.strip.tabs.forEach(id => { const t = tabById(id); if (t) rows.push({ kind: 'tab', t }); });
+    if (tl.closed) (d.closed || []).forEach(c => rows.push({ kind: 'closed', c }));
   }
   pt.rows = rows;
   pt.sel = Math.max(0, Math.min(pt.sel, rows.length - 1));
   const ws = d.workspaces.find(w => w.id === d.currentWs);
+  const days = t => Math.max(1, Math.round((Date.now() - (t.lastActive || Date.now())) / 86400e3));
   let html = '';
   let lastSect = null;
   rows.forEach((r, i) => {
     const pin = r.pinned || r.p;
-    const sect = pt.q ? ({ tab: 'Open tabs', bm: 'Bookmarks', go: 'Web', search: 'Web' })[r.kind] : pin ? `Pinned in ${pin.wsId ? (d.workspaces.find(w => w.id === pin.wsId) || {}).name || '' : 'All tabs'}` : (ws ? 'Tabs' : 'All tabs');
-    if (sect !== lastSect) { html += `<div class="pop-label">${esc(sect)}</div>`; lastSect = sect; }
+    const sect = pt.review ? `Not used for ${tl.forgetDays}+ days, oldest first` : pt.q ? ({ tab: 'Tabs and bookmarks', bm: 'Tabs and bookmarks', go: 'Web', search: 'Web' })[r.kind]
+      : r.kind === 'closed' ? 'Recently closed' : pin ? `Pinned in ${pin.wsId ? (d.workspaces.find(w => w.id === pin.wsId) || {}).name || '' : 'All tabs'}` : (ws ? 'Tabs' : 'All tabs');
+    if (sect !== lastSect) {
+      html += `<div class="pop-label${pin ? ' pin-zone' : ''}"${pin ? ' data-drop="pin"' : ''}>${esc(sect)}${pt.review && i === 0 ? ' <button class="linkish" data-offer="close-review">Close all of these</button> <button class="linkish" data-offer="end-review">Back to the list</button>' : ''}</div>`;
+      lastSect = sect;
+    }
     if (r.kind === 'search' || r.kind === 'go') {
       const label = r.kind === 'go' ? `Go to ${r.text}` : `Search ${d.engine ? `with ${d.engine} ` : 'the web '}for “${r.text}”`;
       html += `<div class="row-tab web${i === pt.sel ? ' sel' : ''}" data-i="${i}" role="option" title="Enter: new tab · Shift+Enter: this tab"><span class="wicon">${icon(r.kind === 'go' ? 'globe' : 'search')}</span><span class="t">${esc(label)}</span><span class="st">Enter</span></div>`;
     } else if (r.kind === 'bm') {
-      html += `<div class="row-tab${i === pt.sel ? ' sel' : ''}" data-i="${i}" role="option" title="${esc(r.b.url)}">${faviconHtml(r.b.url, '')}<span class="t">${esc(r.b.title || r.b.url)}</span><span class="st">${esc(hostOf(r.b.url))}</span></div>`;
+      html += `<div class="row-tab${i === pt.sel ? ' sel' : ''}" data-i="${i}" role="option" title="${esc(r.b.url)}">${faviconHtml(r.b.url, '')}<span class="t">${esc(r.b.title || r.b.url)}</span><span class="st">${icon('bookmarks')} ${esc(hostOf(r.b.url))}</span></div>`;
+    } else if (r.kind === 'closed') {
+      html += `<div class="row-tab closed${i === pt.sel ? ' sel' : ''}" data-i="${i}" role="option" title="Reopen ${esc(r.c.url)}">${faviconHtml(r.c.url, '')}<span class="t">${esc(r.c.title)}</span><span class="st">${i === rows.findIndex(x => x.kind === 'closed') ? 'Ctrl+Z' : 'Reopen'}</span></div>`;
     } else if (r.kind === 'pin') {
-      html += `<div class="row-tab closed${i === pt.sel ? ' sel' : ''}" data-i="${i}" role="option">${faviconHtml(r.p.pin.url, (d.icons || {})[r.p.pin.url] || '')}<span class="t">${esc(r.p.pin.title || r.p.pin.url)}</span><span class="st">Not open</span><button class="x act on" data-unpin="${i}" title="Unpin (Alt+S)">${icon('pin')}</button></div>`;
+      const parked = r.p.pin.parked;
+      html += `<div class="row-tab closed${parked ? ' parked' : ''}${i === pt.sel ? ' sel' : ''}" data-i="${i}" data-drop="pin" role="option">${faviconHtml(r.p.pin.url, (d.icons || {})[r.p.pin.url] || '')}<span class="t">${esc(r.p.pin.title || r.p.pin.url)}</span><span class="st">${parked ? esc(TabsMatch.parkedLabel(parked)) : 'Not open'}</span><button class="x act on" data-unpin="${i}" title="Unpin (Alt+S)">${icon('pin')}</button></div>`;
     } else {
       const t = r.t;
-      html += `<div class="row-tab${i === pt.sel ? ' sel' : ''}${t.id === d.activeId ? ' cur' : ''}" data-i="${i}" role="option" title="${esc(t.url)}">${faviconHtml(t.url, t.favicon)}<span class="t">${esc(t.title || t.url)}</span>${/^(https?|file):/i.test(t.url || '') ? (r.pinned ? `<button class="x act on" data-unpin="${i}" title="Unpin (Alt+S)">${icon('pin')}</button>` : `<button class="x act" data-star="${i}" title="Add to common bar (Alt+Shift+S)">${icon('star')}</button><button class="x act" data-pin="${i}" title="Pin here (Alt+S)">${icon('pin')}</button>`) : ''}<button class="x" data-x="${i}" title="Close (Delete)">${icon('close')}</button></div>`;
+      const web = /^(https?|file):/i.test(t.url || '');
+      const onCommon = commonOpen.has(t.id);
+      html += `<div class="row-tab${i === pt.sel ? ' sel' : ''}${t.id === d.activeId ? ' cur' : ''}" data-i="${i}" role="option" title="${esc(t.url)}"${web ? ' draggable="true"' : ''}${r.pinned ? ' data-drop="pin"' : ''}>${faviconHtml(t.url, t.favicon)}<span class="t">${esc(t.title || t.url)}</span>${r.old ? `<span class="st">${days(t)} d</span>` : ''}${web ? `<button class="x act star${onCommon ? ' on' : ''}" data-star="${i}" title="${onCommon ? 'On the common bar: click to take it off' : 'Add to the common bar'} (Alt+Shift+S)">${icon('star')}</button>${r.pinned ? `<button class="x act on" data-unpin="${i}" title="Unpin (Alt+S)">${icon('pin')}</button>` : `<button class="x act" data-pin="${i}" title="Pin here (Alt+S)">${icon('pin')}</button>`}<button class="x act" data-park="${i}" title="Park: close it, keep it pinned here with today’s date (Alt+P)">${icon('clock')}</button>` : ''}<button class="x" data-x="${i}" title="Close (Delete)">${icon('close')}</button></div>`;
     }
   });
   const S = d.strip;
-  if (!pt.q && d.currentWs && S.noWorkspace) html += `<div class="pop-label" style="text-transform:none;letter-spacing:0;cursor:pointer" data-ws="">${S.noWorkspace} tab${S.noWorkspace === 1 ? '' : 's'} in no workspace — show all</div>`;
+  if (!pt.q && !pt.review && d.currentWs && S.noWorkspace) html += `<div class="pop-label" style="text-transform:none;letter-spacing:0;cursor:pointer" data-ws="">${S.noWorkspace} tab${S.noWorkspace === 1 ? '' : 's'} in no workspace — show all</div>`;
   $('#pt-list').innerHTML = html || '<div class="empty">No tabs</div>';
+  if (!pt.drag) setFoot(null);
   const s = $('#pt-list .sel');
   if (s) s.scrollIntoView({ block: 'nearest' });
+}
+
+/** The workspace you are in, clicked again: actions on all its tabs. */
+function toggleWsMenu(btn) {
+  const m = $('#pt-wsmenu');
+  if (!m) return;
+  if (!m.hidden) { m.hidden = true; return; }
+  const d = data;
+  const id = d.currentWs || '';
+  const name = id ? (d.workspaces.find(w => w.id === id) || {}).name : 'All tabs';
+  const items = [['openAll', 'Open all its pinned sites'], ['close', 'Close these tabs'], ['sleep', 'Put these tabs to sleep']];
+  if ((d.windowCount || 1) > 1) items.push(['gather', 'Gather its tabs in this window']);
+  m.innerHTML = `<div class="wm-title">${esc(name)}</div>${items.map(([a, l]) => `<button role="menuitem" data-wsact="${a}">${esc(l)}</button>`).join('')}`;
+  const r = btn.getBoundingClientRect(), pr = $('#pop').getBoundingClientRect();
+  m.style.left = `${Math.max(6, r.left - pr.left)}px`; m.style.top = `${r.bottom - pr.top + 4}px`;
+  m.hidden = false;
+  const first = m.querySelector('button'); if (first) first.focus();
 }
 
 function pointerAct(i, alternate = false) {
   const r = pt.rows[i];
   if (!r) return;
   if (r.kind === 'pin') api.cmd('pinned:open', r.p.wsId || '', r.p.index);
+  else if (r.kind === 'closed') api.cmd('tab:reopen', r.c.i);
   // Editing the address of this page: Enter goes there in this tab (Shift+Enter: a new tab).
   else if (pt.editUrl && (r.kind === 'search' || r.kind === 'go')) { if (alternate) api.cmd('overlay:web', r.kind, r.text, true); else api.cmd('page:act', 'go', r.text); }
   else if (r.kind === 'search' || r.kind === 'go') api.cmd('overlay:web', r.kind, r.text, !alternate);
   else if (r.kind === 'bm') api.cmd('overlay:web', 'go', r.b.url, !alternate);
   else api.cmd('tab:activate', r.t.id);
+}
+
+/** Close tabs from the list; the note offers Undo for six seconds. */
+function closeFromList(ids) {
+  const list = [].concat(ids);
+  (list.length === 1 ? api.cmd('tab:close', list[0]) : api.cmd('tabs:close', list)).then(() => {
+    toast(list.length === 1 ? 'Tab closed' : `${list.length} tabs closed`, { undo: () => { for (let k = 0; k < list.length; k++) api.cmd('tab:reopen', 0); }, ms: 6000 });
+  });
 }
 
 /** An address rather than search words (same rules as the address bar, roughly). */
@@ -335,32 +413,102 @@ function looksLikeAddress(t) {
 
 root.addEventListener('click', e => {
   if (mode !== 'pointer') return;
+  const wa = e.target.closest('[data-wsact]');
+  if (wa) {
+    e.stopPropagation();
+    const a = wa.dataset.wsact;
+    $('#pt-wsmenu').hidden = true;
+    api.cmd('ws:act', data.currentWs || null, a).then(n => toast(({ openAll: n ? `Opened ${n} pinned site${n === 1 ? '' : 's'}` : 'Every pinned site is already open', close: `${n} tab${n === 1 ? '' : 's'} closed`, sleep: `${n} tab${n === 1 ? '' : 's'} put to sleep`, gather: n ? `${n} tab${n === 1 ? '' : 's'} brought here` : 'No tabs of this workspace in other windows' })[a], a === 'close' && n ? { undo: () => { for (let k = 0; k < Math.min(n, 5); k++) api.cmd('tab:reopen', 0); }, ms: 6000 } : {}));
+    return;
+  }
+  if (!e.target.closest('#pt-wsmenu') && $('#pt-wsmenu') && !$('#pt-wsmenu').hidden && !e.target.closest('[data-ws]')) $('#pt-wsmenu').hidden = true;
+  const of = e.target.closest('[data-offer]');
+  if (of) {
+    e.stopPropagation();
+    const a = of.dataset.offer;
+    if (a === 'dismiss') { pt.dismissed = true; renderPointer(); }
+    else if (a === 'dups') { const ids = TabsMatch.duplicates(data.tabs, data.activeId).flatMap(g => g.close.map(t => t.id)); if (ids.length) closeFromList(ids); }
+    else if (a === 'review') { pt.review = TabsMatch.forgotten(data.tabs, listPrefs(data).forgetDays, data.activeId).map(t => t.id); pt.sel = 0; renderPointer(); }
+    else if (a === 'close-review') { const ids = (pt.review || []).filter(id => data.tabs.some(t => t.id === id)); pt.review = null; if (ids.length) closeFromList(ids); else renderPointer(); }
+    else if (a === 'end-review') { pt.review = null; renderPointer(); }
+    return;
+  }
   const x = e.target.closest('[data-x]');
-  if (x) { e.stopPropagation(); const r = pt.rows[Number(x.dataset.x)]; if (r && r.t) api.cmd('tab:close', r.t.id); return; }
+  if (x) { e.stopPropagation(); const r = pt.rows[Number(x.dataset.x)]; if (r && r.t) closeFromList(r.t.id); return; }
   const st = e.target.closest('[data-star]');
   if (st) { e.stopPropagation(); const r = pt.rows[Number(st.dataset.star)]; if (r && r.t) api.cmd('tab:common', r.t.id); return; }
   const pn = e.target.closest('[data-pin]');
   if (pn) { e.stopPropagation(); const r = pt.rows[Number(pn.dataset.pin)]; if (r && r.t) api.cmd('tab:pin', r.t.id); return; }
+  const pk = e.target.closest('[data-park]');
+  if (pk) { e.stopPropagation(); const r = pt.rows[Number(pk.dataset.park)]; if (r && r.t) api.cmd('tab:park', r.t.id).then(ok => { if (ok) toast('Parked: kept pinned here with today’s date'); }); return; }
   const un = e.target.closest('[data-unpin]');
   if (un) { e.stopPropagation(); const r = pt.rows[Number(un.dataset.unpin)]; const p = r && (r.pinned || r.p); if (p) api.cmd('pinned:unpin', p.wsId || '', p.index); return; }
   const w = e.target.closest('[data-ws]');
-  if (w) { api.cmd('ws:switch', w.dataset.ws || null); return; }
+  if (w) {
+    // The workspace you are in, clicked again: its actions.
+    if ((w.dataset.ws || '') === (data.currentWs || '') && w.closest('#pt-ws')) { toggleWsMenu(w); return; }
+    api.cmd('ws:switch', w.dataset.ws || null); return;
+  }
   const c = e.target.closest('[data-common]');
   if (c) { api.cmd('common:open', Number(c.dataset.common)); return; }
   const row = e.target.closest('.row-tab');
-  if (row) pointerAct(Number(row.dataset.i));
+  if (row && row.closest('#pt-list')) pointerAct(Number(row.dataset.i));
 });
+
+/** Drag a row onto the common bar, a workspace chip or the pinned part of the list. */
+function wirePointerDrag() {
+  const pop = $('#pop');
+  const target = el => el && (el.closest('#pt-common') ? { kind: 'common', el: el.closest('#pt-common') } : el.closest('#pt-ws [data-ws]') ? { kind: 'ws', el: el.closest('[data-ws]') } : el.closest('[data-drop="pin"]') ? { kind: 'pin', el: el.closest('[data-drop="pin"]') } : null);
+  const tell = tg => {
+    const d = data;
+    if (!tg) { setFoot('<span>Drop on the common bar, a workspace, or the pinned sites</span>'); return; }
+    const t = d.tabs.find(x => x.id === pt.drag);
+    const name = t ? (t.title || t.url) : 'this tab';
+    const wsName = id => (id ? (d.workspaces.find(w => w.id === id) || {}).name : 'no workspace') || '';
+    setFoot(`<span>${esc(tg.kind === 'common' ? `Add “${name}” to the common bar` : tg.kind === 'ws' ? `Move “${name}” to ${wsName(tg.el.dataset.ws)}` : `Pin “${name}” here`)}</span>`);
+  };
+  let lit = null;
+  const light = tg => { if (lit && (!tg || lit !== tg.el)) lit.classList.remove('drop-on'); lit = tg ? tg.el : null; if (lit) lit.classList.add('drop-on'); };
+  pop.addEventListener('dragstart', e => {
+    const row = e.target.closest && e.target.closest('.row-tab[draggable="true"]');
+    const r = row && pt.rows[Number(row.dataset.i)];
+    if (!r || !r.t) { e.preventDefault(); return; }
+    pt.drag = r.t.id;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', r.t.url || '');
+    pop.classList.add('dragging');
+    tell(null);
+  });
+  pop.addEventListener('dragover', e => {
+    if (!pt.drag) return;
+    const tg = target(e.target);
+    if (tg) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+    light(tg); tell(tg);
+  });
+  pop.addEventListener('drop', e => {
+    if (!pt.drag) return;
+    const tg = target(e.target);
+    if (!tg) return;
+    e.preventDefault();
+    const id = pt.drag;
+    if (tg.kind === 'common') api.cmd('tab:to', id, 'common');
+    else if (tg.kind === 'pin') api.cmd('tab:to', id, 'pin');
+    else api.cmd('tab:ws', id, tg.el.dataset.ws || 'none');
+  });
+  pop.addEventListener('dragend', () => { pt.drag = null; light(null); pop.classList.remove('dragging'); setFoot(null); });
+}
 
 /** Switch the Ferna Tabs list between tabs and the bookmarks browser. */
 function togglePointerBookmarks() {
   const q = $('#pt-q');
   const pop = $('#pop');
+  if (pt.view === 'settings') togglePointerSettings();
   if (pt.bmv) {
     pt.bmv = null;
     pop.classList.remove('bm-view');
     $('#pt-bm').setAttribute('aria-pressed', 'false');
     $('#pt-list').className = 'pop-list'; $('#pt-list').removeAttribute('tabindex');
-    q.placeholder = 'Filter tabs, or type to search the web';
+    q.placeholder = 'Filter tabs and bookmarks, or type to search the web';
     q.value = ''; pt.q = ''; pt.raw = ''; renderPointer();
   } else {
     pop.classList.add('bm-view');
@@ -374,10 +522,91 @@ function togglePointerBookmarks() {
   q.focus();
 }
 
+/** The list's own settings: its size, position, rows, font and what it shows. */
+function togglePointerSettings() {
+  const pop = $('#pop');
+  if (pt.view === 'settings') {
+    pt.view = 'list';
+    pop.classList.remove('set-view');
+    $('#pt-set').setAttribute('aria-pressed', 'false');
+    renderPointer();
+    $('#pt-q').focus();
+    return;
+  }
+  if (pt.bmv) togglePointerBookmarks();
+  pt.view = 'settings';
+  pop.classList.add('set-view');
+  $('#pt-set').setAttribute('aria-pressed', 'true');
+  $('#pt-offer').hidden = true;
+  drawPointerSettings();
+}
+function drawPointerSettings() {
+  const tl = listPrefs(data);
+  const opt = (v, l, cur) => `<option value="${esc(String(v))}"${String(v) === String(cur) ? ' selected' : ''}>${esc(l)}</option>`;
+  const num = (k, lo, hi, step, unit) => `<span class="ps-num"><input type="number" data-ps="${k}" min="${lo}" max="${hi}" step="${step}" value="${tl[k]}"> ${unit}</span>`;
+  const chk = (k, l) => `<label class="ps-chk"><input type="checkbox" data-ps="${k}"${tl[k] ? ' checked' : ''}> ${esc(l)}</label>`;
+  $('#pt-list').innerHTML = `<div class="ps" role="form" aria-label="Settings of this list">
+      <div class="pop-label">Size and place</div>
+      <div class="ps-row"><span>Width</span>${num('width', 300, 900, 10, 'px')}</div>
+      <div class="ps-row"><span>Height</span>${num('height', 280, 1000, 10, 'px')}</div>
+      <div class="ps-row"><span>Opens</span><select data-ps="position">${opt('pointer', 'At the mouse pointer', tl.position)}${opt('center', 'In the middle of the window', tl.position)}</select></div>
+      <div class="pop-label">Items</div>
+      <div class="ps-row"><span>Row size</span><select data-ps="rows">${opt('compact', 'Compact', tl.rows)}${opt('normal', 'Normal', tl.rows)}${opt('large', 'Large', tl.rows)}</select></div>
+      <div class="ps-row"><span>Icon size</span><select data-ps="icons" data-num="1">${[14, 16, 20, 24].map(v => opt(v, `${v} px`, tl.icons)).join('')}</select></div>
+      <div class="ps-row"><span>Font</span><select data-ps="font">${TabsMatch.FONTS.map(f => opt(f, f || 'Same as the browser', tl.font)).join('')}</select></div>
+      <div class="ps-row"><span>Font size</span>${num('fontSize', 10, 22, 1, 'px')}</div>
+      <div class="pop-label">Show</div>
+      ${chk('pageRow', 'The page controls while the bars are hidden (Ctrl+Shift+H)')}
+      ${chk('common', 'The common bar')}
+      ${chk('closed', 'Recently closed tabs')}
+      ${chk('offers', 'Offers to close duplicates and forgotten tabs')}
+      <div class="ps-row"><span>Forgotten after</span><select data-ps="forgetDays" data-num="1">${[1, 3, 7, 14, 30].map(v => opt(v, `${v} day${v === 1 ? '' : 's'}`, tl.forgetDays)).join('')}</select></div>
+      ${chk('hints', 'Keyboard hints at the bottom')}
+      <div class="ps-foot"><button class="btn small" data-ps-reset="1">Reset to defaults</button><button class="btn small primary" data-ps-done="1">Done</button></div>
+    </div>`;
+  const box = $('#pt-list .ps');
+  box.addEventListener('change', e => {
+    const el = e.target.closest('[data-ps]');
+    if (!el) return;
+    const k = el.dataset.ps;
+    const v = el.type === 'checkbox' ? el.checked : (el.type === 'number' || el.dataset.num) ? Number(el.value) : el.value;
+    saveListPrefs({ ...listPrefs(data), [k]: v }, k === 'pageRow');
+  });
+  box.addEventListener('click', e => {
+    if (e.target.closest('[data-ps-reset]')) saveListPrefs({ ...TabsMatch.LIST_DEFAULTS }, true);
+    if (e.target.closest('[data-ps-done]')) togglePointerSettings();
+  });
+}
+function saveListPrefs(v, redraw) {
+  api.cmd('tabslist:set', v).then(clean => {
+    data = { ...data, settings: { ...(data.settings || {}), tabsList: clean } };
+    placePointer(data);
+    // The page controls row is part of the list's frame: draw the list again.
+    if (redraw) { const d = data; openPointer(d); togglePointerSettings(); } else if (pt.view === 'settings') drawPointerSettings();
+  });
+}
+
 function pointerKeys(e) {
+  if (pt.view === 'settings') {
+    if (e.key === 'Escape') { e.preventDefault(); togglePointerSettings(); return true; }
+    return false;
+  }
+  const m = $('#pt-wsmenu');
+  if (m && !m.hidden) {
+    if (e.key === 'Escape') { e.preventDefault(); m.hidden = true; $('#pt-q').focus(); return true; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const b = [...m.querySelectorAll('button')]; const i = b.indexOf(document.activeElement);
+      b[(i + (e.key === 'ArrowDown' ? 1 : -1) + b.length) % b.length].focus();
+      return true;
+    }
+    return false;
+  }
   if (e.altKey && !e.ctrlKey && !e.shiftKey && e.code === 'KeyB') { e.preventDefault(); togglePointerBookmarks(); return true; }
   if (pt.bmv) return pt.bmv.keys(e);
   const n = pt.rows.length;
+  if (pt.review && e.key === 'Escape') { e.preventDefault(); pt.review = null; renderPointer(); return true; }
+  if (e.ctrlKey && !e.shiftKey && !e.altKey && e.code === 'KeyZ' && !(e.target && e.target.id === 'pt-q' && e.target.value)) { e.preventDefault(); api.cmd('tab:reopen', 0); return true; }
   if (e.altKey && e.shiftKey && /^Digit[1-9]$/.test(e.code)) {
     e.preventDefault();
     const w = data.workspaces[Number(e.code.slice(5)) - 1];
@@ -395,7 +624,19 @@ function pointerKeys(e) {
   if (e.key === 'ArrowDown') { e.preventDefault(); pt.sel = Math.min(n - 1, pt.sel + 1); renderPointer(); return true; }
   if (e.key === 'ArrowUp') { e.preventDefault(); pt.sel = Math.max(0, pt.sel - 1); renderPointer(); return true; }
   if (e.key === 'Enter') { e.preventDefault(); pointerAct(pt.sel, e.shiftKey); return true; }
-  if (e.key === 'Delete') { e.preventDefault(); const r = pt.rows[pt.sel]; if (r && r.t) api.cmd('tab:close', r.t.id); return true; }
+  if (e.key === 'Delete') {
+    // In the search box, Delete deletes text while there is text after the cursor (or selected).
+    const q = e.target && e.target.id === 'pt-q' ? e.target : null;
+    if (q && q.value && (q.selectionStart < q.value.length || q.selectionStart !== q.selectionEnd)) return false;
+    e.preventDefault(); const r = pt.rows[pt.sel]; if (r && r.t) closeFromList(r.t.id); return true;
+  }
+  // Alt+P parks the selected tab (closes it, keeps it pinned here with the date).
+  if (e.altKey && !e.ctrlKey && !e.shiftKey && e.code === 'KeyP') {
+    e.preventDefault();
+    const r = pt.rows[pt.sel];
+    if (r && r.t) api.cmd('tab:park', r.t.id).then(ok => { if (ok) toast('Parked: kept pinned here with today’s date'); });
+    return true;
+  }
   // As in Ferna Tabs: Alt+S pins the selected tab here (or unpins it), Alt+Shift+S puts it on the common bar.
   if (e.altKey && !e.ctrlKey && e.code === 'KeyS') {
     e.preventDefault();
@@ -415,8 +656,7 @@ const COMMANDS = [
   ['tabOverview', 'Tab Overview', 'Ctrl+Shift+A'], ['toggleTabBar', 'Hide/unhide tab bar', 'Ctrl+Shift+H'],
   ['toggleBookmarksBar', 'Hide/unhide bookmarks bar', 'Ctrl+Shift+B'], ['cycleTabPosition', 'Move tab bar (top / left / right)', 'Ctrl+Shift+,'],
   ['collapseTabs', 'Collapse vertical tab bar', 'Ctrl+Shift+\\'], ['focusMode', 'Focus mode', 'Ctrl+Shift+F'],
-  ['shotVisible', 'Screenshot: visible area', 'Alt+Shift+V'], ['shotFull', 'Screenshot: entire page', 'Alt+Shift+F'],
-  ['shotRegion', 'Screenshot: select region', 'Alt+Shift+R'], ['shotElement', 'Screenshot: select element', 'Alt+Shift+E'],
+  ['zoomIn', 'Zoom in', 'Ctrl+='], ['zoomOut', 'Zoom out', 'Ctrl+−'], ['zoomReset', 'Reset zoom', 'Ctrl+0'],
   ['history', 'History', 'Ctrl+H'], ['downloads', 'Downloads', 'Ctrl+J'], ['bookmarkManager', 'Bookmarks', 'Ctrl+Shift+O'],
   ['find', 'Find in page', 'Ctrl+F'], ['reopenTab', 'Reopen closed tab', 'Ctrl+Shift+T'], ['print', 'Print', 'Ctrl+P'],
   ['devtools', 'Developer tools', 'F12'], ['settings', 'Settings', ''], ['nextWorkspace', 'Next workspace', 'Alt+Shift+.'],
@@ -484,84 +724,6 @@ function paletteKeys(e) {
 }
 
 // =====================================================================
-// Screenshot region picker: select any area of the whole page, even beyond the screen
-// =====================================================================
-function openRegion(d) {
-  const c = d.content;
-  root.innerHTML = `
-    <div class="reg" id="reg" style="left:${c.x}px;top:${c.y}px;width:${c.width}px;height:${c.height}px">
-      <div id="reg-canvas" style="position:relative;width:${d.cssWidth}px">
-        <img id="reg-img" src="ferna://shotimg/${encodeURIComponent(d.id)}.png" style="width:${d.cssWidth}px" alt="Page capture">
-        <div class="sel" id="reg-sel" hidden><span class="dim" id="reg-dim"></span></div>
-      </div>
-    </div>
-    <div class="reg-bar" style="top:${c.y + 12}px">
-      <span class="tip" id="reg-tip">Drag to select · scroll to reach any part of the page</span>
-      <button class="btn small" id="reg-full">Full width</button>
-      <button class="btn small" id="reg-cancel">Cancel</button>
-      <button class="btn small primary" id="reg-ok" disabled>Capture</button>
-    </div>`;
-  const reg = $('#reg');
-  const img = $('#reg-img');
-  const sel = $('#reg-sel');
-  let rect = null;
-  img.onload = () => { reg.scrollTop = d.scrollY || 0; reg.scrollLeft = d.scrollX || 0; };
-  const show = () => {
-    sel.hidden = !rect;
-    $('#reg-ok').disabled = !rect || rect.width < 4 || rect.height < 4;
-    if (!rect) return;
-    Object.assign(sel.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
-    $('#reg-dim').textContent = `${Math.round(rect.width)} × ${Math.round(rect.height)}`;
-  };
-  const pos = e => {
-    const b = reg.getBoundingClientRect();
-    const H = img.getBoundingClientRect().height;
-    return { x: Math.max(0, Math.min(d.cssWidth, e.clientX - b.left + reg.scrollLeft)), y: Math.max(0, Math.min(H, e.clientY - b.top + reg.scrollTop)) };
-  };
-  let drag = null;
-  let auto = null;
-  reg.addEventListener('mousedown', e => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const p = pos(e);
-    const inside = rect && p.x >= rect.x && p.x <= rect.x + rect.width && p.y >= rect.y && p.y <= rect.y + rect.height;
-    drag = inside ? { kind: 'move', dx: p.x - rect.x, dy: p.y - rect.y } : { kind: 'new', x0: p.x, y0: p.y };
-    let last = e;
-    const update = ev => {
-      last = ev;
-      const q = pos(ev);
-      if (drag.kind === 'new') rect = { x: Math.min(drag.x0, q.x), y: Math.min(drag.y0, q.y), width: Math.abs(q.x - drag.x0), height: Math.abs(q.y - drag.y0) };
-      else rect = { ...rect, x: Math.max(0, Math.min(d.cssWidth - rect.width, q.x - drag.dx)), y: Math.max(0, q.y - drag.dy) };
-      show();
-    };
-    const tick = () => {
-      // Auto-scroll when dragging near the top or bottom edge, so a selection can span the whole page.
-      const b = reg.getBoundingClientRect();
-      const m = 40;
-      if (last.clientY > b.bottom - m) reg.scrollTop += Math.min(40, (last.clientY - (b.bottom - m)));
-      else if (last.clientY < b.top + m) reg.scrollTop -= Math.min(40, ((b.top + m) - last.clientY));
-      update(last);
-      auto = requestAnimationFrame(tick);
-    };
-    auto = requestAnimationFrame(tick);
-    const up = () => { removeEventListener('mousemove', update); removeEventListener('mouseup', up); cancelAnimationFrame(auto); drag = null; };
-    addEventListener('mousemove', update);
-    addEventListener('mouseup', up);
-  });
-  reg.addEventListener('dblclick', () => { if (rect) api.cmd('overlay:region', rect); });
-  const done = () => { if (rect && rect.width >= 4 && rect.height >= 4) api.cmd('overlay:region', rect); };
-  $('#reg-ok').onclick = done;
-  $('#reg-cancel').onclick = () => api.cmd('overlay:region', null);
-  $('#reg-full').onclick = () => {
-    const top = rect ? rect.y : reg.scrollTop;
-    const h = rect ? rect.height : reg.clientHeight;
-    rect = { x: 0, y: top, width: d.cssWidth, height: h };
-    show();
-  };
-  keyHandler = e => { if (e.key === 'Enter') { e.preventDefault(); done(); return true; } return false; };
-}
-
-// =====================================================================
 // Prompt (new workspace, rename)
 // =====================================================================
 function openPrompt(d) {
@@ -581,72 +743,38 @@ function openPrompt(d) {
 }
 
 // =====================================================================
-// Zoom panel (Zoom Page WE style): full / text zoom, levels, AutoFit, minimum font size
+// Zoom panel (Alt+Z): the page zoom, remembered per site, like Chrome
 // =====================================================================
 let zp = null;
 
 function openZoom(d) {
   zp = d;
   const W = innerWidth;
-  const pw = 360;
+  const pw = 280;
   const x = Math.max(8, Math.min(d.anchor.x + d.anchor.width - pw, W - pw - 8));
   const y = d.anchor.y + d.anchor.height + 6;
   root.innerHTML = `<div class="backdrop clear" data-bg="1"></div>
     <div class="zpanel" id="zpanel" style="left:${x}px;top:${y}px;width:${pw}px" role="dialog" aria-label="Zoom">
-      <div class="zp-cols">
-        <div class="zp-font" id="zp-font" title="Scroll here to change the minimum font size">
-          <div class="zp-label">Minimum font</div>
-          <select class="field" id="zp-min" aria-label="Minimum font size"></select>
-          <button class="btn small" data-z="fontReset" title="Reset font size to the default (Ctrl+Alt+7)">Font reset</button>
-        </div>
-        <div class="zp-zoom" id="zp-zoom" title="Scroll here to zoom; Shift for small steps">
-          <div class="zp-type" role="radiogroup" aria-label="Zoom type">
-            <button data-type="0" role="radio">Full</button><button data-type="1" role="radio">Text</button>
-          </div>
-          <div class="zp-row">
-            <button class="zbtn" data-z="out" title="Zoom out (Ctrl+−); Shift = small step">−</button>
-            <select class="field" id="zp-level" aria-label="Zoom level"></select>
-            <button class="zbtn" data-z="in" title="Zoom in (Ctrl++); Shift = small step">+</button>
-          </div>
-          <div class="zp-row">
-            <button class="btn small" data-z="autofit" title="Fit the page width to the window (Ctrl+Alt+8)">AutoFit</button>
-            <button class="btn small" data-z="reset" title="Default type and level (Ctrl+0). Ctrl+click: make this the default">Reset</button>
-          </div>
-        </div>
+      <div class="zp-row" id="zp-zoom" title="Scroll here to zoom">
+        <button class="zbtn" data-z="out" title="Zoom out (Ctrl+−)" aria-label="Zoom out">−</button>
+        <output class="zp-pct" id="zp-level" aria-live="polite"></output>
+        <button class="zbtn" data-z="in" title="Zoom in (Ctrl++)" aria-label="Zoom in">+</button>
+        <button class="btn small" data-z="reset" title="Back to the default size (Ctrl+0)">Reset</button>
       </div>
       <div class="zp-foot"><span id="zp-scope"></span><a href="#" id="zp-settings">Zoom settings</a></div>
     </div>`;
   root.querySelector('[data-bg]').onclick = close;
   renderZoom();
-  $('#zpanel').addEventListener('click', async e => {
-    const t = e.target.closest('[data-type]');
-    if (t) return zoomDo('setType', Number(t.dataset.type));
-    const b = e.target.closest('[data-z]');
-    if (!b) return;
-    let act = b.dataset.z;
-    if ((act === 'in' || act === 'out') && e.shiftKey) act += 'Small';
-    if (act === 'reset' && e.ctrlKey) act = 'setDefault';
-    zoomDo(act);
-  });
-  $('#zp-level').onchange = e => zoomDo('set', Number(e.target.value));
-  $('#zp-min').onchange = e => zoomDo('minFont', Number(e.target.value));
-  $('#zp-zoom').addEventListener('wheel', e => { e.preventDefault(); zoomDo((e.deltaY < 0 ? 'in' : 'out') + (e.shiftKey ? 'Small' : '')); }, { passive: false });
-  $('#zp-font').addEventListener('wheel', e => {
-    e.preventDefault();
-    const list = zp.fonts;
-    const i = Math.max(0, list.indexOf(zp.state.minFont || 0));
-    zoomDo('minFont', list[Math.max(0, Math.min(list.length - 1, i + (e.deltaY < 0 ? 1 : -1)))]);
-  }, { passive: false });
+  $('#zpanel').addEventListener('click', e => { const b = e.target.closest('[data-z]'); if (b) zoomDo(b.dataset.z); });
+  $('#zp-zoom').addEventListener('wheel', e => { e.preventDefault(); zoomDo(e.deltaY < 0 ? 'in' : 'out'); }, { passive: false });
   $('#zp-settings').onclick = e => { e.preventDefault(); close(); api.cmd('run', 'settings'); };
   keyHandler = e => {
-    if ((e.key === '+' || e.key === '=') ) { e.preventDefault(); zoomDo(e.shiftKey && e.key === '=' ? 'in' : 'in'); return true; }
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomDo('in'); return true; }
     if (e.key === '-') { e.preventDefault(); zoomDo('out'); return true; }
     if (e.key === '0') { e.preventDefault(); zoomDo('reset'); return true; }
-    if (e.key.toLowerCase() === 't') { e.preventDefault(); zoomDo('type'); return true; }
-    if (e.key.toLowerCase() === 'a') { e.preventDefault(); zoomDo('autofit'); return true; }
     return false;
   };
-  setTimeout(() => $('#zp-level').focus(), 0);
+  setTimeout(() => { const b = root.querySelector('[data-z="in"]'); if (b) b.focus(); }, 0);
 }
 
 async function zoomDo(action, value) {
@@ -656,13 +784,56 @@ async function zoomDo(action, value) {
 
 function renderZoom() {
   if (!zp || !$('#zpanel')) return;
-  const st = zp.state;
-  const levels = [...new Set([...zp.levels, zp.level])].sort((a, b) => a - b);
-  $('#zp-level').innerHTML = levels.map(l => `<option value="${l}" ${l === zp.level ? 'selected' : ''}>${l}%</option>`).join('');
-  const fonts = [...new Set([...zp.fonts, st.minFont || 0])].sort((a, b) => a - b);
-  $('#zp-min').innerHTML = fonts.map(f => `<option value="${f}" ${f === (st.minFont || 0) ? 'selected' : ''}>${f ? `${f} px` : 'Off'}</option>`).join('');
-  root.querySelectorAll('[data-type]').forEach(b => { const on = (b.dataset.type === '1') === (st.type === 'text'); b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
-  $('#zp-scope').textContent = zp.mode === 'tab' ? 'This tab only' : `Remembered for ${zp.site || 'this site'}`;
+  $('#zp-level').textContent = `${zp.level}%`;
+  $('#zp-scope').textContent = zp.private ? 'This private window only' : zp.site ? `Remembered for ${zp.site}` : '';
+}
+
+// =====================================================================
+// Screen sharing: the site asked to share your screen (video calls, presentations)
+// =====================================================================
+function openShare(d) {
+  const kinds = [['screen', 'Entire screen'], ['window', 'Window'], ['tab', 'Tab']].filter(([k]) => d.items.some(i => i.kind === k));
+  let kind = kinds.length ? kinds[0][0] : 'screen';
+  let sel = null;
+  root.innerHTML = `<div class="backdrop" data-bg="1"></div>
+    <div class="dlg share" role="dialog" aria-modal="true" aria-labelledby="sh-t">
+      <h2 id="sh-t">${esc(d.origin || 'This site')} wants to share your screen</h2>
+      <p class="muted">Choose what to share. Nothing is shared until you click Share.</p>
+      <div class="sh-kinds" role="tablist">${kinds.map(([k, l]) => `<button role="tab" data-kind="${k}">${l}</button>`).join('')}</div>
+      <div class="sh-grid" id="sh-grid" role="listbox" aria-label="What to share"></div>
+      <div class="sh-foot">
+        ${d.audio ? `<label class="sh-audio" id="sh-audio-l"><input type="checkbox" id="sh-audio" checked> <span id="sh-audio-t">Share sound</span></label>` : '<span></span>'}
+        <span><button class="btn" id="sh-cancel">Cancel</button> <button class="btn primary" id="sh-ok" disabled>Share</button></span>
+      </div>
+    </div>`;
+  const draw = () => {
+    root.querySelectorAll('[data-kind]').forEach(b => { b.classList.toggle('on', b.dataset.kind === kind); b.setAttribute('aria-selected', String(b.dataset.kind === kind)); });
+    const list = d.items.filter(i => i.kind === kind);
+    $('#sh-grid').innerHTML = list.map(i => `<button class="sh-item${sel === i.id ? ' on' : ''}" role="option" aria-selected="${sel === i.id}" data-id="${esc(i.id)}" title="${esc(i.name)}">
+        <span class="sh-th">${i.thumb ? `<img src="${esc(i.thumb)}" alt="">` : ''}</span>
+        <span class="sh-name">${i.icon ? `<img class="sh-ic" src="${esc(i.icon)}" alt="">` : ''}<span>${esc(i.name)}</span></span></button>`).join('') || '<p class="muted">Nothing to share here.</p>';
+    $('#sh-ok').disabled = !sel || !d.items.some(i => i.id === sel && i.kind === kind);
+    const al = $('#sh-audio-l');
+    if (al) {
+      // Sound: of a tab; of the whole computer when sharing a screen on Windows.
+      const can = kind === 'tab' || (kind === 'screen' && d.loopback);
+      al.hidden = !can;
+      $('#sh-audio-t').textContent = kind === 'tab' ? 'Share tab sound' : 'Share system sound';
+    }
+  };
+  draw();
+  root.querySelector('[data-bg]').onclick = () => api.cmd('share:pick', null, false);
+  root.querySelector('.sh-kinds').onclick = e => { const b = e.target.closest('[data-kind]'); if (b) { kind = b.dataset.kind; sel = null; draw(); } };
+  $('#sh-grid').addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (b) { sel = b.dataset.id; draw(); } });
+  $('#sh-grid').addEventListener('dblclick', e => { const b = e.target.closest('[data-id]'); if (b) { sel = b.dataset.id; go(); } });
+  const go = () => { if (!sel) return; const a = $('#sh-audio'); api.cmd('share:pick', sel, !!(a && a.checked && !$('#sh-audio-l').hidden)); };
+  $('#sh-ok').onclick = go;
+  $('#sh-cancel').onclick = () => api.cmd('share:pick', null, false);
+  keyHandler = e => {
+    if (e.key === 'Enter' && sel) { e.preventDefault(); go(); return true; }
+    return false;
+  };
+  setTimeout(() => { const b = root.querySelector('[data-kind]'); if (b) b.focus(); }, 0);
 }
 
 // =====================================================================
@@ -682,123 +853,14 @@ function openBookmarks(d) {
   setTimeout(() => bmPop.focus(), 0);
 }
 
-function toast(text) {
+function toast(text, { undo = null, ms = 0 } = {}) {
   let t = $('#ov-toast');
-  if (!t) { t = document.createElement('div'); t.id = 'ov-toast'; document.body.appendChild(t); }
-  t.textContent = text; t.classList.add('on');
-  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('on'), 2200);
-}
-
-// =====================================================================
-// Equalizer panel (Alt+Q)
-// =====================================================================
-let eqp = null;
-function openEq(d) {
-  eqp = { ...d };
-  const W = innerWidth;
-  const pw = Math.min(460, W - 16);
-  const x = Math.max(8, Math.min(d.anchor.x + d.anchor.width - pw, W - pw - 8));
-  const y = d.anchor.y + d.anchor.height + 6;
-  const fmt = f => f >= 1000 ? `${f / 1000}k` : String(f);
-  root.innerHTML = `<div class="backdrop clear" data-bg="1"></div>
-    <div class="zpanel eqp" id="eqp" style="left:${x}px;top:${y}px;width:${pw}px" role="dialog" aria-label="Equalizer">
-      <div class="eq-head">
-        <label class="eq-switch"><input type="checkbox" id="eq-on"><span></span><b>Equalizer</b></label>
-        <label class="eq-auto" title="Detect the genre of what is playing and pick a preset"><input type="checkbox" id="eq-auto"> Auto-EQ</label>
-      </div>
-      <div class="eq-detect" id="eq-detect"></div>
-      <div class="eq-presets" id="eq-presets" role="radiogroup" aria-label="Presets"></div>
-      <div class="eq-bands" id="eq-bands">
-        ${d.bands.map((f, i) => `<div class="eq-band"><span class="eq-val" id="eq-v${i}">0</span><input type="range" min="-12" max="12" step="0.5" value="0" data-band="${i}" aria-label="${fmt(f)} Hz" orient="vertical"><span class="eq-f">${fmt(f)}</span></div>`).join('')}
-      </div>
-      <div class="eq-save"><input id="eq-name" maxlength="40" placeholder="Name this sound (e.g. My Baila, Car stereo)"><button class="btn small" id="eq-save">Save preset</button></div>
-      <div class="zp-foot"><span id="eq-note"></span><a href="#" id="eq-reset">Reset to flat</a></div>
-    </div>`;
-  root.querySelector('[data-bg]').onclick = close;
-  const P = d.presets;
-  const drawPresets = () => {
-    $('#eq-presets').innerHTML = Object.keys(P).map(k => `<button data-preset="${k}" role="radio">${esc(P[k].label)}</button>`).join('') +
-      (eqp.user || []).map(u => `<button data-user="${esc(u.id)}" role="radio" class="user" title="Your preset. Right-click to delete.">★ ${esc(u.name)}</button>`).join('') +
-      '<button data-preset="custom" role="radio">Custom</button>';
-  };
-  drawPresets();
-  $('#eq-presets').addEventListener('contextmenu', async e => {
-    const b = e.target.closest('[data-user]');
-    if (!b) return;
-    e.preventDefault();
-    if (!confirm(`Delete your preset “${b.textContent.replace(/^★ /, '')}”?`)) return;
-    const r = await api.cmd('eq:preset-delete', b.dataset.user);
-    eqp.user = r.user; drawPresets(); renderEq();
-  });
-  $('#eq-save').onclick = async () => {
-    const name = $('#eq-name').value.trim();
-    if (!name) { $('#eq-name').focus(); return; }
-    const gains = [...document.querySelectorAll('#eqp [data-band]')].map(r => Number(r.value));
-    const r = await api.cmd('eq:preset-save', name, gains);
-    if (r) { eqp.user = r.user; eqp.cfg = r.cfg; $('#eq-name').value = ''; drawPresets(); renderEq(); }
-  };
-  const panel = $('#eqp');
-  const send = async patch => { const r = await api.cmd('eq:set', patch); eqp.cfg = r.cfg; eqp.status = r.status; renderEq(); };
-  $('#eq-on').onchange = e => send({ enabled: e.target.checked });
-  $('#eq-auto').onchange = e => send({ auto: e.target.checked, enabled: true });
-  $('#eq-reset').onclick = e => { e.preventDefault(); send({ preset: 'flat', auto: false, gains: d.bands.map(() => 0) }); };
-  panel.addEventListener('click', e => {
-    const u = e.target.closest('[data-user]');
-    if (u) { const p = (eqp.user || []).find(x => x.id === u.dataset.user); if (p) send({ preset: 'custom', auto: false, enabled: true, gains: p.gains, customName: p.name }); return; }
-    const b = e.target.closest('[data-preset]');
-    if (!b) return;
-    const k = b.dataset.preset;
-    send({ preset: k, auto: false, enabled: true, ...(k !== 'custom' ? { gains: P[k].gains } : {}) });
-  });
-  let pending = null;
-  panel.addEventListener('input', e => {
-    const i = e.target.dataset && e.target.dataset.band;
-    if (i === undefined) return;
-    const gains = [...panel.querySelectorAll('[data-band]')].map(r => Number(r.value));
-    $(`#eq-v${i}`).textContent = fmtDb(Number(e.target.value));
-    clearTimeout(pending);
-    pending = setTimeout(() => send({ preset: 'custom', auto: false, enabled: true, gains }), 60);
-  });
-  renderEq();
-  clearInterval(openEq.poll);
-  openEq.poll = setInterval(async () => {
-    if (mode !== 'eq') { clearInterval(openEq.poll); return; }
-    const r = await api.cmd('eq:status').catch(() => null);
-    if (r) { eqp.cfg = r.cfg; eqp.status = r.status; renderEq(true); }
-  }, 1000);
-}
-const fmtDb = v => (v > 0 ? '+' : '') + (Math.round(v * 2) / 2);
-function renderEq(fromPoll = false) {
-  if (!$('#eqp')) return;
-  const c = eqp.cfg, s = eqp.status, P = eqp.presets;
-  $('#eq-on').checked = c.enabled;
-  $('#eq-auto').checked = c.auto;
-  $('#eqp').classList.toggle('off', !c.enabled);
-  const shownPreset = c.auto ? (s && s.applied) || 'flat' : c.preset;
-  const userOn = !c.auto && c.preset === 'custom' && c.customName ? ((eqp.user || []).find(u => u.name === c.customName) || {}).id : null;
-  document.querySelectorAll('#eq-presets [data-preset], #eq-presets [data-user]').forEach(b => {
-    const on = b.dataset.user ? b.dataset.user === userOn : (!userOn && b.dataset.preset === shownPreset);
-    b.classList.toggle('on', on);
-    b.setAttribute('aria-checked', String(on));
-  });
-  const gains = c.auto ? (s && s.gains) || P.flat.gains : c.preset === 'custom' ? c.gains : (P[c.preset] || P.flat).gains;
-  document.querySelectorAll('#eqp [data-band]').forEach((r, i) => {
-    if (!(fromPoll && document.activeElement === r)) r.value = gains[i];
-    r.disabled = !!c.auto;
-    $(`#eq-v${i}`).textContent = fmtDb(Number(r.value));
-  });
-  const det = $('#eq-detect');
-  if (c.enabled && c.auto) {
-    det.hidden = false;
-    det.innerHTML = s && s.genre
-      ? `Detected <b>${esc(P[s.genre] ? P[s.genre].label : s.genre)}</b> · ${s.confidence}% · using <b>${esc(P[s.applied] ? P[s.applied].label : s.applied)}</b><div class="why">${esc(s.reason || '')}</div>`
-      : `<span class="why">${esc((s && s.reason) || 'Play something: Auto-EQ listens for a few seconds, and reads the page title.')}</span>`;
-  } else det.hidden = true;
-  const note = $('#eq-note');
-  if (!eqp.web) note.textContent = 'Works on web pages.';
-  else if (s && s.skipped && !s.attached) note.textContent = 'This player streams from another site that does not allow audio processing.';
-  else if (c.enabled && s) note.textContent = s.attached ? `Equalizing ${s.attached} player${s.attached === 1 ? '' : 's'} on this page` : 'Waiting for audio on this page';
-  else note.textContent = 'Applies to every tab.';
+  if (!t) { t = document.createElement('div'); t.id = 'ov-toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.textContent = text;
+  t.classList.toggle('has-undo', !!undo);
+  if (undo) { const b = document.createElement('button'); b.textContent = 'Undo'; b.onclick = () => { t.classList.remove('on'); undo(); }; t.append(' ', b); }
+  t.classList.add('on');
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('on'), ms || 2200);
 }
 
 // =====================================================================

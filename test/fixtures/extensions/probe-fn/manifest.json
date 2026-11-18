@@ -1,0 +1,47 @@
+{
+ "manifest_version": 3,
+ "name": "Probe functions",
+ "version": "1.0",
+ "permissions": [
+  "tabs",
+  "storage",
+  "scripting",
+  "alarms",
+  "notifications",
+  "contextMenus",
+  "unlimitedStorage",
+  "downloads",
+  "sidePanel"
+ ],
+ "host_permissions": [
+  "<all_urls>"
+ ],
+ "background": {
+  "service_worker": "sw.js"
+ },
+ "action": {
+  "default_title": "Probe"
+ },
+ "commands": {
+  "hello": {
+   "suggested_key": {
+    "default": "Alt+Shift+Y"
+   },
+   "description": "Hello"
+  }
+ },
+ "content_scripts": [
+  {
+   "matches": [
+    "http://*/*"
+   ],
+   "js": [
+    "cs.js"
+   ],
+   "run_at": "document_start"
+  }
+ ],
+ "side_panel": {
+  "default_path": "panel.html"
+ }
+}

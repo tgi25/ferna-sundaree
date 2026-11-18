@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Ferna Equalizer",
+  "short_name": "Ferna EQ",
+  "version": "1.0.0",
+  "description": "10-band equalizer for YouTube and any video or music on the web, with 28 genre presets, your own presets and Auto-EQ.",
+  "author": "Ferna Software Solutions",
+  "homepage_url": "https://tgi25.github.io/ferna-software/",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": {
+    "default_title": "Ferna Equalizer",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+  },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_page": "options.html",
+  "permissions": ["storage", "scripting", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [{ "matches": ["http://*/*", "https://*/*", "file:///*"], "js": ["content.js"], "run_at": "document_idle", "all_frames": true }],
+  "commands": {
+    "toggle": { "suggested_key": { "default": "Alt+Shift+Q" }, "description": "Turn the equalizer on or off" },
+    "auto": { "description": "Turn Auto-EQ on or off" },
+    "next": { "description": "Next preset" }
+  }
+}

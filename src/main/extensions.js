@@ -47,6 +47,10 @@ class ExtensionManager {
     require('./zipsafe').hardenAdmZip();
     const { installChromeWebStore } = require('electron-chrome-web-store');
     const ctx = this.ctx;
+    // The bridge and chrome.sidePanel must be in place before the library freezes `chrome`.
+    for (const type of ['frame', 'service-worker']) {
+      this.ses.registerPreloadScript({ id: `ferna-crx-early-${type}`, type, filePath: path.join(__dirname, '..', 'preload', 'crx-early.js') });
+    }
     this.lib = new ElectronChromeExtensions({
       session: this.ses,
       createTab: async details => {
@@ -78,6 +82,8 @@ class ExtensionManager {
     for (const type of ['frame', 'service-worker']) {
       this.ses.registerPreloadScript({ id: `ferna-crx-extra-${type}`, type, filePath: path.join(__dirname, '..', 'preload', 'crx-extra.js') });
     }
+    // Side panel, tab capture, downloads, zoom events and keyboard shortcuts (crxmore.js).
+    require('./crxmore').install(this);
     // Repaint toolbar buttons whenever an extension changes its icon, badge or title.
     const ba = this.lib.api.browserAction;
     const origUpdate = ba.onUpdate.bind(ba);
@@ -342,6 +348,9 @@ class ExtensionManager {
   // ------------------------------------------------------------ managing
   async uninstall(id) {
     const k = this.reg.data.known[id];
+    // Installed again later, it is new again (runtime.onInstalled) with no side panel choices.
+    if (this.reg.data.crxVersions) delete this.reg.data.crxVersions[id];
+    if (this.reg.data.sidePanel) delete this.reg.data.sidePanel[id];
     if (this.api.getExtension(id)) this.api.removeExtension(id);
     if (k && k.path.startsWith(this.storeDir)) fs.rmSync(path.join(this.storeDir, id), { recursive: true, force: true });
     if (k && (k.source === 'unpacked' || k.source === 'zip')) {
@@ -481,6 +490,8 @@ class ExtensionManager {
   }
 
   click(win, id, rect) {
+    // "Open the side panel when the toolbar button is clicked" (chrome.sidePanel), on any page.
+    if (this.sidePanelClick && this.sidePanelClick(win, id)) return;
     const t = win.active;
     const tabId = t && t.view && t.kind === 'web' ? t.view.webContents?.id : -1;
     if (tabId < 0) { win.sendUi('toast', { text: 'Extensions work on web pages. Open a website first.' }); return; }

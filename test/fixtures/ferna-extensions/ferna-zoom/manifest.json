@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Ferna Zoom",
+  "short_name": "Ferna Zoom",
+  "version": "1.0.2",
+  "description": "Full-page or text-only zoom, remembered per site or per tab, with AutoFit to the window width and a minimum font size.",
+  "author": "Ferna Software Solutions",
+  "homepage_url": "https://tgi25.github.io/ferna-software/",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": {
+    "default_title": "Ferna Zoom",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+  },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_page": "options.html",
+  "permissions": ["tabs", "storage", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [{ "matches": ["http://*/*", "https://*/*", "file:///*"], "js": ["content.js"], "run_at": "document_start", "all_frames": true, "match_about_blank": true, "match_origin_as_fallback": true }],
+  "commands": {
+    "zoom-in": { "suggested_key": { "default": "Alt+Shift+Up" }, "description": "Zoom in" },
+    "zoom-out": { "suggested_key": { "default": "Alt+Shift+Down" }, "description": "Zoom out" },
+    "zoom-reset": { "suggested_key": { "default": "Alt+Shift+0" }, "description": "Reset zoom" },
+    "zoom-autofit": { "suggested_key": { "default": "Alt+Shift+A" }, "description": "AutoFit: fit the page to the window width" },
+    "zoom-type": { "description": "Switch between full zoom and text zoom" }
+  }
+}

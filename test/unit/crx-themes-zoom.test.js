@@ -8,7 +8,7 @@ const AdmZip = require('adm-zip');
 const crx = require('../../src/main/crx');
 const { packCrx, zipFolder } = require('../../tools/make-crx');
 const { themeFromManifest } = require('../../src/main/themes');
-const zoom = require('../../src/main/zoom');
+const ZL = require('../../src/main/zoomlevels');
 const { computeLayout } = require('../../src/main/layout');
 const FIX = path.join(__dirname, '..', 'fixtures');
 
@@ -62,39 +62,32 @@ test('themes map Chrome colours to UI variables', () => {
   assert.ok(!('theme_frame' in themeFromManifest({ theme: { images: { theme_frame: '../x.png' } } }).images));
 });
 
-test('zoom: levels, fixed steps, small steps, limits', () => {
-  const p = { ...zoom.DEFAULTS };
-  assert.strictEqual(zoom.nextLevel(100, 'in', p), 110);
-  assert.strictEqual(zoom.nextLevel(100, 'out', p), 90);
-  assert.strictEqual(zoom.nextLevel(105, 'in', p), 110);
-  assert.strictEqual(zoom.nextLevel(500, 'in', p), 500);
-  assert.strictEqual(zoom.nextLevel(30, 'out', p), 30);
-  assert.strictEqual(zoom.nextLevel(100, 'in', { ...p, stepMode: 'fixed', step: 25 }), 125);
-  assert.strictEqual(zoom.nextLevel(100, 'out', p, true), 98);
+test('zoom 0.9: Chrome steps from any level, limits', () => {
+  assert.strictEqual(ZL.step(100, 'in'), 110);
+  assert.strictEqual(ZL.step(100, 'out'), 90);
+  assert.strictEqual(ZL.step(105, 'in'), 110);
+  assert.strictEqual(ZL.step(133, 'out'), 125);
+  assert.strictEqual(ZL.step(500, 'in'), 500);
+  assert.strictEqual(ZL.step(25, 'out'), 25);
+  assert.strictEqual(ZL.clamp(9999), 500);
+  assert.strictEqual(ZL.clamp('x'), 100);
 });
 
-test('zoom: text mode separates text and non-text levels; per-tab uses CSS', () => {
-  const p = { ...zoom.DEFAULTS };
-  assert.deepStrictEqual(zoom.effective({ type: 'full', full: 150, text: 100, nonText: 100, minFont: 0 }, p), { pageFactor: 1.5, textFactor: 1, minFont: 0, lineSpacing: 1, useCss: false });
-  const e = zoom.effective({ type: 'text', full: 150, text: 130, nonText: 100, minFont: 14 }, { ...p, mode: 'tab' });
-  assert.strictEqual(e.pageFactor, 1);
-  assert.strictEqual(e.textFactor, 1.3);
-  assert.strictEqual(e.minFont, 14);
-  assert.strictEqual(e.useCss, true);
+test('zoom 0.9: remembered per host; older per-domain levels still apply; other pages none', () => {
+  assert.strictEqual(ZL.hostKey('https://Mail.Example.com/u/0/'), 'mail.example.com');
+  assert.strictEqual(ZL.hostKey('http://localhost:8080/x'), 'localhost:8080');
+  assert.strictEqual(ZL.hostKey('ferna://settings/'), '');
+  const levels = { 'mail.example.com': 125, 'example.org': 150 };
+  assert.strictEqual(ZL.levelFor('https://mail.example.com/', levels), 125);
+  assert.strictEqual(ZL.levelFor('https://www.example.org/a', levels), 150);
+  assert.strictEqual(ZL.levelFor('https://example.org/', levels), 150);
+  assert.strictEqual(ZL.levelFor('https://other.com/', levels, 110), 110);
 });
 
-test('zoom: site keys group sub-domains unless asked not to', () => {
-  const p = { ...zoom.DEFAULTS };
-  assert.strictEqual(zoom.siteKey('https://mail.google.com/x', p), 'google.com');
-  assert.strictEqual(zoom.siteKey('https://www.sjp.ac.lk/', p), 'sjp.ac.lk');
-  assert.strictEqual(zoom.siteKey('https://mail.google.com/x', { ...p, subdomainsSeparate: true }), 'mail.google.com');
-  assert.strictEqual(zoom.siteKey('ferna://settings/', p), '');
-});
-
-test('zoom: AutoFit fits content width within the configured range', () => {
-  const p = { ...zoom.DEFAULTS };
-  assert.strictEqual(zoom.autofitLevel({ vw: 1232, left: 316, right: 916, sw: 1232 }, 100, p), 200);
-  assert.strictEqual(zoom.autofitLevel({ vw: 1000, left: 0, right: 1000, sw: 1600 }, 100, p), 61);
+test('zoom 0.9: old Zoom Page WE settings keep full-zoom levels, drop text-only ones', () => {
+  const m = ZL.migrate({ 'a.com': { type: 'full', full: 133 }, 'b.com': { type: 'text', full: 100, text: 150 }, 'c.com': { type: 'full', full: 100 } }, { defaultType: 'full', defaultFull: 110 });
+  assert.deepStrictEqual(m, { levels: { 'a.com': 133 }, def: 110 });
+  assert.deepStrictEqual(ZL.migrate(undefined, { defaultType: 'text' }), { levels: {}, def: 100 });
 });
 
 test('layout: Ctrl+Shift+H hides the chosen bars, no edge reveal, window controls move to the bar still shown', () => {

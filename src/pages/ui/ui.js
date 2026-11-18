@@ -17,7 +17,6 @@ $('#btn-back').innerHTML = icon('back');
 $('#btn-forward').innerHTML = icon('forward');
 $('#btn-star').innerHTML = icon('star');
 $('#btn-shield').insertAdjacentHTML('afterbegin', icon('shield'));
-$('#btn-shot').innerHTML = icon('camera');
 $('#btn-zoom').insertAdjacentHTML('afterbegin', icon('zoom'));
 $('#btn-puzzle').innerHTML = icon('puzzle');
 const rectOf = el => { const r = el.getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }; };
@@ -25,20 +24,14 @@ $('#btn-zoom').onclick = () => api.cmd('zoom:panel', rectOf($('#btn-zoom')));
 $('#btn-puzzle').onclick = () => api.cmd('ext:puzzle');
 $('#btn-pip').innerHTML = icon('pip');
 $('#btn-pip').onclick = () => api.cmd('run', 'pip');
-$('#btn-eq').insertAdjacentHTML('afterbegin', icon('eq'));
-$('#btn-eq').onclick = () => api.cmd('eq:panel', rectOf($('#btn-eq')));
 $('#btn-media').innerHTML = icon('play');
 $('#btn-media').onclick = () => api.cmd('media:panel', rectOf($('#btn-media')));
 $('#btn-split').innerHTML = icon('split');
 $('#btn-split').onclick = () => api.cmd('split:act', 'toggle');
 $('#btn-split').addEventListener('contextmenu', e => { e.preventDefault(); api.cmd('menu:split'); });
 $('#btn-assistant').innerHTML = icon('sparkle');
-$('#btn-feeds').insertAdjacentHTML('afterbegin', icon('feeds'));
-$('#btn-feeds').onclick = () => api.cmd('feeds:toggle-panel');
-$('#btn-rss').innerHTML = icon('rss');
 $('#btn-check').insertAdjacentHTML('afterbegin', icon('shield'));
 $('#btn-check').onclick = () => api.cmd('check:toggle-panel');
-$('#btn-rss').onclick = () => api.cmd('feeds:rss-menu');
 $('#btn-assistant').onclick = () => api.cmd('run', 'assistant');
 $('#btn-reader').innerHTML = icon('reader');
 $('#btn-reader').onclick = () => api.cmd('run', 'readerMode');
@@ -207,7 +200,7 @@ window.__fernaContrast = () => {
   const tb = rgbOf(getComputedStyle($('#toolbar')).backgroundColor);
   const at = document.querySelector('#tabs .tab.active');
   const curTab = at ? { bg: contrast(rgbOf(getComputedStyle(at).backgroundColor) || tb, rgbOf(getComputedStyle(el.tabs).backgroundColor) || tb), mark: contrast(rgbOf(getComputedStyle(at, '::after').backgroundColor) || tb, rgbOf(getComputedStyle(at).backgroundColor) || tb) } : null;
-  return { curTab, toolbar: contrast(tb, rgbOf(getComputedStyle($('#btn-menu')).color)), eqOn: contrast(rgbOf(getComputedStyle(document.documentElement).getPropertyValue('--tb-on-bg')), rgbOf(getComputedStyle(document.documentElement).getPropertyValue('--tb-on-ink'))), tabs: contrast(rgbOf(getComputedStyle(el.tabs).backgroundColor) || tb, rgbOf(getComputedStyle(el.tabs).color)) };
+  return { curTab, toolbar: contrast(tb, rgbOf(getComputedStyle($('#btn-menu')).color)), onBtn: contrast(rgbOf(getComputedStyle(document.documentElement).getPropertyValue('--tb-on-bg')), rgbOf(getComputedStyle(document.documentElement).getPropertyValue('--tb-on-ink'))), tabs: contrast(rgbOf(getComputedStyle(el.tabs).backgroundColor) || tb, rgbOf(getComputedStyle(el.tabs).color)) };
 };
 $('#btn-downloads').innerHTML = icon('download') + '<span class="count" id="dl-count"></span>';
 $('#btn-overview').innerHTML = icon('grid');
@@ -221,7 +214,6 @@ $('#btn-forward').onclick = () => api.cmd('nav:forward');
 $('#btn-reload').onclick = () => api.cmd(S && S.nav.loading ? 'nav:stop' : 'nav:reload');
 $('#btn-star').onclick = () => api.cmd('run', 'bookmark');
 $('#btn-shield').onclick = () => api.cmd('menu:shield');
-$('#btn-shot').onclick = () => api.cmd('menu:shot');
 $('#btn-downloads').onclick = () => api.cmd('run', 'downloads');
 $('#btn-overview').onclick = () => api.cmd('run', 'tabOverview');
 $('#btn-menu').onclick = () => api.cmd('menu:app');
@@ -286,7 +278,7 @@ api.on('toast', ({ text, action, cmd, ms }) => {
   el.toast.style.top = `${bar ? bar.y + Math.max(2, (Math.min(bar.height, 44) - 32) / 2) : 6}px`;
   el.toast.textContent = text;
   // An optional action button (a command of this page, from a fixed list).
-  if (action && /^(feeds:toggle-panel|feeds:open-digest|check:toggle-panel|wsx:accept|wsx:settings)$/.test(cmd || '')) {
+  if (action && /^(check:toggle-panel|wsx:accept|wsx:settings)$/.test(cmd || '')) {
     const b = document.createElement('button');
     b.className = 'toast-act'; b.textContent = String(action).slice(0, 30);
     b.onclick = () => { el.toast.classList.remove('on'); api.cmd(cmd); };
@@ -386,11 +378,10 @@ function renderToolbar() {
   star.classList.toggle('on', n.bookmarked);
   star.title = n.bookmarked ? 'Remove bookmark (Ctrl+D)' : 'Bookmark this page (Ctrl+D)';
   const zb = $('#btn-zoom');
-  const z = n.zoom || { level: 100, type: 'full', isDefault: true };
+  const z = n.zoom || { level: 100, isDefault: true };
   zb.hidden = false; zb.disabled = n.internal || !n.url;
-  zb.classList.toggle('text', z.type === 'text');
-  $('#zoom-level').textContent = z.isDefault && z.level === 100 ? '' : `${z.level}%`;
-  zb.title = `Zoom: ${z.type === 'text' ? 'text only' : 'full page'} ${z.level}%${z.minFont ? `, minimum font ${z.minFont}px` : ''} (Alt+Z)`;
+  $('#zoom-level').textContent = z.isDefault ? '' : `${z.level}%`;
+  zb.title = `Zoom: ${z.level}% (Alt+Z)`;
   const onToolbar = S.layout.windowControls === 'toolbar';
   el.toolbar.classList.toggle('drag', onToolbar);
   const wt = $('#winctl-tb');
@@ -403,11 +394,6 @@ function renderToolbar() {
   $('#btn-split').classList.toggle('on', !!n.split);
   $('#btn-split').title = n.split ? 'Leave split view (Alt+Shift+D). Right-click for more.' : 'Split view: this tab and the next side by side (Alt+Shift+D). Right-click to choose.';
   $('#btn-assistant').classList.toggle('on', S.side === 'assistant');
-  $('#btn-feeds').classList.toggle('on', S.side === 'feeds');
-  const fc = $('#feeds-count'); const fu = S.feedsUnread || 0;
-  fc.textContent = fu > 99 ? '99+' : String(fu); fc.classList.toggle('on', fu > 0);
-  $('#btn-feeds').title = `Ferna Feeds: your news and research${fu ? ` (${fu} unread)` : ''}`;
-  $('#btn-feeds').disabled = !!S.private;
   const ck = $('#btn-check');
   const c = n.check;
   ck.hidden = !(c && c.level) || !!S.exam;
@@ -421,13 +407,8 @@ function renderToolbar() {
       : c.level === 'warn' ? 'This article has wording worth checking. Click to see who else reports it.'
       : 'News article: click to see who else reports it (fact check)';
   }
-  const rss = $('#btn-rss');
   const web = !!n.url && !n.internal && /^https?:/.test(n.url);
   // Always in the address bar: greyed out where they do not apply.
-  rss.hidden = false; rss.disabled = !web || !!S.private;
-  rss.classList.toggle('found', !!n.feeds);
-  rss.classList.toggle('on', !!(n.feeds && n.feeds.subscribed));
-  rss.title = n.feeds ? (n.feeds.subscribed ? 'You follow this site’s feed (Ferna Feeds)' : `This page has ${n.feeds.count > 1 ? `${n.feeds.count} feeds` : 'a feed'}: follow it in Ferna Feeds`) : 'Page feed: follow this site in Ferna Feeds (no feed found here; the page itself can be followed)';
   $('#btn-reader').hidden = false; $('#btn-reader').disabled = !web; $('#btn-reader').classList.toggle('on', !!n.reader);
   $('#btn-translate').hidden = false; $('#btn-translate').disabled = !web;
   $('#btn-key').hidden = !web || !n.passwords;
@@ -437,10 +418,6 @@ function renderToolbar() {
   if (S.split && !dv.classList.contains('drag')) { const r = S.split.divider; Object.assign(dv.style, { left: `${r.x}px`, top: `${r.y}px`, width: `${r.width}px`, height: `${r.height}px` }); }
   $('#btn-pip').hidden = n.internal || !n.hasVideo;
   $('#btn-pip').classList.toggle('on', !!n.pipOn);
-  const eqb = $('#btn-eq');
-  eqb.hidden = false; eqb.disabled = !!n.internal || !n.url;
-  eqb.classList.toggle('on', !!(n.eq && n.eq.enabled));
-  eqb.title = n.eq && n.eq.enabled ? `Equalizer: ${n.eq.label} (Alt+Q)` : 'Equalizer: off (Alt+Q)';
   const shield = $('#btn-shield');
   shield.classList.toggle('off-shield', !n.blockerOn);
   syncOmniActs();
@@ -554,10 +531,9 @@ const pagebarOn = () => !!(S && S.layout.hiddenByKey && !S.layout.toolbar && S.l
 const PAGE_TOOLS = [
   ['copy', 'copy', 'Copy this address'], ['clear', 'close', 'Clear the address and type a new one'],
   ['reader', 'reader', 'Reading mode (F9)'], ['translate', 'translate', 'Translate this page (Alt+Shift+T)'],
-  ['rss', 'rss', 'Page feed: follow this site in Ferna Feeds'], ['zoom', 'zoom', 'Zoom (Alt+Z)'],
-  ['eq', 'eq', 'Equalizer (Alt+Q)'], ['shield', 'shield', 'Tracker and ad blocking'],
-  ['shot', 'camera', 'Screenshot'], ['bookmarks', 'bookmarks', 'Bookmarks (Ctrl+Shift+Y)'],
-  ['feeds', 'feeds', 'Ferna Feeds'], ['assistant', 'sparkle', 'AI assistant (Alt+A)'], ['overview', 'grid', 'Tab Overview (Ctrl+Shift+A)'],
+  ['zoom', 'zoom', 'Zoom (Alt+Z)'], ['shield', 'shield', 'Tracker and ad blocking'],
+  ['bookmarks', 'bookmarks', 'Bookmarks (Ctrl+Shift+Y)'],
+  ['assistant', 'sparkle', 'AI assistant (Alt+A)'], ['overview', 'grid', 'Tab Overview (Ctrl+Shift+A)'],
 ];
 /** Each tool's state for the current page: { disabled, on, title }. */
 function toolState(k, n) {
@@ -566,12 +542,8 @@ function toolState(k, n) {
     case 'copy': return { disabled: !n.url || n.url === 'ferna://newtab/' };
     case 'reader': return { disabled: !web, on: !!n.reader };
     case 'translate': return { disabled: !web };
-    case 'rss': return { disabled: !web || !!S.private, on: !!(n.feeds && n.feeds.subscribed), found: !!n.feeds, title: n.feeds ? (n.feeds.subscribed ? 'You follow this site’s feed' : 'This page has a feed: follow it in Ferna Feeds') : null };
-    case 'zoom': return { disabled: !!n.internal || !n.url, title: n.zoom && !n.zoom.isDefault ? `Zoom: ${n.zoom.level}% (Alt+Z)` : null };
-    case 'eq': return { disabled: !!n.internal || !n.url, on: !!(n.eq && n.eq.enabled) };
+    case 'zoom': return { disabled: !!n.internal || !n.url, on: !!(n.zoom && !n.zoom.isDefault), title: n.zoom && !n.zoom.isDefault ? `Zoom: ${n.zoom.level}% (Alt+Z)` : null };
     case 'shield': return { disabled: !/^https?:/.test(n.url || ''), off: !n.blockerOn, title: n.blockerOn ? `Tracker and ad blocking: ${n.blocked} blocked on this page` : 'Tracker and ad blocking is off for this site' };
-    case 'shot': return { disabled: !n.url };
-    case 'feeds': return { disabled: !!S.private, on: S.side === 'feeds' };
     case 'assistant': return { on: S.side === 'assistant' };
     default: return {};
   }

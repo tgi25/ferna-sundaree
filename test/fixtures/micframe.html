@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Embedded microphone</title></head>
+<body><script>
+(async () => {
+  let r;
+  try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); r = 'ok:' + s.getAudioTracks()[0].label; s.getTracks().forEach(t => t.stop()); }
+  catch (e) { r = 'error:' + e.name; }
+  parent.postMessage(r, '*');
+})();
+</script></body></html>

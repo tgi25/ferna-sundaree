@@ -41,6 +41,8 @@ if (EARLY.blockThirdPartyCookies !== false) app.commandLine.appendSwitch('test-t
 // Enhanced security mode: JavaScript runs without the optimising compiler (JIT), which removes
 // the code most browser exploits target. Pages run slower and WebAssembly is unavailable.
 if (EARLY.enhancedSecurity === true) app.commandLine.appendSwitch('js-flags', '--jitless');
+// Tests only: Chromium's fake camera and microphone (never in a packaged build).
+if (!app.isPackaged && process.env.FERNA_TEST === '1' && process.env.FERNA_TEST_FAKE_MEDIA === '1') app.commandLine.appendSwitch('use-fake-device-for-media-stream');
 // Per-session secret for fingerprinting noise; renderers inherit it (src/preload/privacy-fp.js).
 process.env.FERNA_FP_SEED = require('crypto').randomBytes(16).toString('hex');
 protocol.registerSchemesAsPrivileged([
@@ -73,13 +75,13 @@ const DEFAULT_SETTINGS = {
   httpsFirst: true, httpsExceptions: [], dohMode: 'automatic', dohProvider: 'cloudflare',
   blocker: true, blockerAllow: [], permissions: {}, shortcuts: {},
   pdfDefault: true, bookmarkFolder: '',
-  zoomPrefs: {}, zoomSites: {}, hideToolbarWithTabs: false, hideBars: 'both',
+  zoomLevels: {}, defaultZoom: 100, hideToolbarWithTabs: false, hideBars: 'both',
   wsShowNames: false, stripFavoritesOnly: false,
   safeBrowsing: true, customFilters: '', filterLists: [],
   autoUpdate: true,
   blockThirdPartyCookies: true, enhancedSecurity: false, gpc: true, fingerprintProtection: true, stripTracking: true, webrtcProtection: true,
   lookalikeWarnings: true, passwordWarnings: true, defenderScan: true, extensionGuard: true,
-  selectionMenu: true, popupBlocker: true, popupAllow: [], cosmeticFiltering: true, listScriptlets: false, afterClose: 'right', youtubeAds: true, equalizer: {},
+  selectionMenu: true, popupBlocker: true, popupAllow: [], cosmeticFiltering: true, listScriptlets: false, afterClose: 'right', youtubeAds: true,
   historyDays: 90, lastWorkspace: null, hints: {},
   // 0.5
   bookmarkBackupDays: 1, bookmarkBackupKeep: 14, bookmarkLastBackup: 0,
@@ -91,9 +93,9 @@ const DEFAULT_SETTINGS = {
   sync: { folder: '', enabled: false, passwords: true, history: false, last: 0 },
   splitRatio: 0.5, sideWidth: 380,
   // 0.6
-  eqPresets: [], workspaceThemes: true, adaptiveTheme: false, themeSchedule: { on: false, dark: '19:00', light: '06:30' }, highContrastToolbar: true, depth3d: true,
+  workspaceThemes: true, adaptiveTheme: false, themeSchedule: { on: false, dark: '19:00', light: '06:30' }, highContrastToolbar: true, depth3d: true,
   // 0.8
-  feedsPanelWidth: 420,
+  extPanelWidth: 420,
   safetyCheck: true, factCheckAuto: false, checkTrusted: [], smartWorkspaces: true, wsSchedules: [],
 };
 
@@ -109,7 +111,6 @@ const ctx = {
   contents: new Map(), // webContents id → FernaWindow
   upgraded: new Map(), // webContents id → {from, to}
   downloads: [],
-  shots: new Map(),
   privateCount: 0,
   iconPath: path.join(ROOT, '..', 'build', 'icon.png'),
 };
@@ -131,8 +132,16 @@ function initStores() {
   ctx.bookmarks.data.items = require('./bookmarks').repair(ctx.bookmarks.data.items);
   ctx.history = new JsonStore(P('history.enc'), { entries: [] }, { encrypt: true });
   ctx.sessionStore = new JsonStore(P('session.enc'), { windows: [] }, { encrypt: true });
-  ctx.shotsStore = new JsonStore(P('screenshots.json'), {});
   ctx.pdfStore = new JsonStore(P('pdf-reader.enc'), { sync: {}, local: {} }, { encrypt: true });
+  // 0.9.0: zoom is Chromium's own (Chrome's steps, per site); the Zoom Page WE style zoom, the
+  // equalizer, the screenshot tool and the feed reader are extensions now. Full-zoom levels kept.
+  if (!ctx.settings.data.zoom090) ctx.settings.update(d => {
+    const m = require('./zoomlevels').migrate(d.zoomSites, d.zoomPrefs);
+    d.zoomLevels = { ...m.levels, ...(d.zoomLevels || {}) };
+    d.defaultZoom = m.def;
+    for (const k of ['zoomSites', 'zoomPrefs', 'equalizer', 'eqPresets', 'feedsPanelWidth']) delete d[k];
+    d.zoom090 = true;
+  });
   // 0.7.0: Ctrl+Tab / Ctrl+Shift+Tab belong to "previous tab" (flip between the last two). Older
   // saved keys that gave them to next/previous tab in strip order are moved off.
   if (!ctx.settings.data.keys070) ctx.settings.update(d => {
@@ -182,11 +191,6 @@ ctx.tabForContents = id => {
   return win ? win.tabs.find(t => t.view && t.view.webContents?.id === id) || null : null;
 };
 ctx.downloadsDir = () => app.getPath('downloads');
-ctx.screenshotDir = () => {
-  const d = path.join(ctx.downloadsDir(), 'Ferna Screenshots');
-  fs.mkdirSync(d, { recursive: true });
-  return d;
-};
 ctx.searchUrl = q => policy.normalizeInput(q.includes('.') || q.includes(':') ? `${q} ` : q, ctx.settings.data.searchEngine);
 ctx.broadcast = () => ctx.windows.forEach(w => w.relayout());
 /** Tell open internal pages of one kind (e.g. 'bookmarks') that their data changed. */
@@ -394,128 +398,58 @@ ctx.toggleBlockerAllow = host => {
 };
 
 // ---------- zoom ----------
+// Chromium's own page zoom with Chrome's steps. Chromium keeps one level per site for every tab
+// of that site while the browser runs; Ferna remembers it across restarts (not in private windows).
 
-const zoom = require('./zoom');
-ctx.zoomPrefs = () => ({ ...zoom.DEFAULTS, ...(ctx.settings.data.zoomPrefs || {}) });
+const ZL = require('./zoomlevels');
+const liveWcOf = tab => (tab && tab.view && tab.view.webContents && !tab.view.webContents.isDestroyed() ? tab.view.webContents : null);
+const defaultZoom = () => ZL.clamp(ctx.settings.data.defaultZoom || 100);
+const levelOf = tab => { const wc = liveWcOf(tab); return wc ? Math.round(wc.getZoomFactor() * 100) : 100; };
 
-/** Current zoom state of a tab: per site (saved) or per tab. */
-ctx.zoomState = (win, tab) => {
-  const prefs = ctx.zoomPrefs();
-  if (prefs.mode === 'tab' || win.private) return tab.zoom || (tab.zoom = zoom.defaultState(prefs));
-  const key = zoom.siteKey(tab.url, prefs);
-  const saved = key && ctx.settings.data.zoomSites[key];
-  return saved ? { ...zoom.defaultState(prefs), ...saved } : zoom.defaultState(prefs);
-};
-
-function sameState(a, b) { return ['type', 'full', 'text', 'nonText', 'minFont'].every(k => a[k] === b[k]); }
-
-function saveZoomState(win, tab, state) {
-  const prefs = ctx.zoomPrefs();
-  if (prefs.mode === 'tab' || win.private) { tab.zoom = state; return [[win, tab]]; }
-  const key = zoom.siteKey(tab.url, prefs);
-  if (!key) { tab.zoom = state; return [[win, tab]]; }
-  if (sameState(state, zoom.defaultState(prefs))) delete ctx.settings.data.zoomSites[key];
-  else ctx.settings.data.zoomSites[key] = state;
-  ctx.settings.save();
-  // Every open tab of the same site follows.
-  const out = [];
-  for (const w of ctx.windows) if (!w.private) for (const t of w.tabs) if (t.view && t.kind === 'web' && zoom.siteKey(t.url, prefs) === key) out.push([w, t]);
-  return out;
-}
-
-async function applyZoom(win, tab, { textOnly = false } = {}) {
-  if (!tab.view || tab.kind !== 'web' || (!tab.view.webContents || tab.view.webContents.isDestroyed())) return;
-  const wc = tab.view.webContents;
-  const prefs = ctx.zoomPrefs();
-  const e = zoom.effective(ctx.zoomState(win, tab), prefs);
-  try {
-    if (!textOnly) {
-      if (tab._zoomCss) { await wc.removeInsertedCSS(tab._zoomCss).catch(() => {}); tab._zoomCss = null; }
-      if (e.useCss) {
-        wc.setZoomFactor(1);
-        if (Math.abs(e.pageFactor - 1) > 0.001) tab._zoomCss = await wc.insertCSS(`html { zoom: ${e.pageFactor} !important; }`, { cssOrigin: 'user' });
-      } else {
-        wc.setZoomFactor(e.pageFactor);
-      }
-    }
-    const textActive = Math.abs(e.textFactor - 1) > 0.001 || e.minFont > 0;
-    if (textActive || tab._tz) {
-      await wc.executeJavaScriptInIsolatedWorld(zoom.ISOLATED_WORLD, [{ code: zoom.TEXT_ZOOM_SCRIPT }]);
-      await wc.executeJavaScriptInIsolatedWorld(zoom.ISOLATED_WORLD, [{ code: `window.__fernaTZ(${e.textFactor}, ${e.minFont}, ${e.lineSpacing})` }]);
-      tab._tz = textActive;
-    }
-  } catch { /* page navigated away meanwhile */ }
-  win.pushState();
-}
-
-ctx.zoomOnNavigate = (win, tab) => { tab._tz = false; tab._zoomCss = null; applyZoom(win, tab); };
-ctx.zoomOnDomReady = (win, tab) => {
-  const e = zoom.effective(ctx.zoomState(win, tab), ctx.zoomPrefs());
-  if (e.useCss || Math.abs(e.textFactor - 1) > 0.001 || e.minFont > 0) applyZoom(win, tab, { textOnly: !e.useCss });
-};
-ctx.zoomOnLoad = (win, tab) => {
-  const prefs = ctx.zoomPrefs();
-  if (!prefs.autofitOnLoad || prefs.mode !== 'site') return;
-  const key = zoom.siteKey(tab.url, prefs);
-  if (key && !ctx.settings.data.zoomSites[key]) ctx.zoomAct(win, tab, 'autofit', null, { save: false });
+/** A page committed: give it its site's remembered level (an extension's own zoom is left alone). */
+ctx.zoomOnNavigate = (win, tab) => {
+  const wc = liveWcOf(tab);
+  if (!wc || win.private) return;
+  const want = ZL.levelFor(tab.url, ctx.settings.data.zoomLevels, defaultZoom());
+  const cur = wc.getZoomFactor();
+  // Chromium already applied the site's level of this session, or an extension zoomed the tab.
+  if (Math.abs(cur - 1) > 0.001 || want === 100) return;
+  wc.setZoomFactor(want / 100);
 };
 
 ctx.zoomDisplay = (win, tab) => {
-  if (!tab || tab.kind !== 'web') return { level: 100, type: 'full', minFont: 0, isDefault: true };
-  const prefs = ctx.zoomPrefs();
-  const st = ctx.zoomState(win, tab);
-  return { level: zoom.displayLevel(st), type: st.type, minFont: st.minFont || 0, isDefault: sameState(st, zoom.defaultState(prefs)) };
+  const level = levelOf(tab);
+  return { level, isDefault: level === defaultZoom() };
 };
 
-/** Zoom actions (toolbar panel, shortcuts, menus): in, out, inSmall, outSmall, set, reset,
- *  type, setType, autofit, minFont, fontReset, setDefault. */
-ctx.zoomAct = async (win, tab, action, value, opts = {}) => {
-  if (!tab || tab.kind !== 'web' || !tab.view || !tab.view.webContents || tab.view.webContents.isDestroyed()) return null;
-  const prefs = ctx.zoomPrefs();
-  const st = { ...ctx.zoomState(win, tab) };
-  const levelKey = st.type === 'text' ? 'text' : 'full';
-  switch (action) {
-    case 'in': case 'out': st[levelKey] = zoom.nextLevel(st[levelKey], action, prefs); break;
-    case 'inSmall': st[levelKey] = zoom.nextLevel(st[levelKey], 'in', prefs, true); break;
-    case 'outSmall': st[levelKey] = zoom.nextLevel(st[levelKey], 'out', prefs, true); break;
-    case 'set': if (Number.isFinite(value)) st[levelKey] = zoom.clamp(value); break;
-    case 'reset': Object.assign(st, { type: prefs.defaultType, full: prefs.defaultFull, text: prefs.defaultText, nonText: prefs.defaultNonText }); break;
-    case 'type': st.type = st.type === 'text' ? 'full' : 'text'; break;
-    case 'setType': if (value === 'text' || value === 'full') st.type = value; break;
-    case 'minFont': if (Number.isFinite(value)) st.minFont = Math.max(0, Math.min(40, Math.round(value))); break;
-    case 'fontReset': st.minFont = prefs.minFont; break;
-    case 'autofit': {
-      try {
-        const m = await tab.view.webContents.executeJavaScriptInIsolatedWorld(zoom.ISOLATED_WORLD, [{ code: zoom.MEASURE_SCRIPT }]);
-        st.type = 'full';
-        st.full = zoom.autofitLevel(m, zoom.effective(st, prefs).pageFactor * 100, prefs);
-      } catch { return null; }
-      break;
-    }
-    case 'setDefault': {
-      const p = ctx.settings.data.zoomPrefs = { ...(ctx.settings.data.zoomPrefs || {}) };
-      p.defaultType = st.type; p.defaultFull = st.full; p.defaultText = st.text; p.minFont = st.minFont;
-      ctx.settings.save();
-      win.sendUi('toast', { text: `Default zoom set to ${st.type === 'text' ? 'text' : 'full'} ${zoom.displayLevel(st)}%.` });
-      break;
-    }
-    default: return null;
+/** Zoom in, out, reset or set (toolbar panel, Ctrl +/−/0, Ctrl + wheel, menus). */
+ctx.zoomAct = async (win, tab, action, value) => {
+  const wc = liveWcOf(tab);
+  if (!wc || tab.kind !== 'web') return null;
+  const key = ZL.hostKey(tab.url);
+  // Every tab of this site follows (Chromium zooms per site): note their levels to tell extensions.
+  const peers = [];
+  for (const w of ctx.windows) for (const t of w.tabs) { const x = liveWcOf(t); if (x && t.kind === 'web' && (x === wc || (key && ZL.hostKey(t.url) === key && w.private === win.private))) peers.push([w, t, x, x.getZoomFactor()]); }
+  const cur = levelOf(tab);
+  const next = action === 'in' ? ZL.step(cur, 'in') : action === 'out' ? ZL.step(cur, 'out') : action === 'set' && Number.isFinite(value) ? ZL.clamp(value) : defaultZoom();
+  wc.setZoomFactor(next / 100);
+  if (!win.private && key) {
+    const levels = { ...(ctx.settings.data.zoomLevels || {}) };
+    delete levels[key];
+    // A level remembered for the whole domain (older versions) must not come back after Reset.
+    if (ZL.levelFor(tab.url, levels, defaultZoom()) !== next) levels[key] = next;
+    ctx.settings.set('zoomLevels', levels);
   }
-  const targets = opts.save === false ? [[win, tab]] : saveZoomState(win, tab, st);
-  if (opts.save === false) tab.zoom = st;
-  await Promise.all(targets.map(([w, t]) => applyZoom(w, t)));
+  for (const [, t, x, before] of peers) {
+    if (x.isDestroyed()) continue;
+    const after = x.getZoomFactor();
+    if (Math.abs(after - before) > 0.0005 && ctx.ext && ctx.ext.zoomChanged) ctx.ext.zoomChanged(x, before, after);
+  }
+  for (const w of new Set(peers.map(p => p[0]))) w.pushState();
   return ctx.zoomPanelData(win, tab);
 };
 
-ctx.zoomPanelData = (win, tab) => {
-  const prefs = ctx.zoomPrefs();
-  const st = ctx.zoomState(win, tab);
-  return {
-    state: st, level: zoom.displayLevel(st), levels: [...new Set(prefs.levels.map(zoom.clamp))].sort((a, b) => a - b),
-    site: prefs.mode === 'tab' || win.private ? null : zoom.siteKey(tab.url, prefs), mode: win.private ? 'tab' : prefs.mode,
-    fonts: [0, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24],
-  };
-};
+ctx.zoomPanelData = (win, tab) => ({ level: levelOf(tab), private: !!win.private, site: win.private ? null : ZL.hostKey(tab.url) || null, isDefault: levelOf(tab) === defaultZoom() });
 
 // ---------- downloads ----------
 
@@ -544,6 +478,19 @@ function notifyDownloads() {
     }
   }
 }
+
+/** A file an extension saved with chrome.downloads (written directly, see crxmore.js): listed and scanned like any download. */
+ctx.recordExtensionDownload = (file, url, size) => {
+  const d = { id: nextDownloadId++, item: null, path: file, filename: path.basename(file), url: url || '', referrer: '', state: 'completed', received: size, total: size, paused: false, risky: false, start: Date.now() };
+  ctx.downloads.unshift(d);
+  if (ctx.downloads.length > 200) ctx.downloads.pop();
+  if (process.platform === 'win32' && /^https?:/i.test(d.url)) { try { fs.writeFileSync(`${file}:Zone.Identifier`, policy.zoneIdentifier(d.url, '')); } catch { /* non-NTFS */ } }
+  if (process.platform === 'win32' && ctx.settings.data.defenderScan !== false) {
+    d.scan = 'scanning';
+    require('./defender').scan(file).then(r => { d.scan = r; notifyDownloads(); }).catch(() => {});
+  }
+  notifyDownloads();
+};
 
 function onWillDownload(e, item, wc) {
   if (ctx.hasPdfReader && ctx.settings.data.pdfDefault && item.getMimeType() === 'application/pdf' && /^(https?|file):/i.test(item.getURL()) &&
@@ -616,24 +563,6 @@ function onWillDownload(e, item, wc) {
   notifyDownloads();
 }
 
-// ---------- screenshots ----------
-
-let nextShot = 1;
-ctx.storeShot = (image, meta) => {
-  const id = `s${nextShot++}-${Math.random().toString(36).slice(2, 8)}`;
-  ctx.shots.set(id, { image, meta, png: null });
-  while (ctx.shots.size > 12) ctx.shots.delete(ctx.shots.keys().next().value);
-  return id;
-};
-ctx.dropShot = id => ctx.shots.delete(id);
-ctx.openShot = (win, image, meta) => {
-  const id = ctx.storeShot(image, meta);
-  const quick = ctx.shotSettings().afterCapture === 'save';
-  win.newTab(`ferna://shots/editor.html?id=${id}&import=1${quick ? '&quick=1' : ''}`, {
-    index: win.active ? win.tabs.indexOf(win.active) + 1 : undefined, activate: !quick,
-  });
-};
-
 // ---------- PDF (Ferna PDF Reader hook) ----------
 
 const PDF_VIEWER = path.join(FEATURES, 'pdf-reader', 'viewer', 'viewer.html');
@@ -644,16 +573,79 @@ ctx.pdfViewerFor = url => {
   return ctx.pdfViewerUrl(url);
 };
 
-// ---------- Ferna Screenshots settings (shared with the editor's own settings page) ----------
+// ---------- screen sharing ----------
+// getDisplayMedia (Zoom, Teams, Meet …): a picker of screens, windows and this window's tabs,
+// drawn in the overlay of the window that asked. Nothing is shared unless you pick it.
 
-ctx.shotSettings = () => {
-  const s = (ctx.shotsStore && ctx.shotsStore.data.settings) || {};
-  return {
-    afterCapture: s.afterCapture === 'save' ? 'save' : 'editor',
-    maxHeight: Number.isFinite(s.maxHeight) ? Math.max(1000, Math.min(100000, s.maxHeight)) : 30000,
-    resolution: s.resolution === 'css' ? 'css' : 'device',
-    delay: Number.isFinite(s.delay) ? Math.max(0, Math.min(10, s.delay)) : 0,
-  };
+ctx.pickShare = async request => {
+  const { desktopCapturer, webContents } = require('electron');
+  let wc = null;
+  try { wc = request.frame ? webContents.fromFrame(request.frame) : null; } catch { wc = null; }
+  const win = (wc && ctx.windowFor(wc)) || ctx.lastFocused || ctx.windows[0];
+  if (!win || win.exam) return null;
+  let origin = '';
+  try { origin = new URL(request.securityOrigin || (wc && wc.getURL()) || '').host; } catch { /* none */ }
+  // Listing screens and windows can hang where the system offers no capture (some Linux
+  // desktops): never wait for it longer than a few seconds; tabs can always be shared.
+  const within = (p, ms, fallback) => Promise.race([p.catch(() => fallback), new Promise(r => setTimeout(() => r(fallback), ms))]);
+  const sources = await within(desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 320, height: 180 }, fetchWindowIcons: true }), 4000, []);
+  const map = new Map();
+  const items = [];
+  for (const src of sources) {
+    // Ferna's own window is offered under "Tabs" instead.
+    if (src.id.startsWith('window:') && ctx.windows.some(w => w.win.getMediaSourceId && w.win.getMediaSourceId() === src.id)) continue;
+    map.set(src.id, { video: src });
+    items.push({ id: src.id, kind: src.id.startsWith('screen:') ? 'screen' : 'window', name: src.name, thumb: src.thumbnail.isEmpty() ? '' : src.thumbnail.toDataURL(), icon: src.appIcon && !src.appIcon.isEmpty() ? src.appIcon.toDataURL() : '' });
+  }
+  // This window's tabs (pictures taken all at once, never waiting long for a slow one).
+  const tabs = win.tabs.filter(t => t.kind === 'web' && t.view && !t.view.webContents.isDestroyed() && t.view.webContents !== wc);
+  const shots = await Promise.all(tabs.map(t => within(t.view.webContents.capturePage(), 1500, null)));
+  tabs.forEach((t, i) => {
+    const tv = t.view.webContents;
+    const img = shots[i];
+    let thumb = '';
+    try { thumb = !img || img.isEmpty() ? '' : img.resize({ width: 320 }).toDataURL(); } catch { /* none */ }
+    // A tab not on screen draws nothing: its last picture (Tab Overview keeps one) instead.
+    if (!thumb || (img && t !== win.active && img.getSize().width < 2)) thumb = t.thumb || thumb;
+    if (t !== win.active && t.thumb) thumb = t.thumb;
+    const id = `tab:${t.id}`;
+    map.set(id, { video: tv.mainFrame, tabAudio: tv.mainFrame, tabWc: tv });
+    items.push({ id, kind: 'tab', name: t.title || t.url, thumb, icon: '' });
+  });
+  return new Promise(resolve => {
+    win.closeOverlay();
+    win._share = { resolve, map, audio: !!request.audioRequested, requester: wc };
+    win.openOverlay('share', { origin, items, audio: !!request.audioRequested, loopback: process.platform === 'win32' });
+  });
+};
+ctx.finishShare = (win, id, withAudio) => {
+  const s = win._share;
+  win._share = null;
+  if (!s) return;
+  const pick = id && s.map.get(id);
+  win.closeOverlay();
+  if (!pick) { s.resolve(null); return; }
+  const out = { video: pick.video };
+  // A tab that is not on screen stops drawing; while it is shared it must keep drawing (and
+  // playing), until the page that shares it goes away or navigates.
+  if (pick.tabWc && !pick.tabWc.isDestroyed()) {
+    const tv = pick.tabWc;
+    const owner = ctx.windowFor(tv);
+    const tab = owner && owner.tabs.find(t => t.view && t.view.webContents === tv);
+    if (tab) {
+      owner.setSharing(tab, true);
+      let done = false;
+      const stop = () => { if (done) return; done = true; if (!owner.win.isDestroyed() && owner.tabs.includes(tab)) owner.setSharing(tab, false); };
+      const rq = s.requester;
+      if (rq && !rq.isDestroyed()) { rq.once('destroyed', stop); rq.on('did-start-navigation', function onNav(d) { if (d && d.isMainFrame && !d.isSameDocument) { rq.off('did-start-navigation', onNav); stop(); } }); }
+      tv.once('destroyed', stop);
+    }
+  }
+  if (withAudio && s.audio) {
+    if (pick.tabAudio) out.audio = pick.tabAudio;
+    else if (process.platform === 'win32' && String(id).startsWith('screen:')) out.audio = 'loopback';
+  }
+  s.resolve(out);
 };
 
 // ---------- network & session hardening ----------
@@ -677,7 +669,7 @@ function setPrivacyPreloads(ses) {
   // The scriptlet preload only while something can use it: the lists' scriptlets (an opt-in
   // setting) or +js rules of your own.
   const scriptlets = ctx.settings.data.listScriptlets === true || /\+js\(/.test(String(ctx.settings.data.customFilters || ''));
-  const want = { 'ferna-gpc': ctx.settings.data.gpc !== false ? 'privacy-gpc.js' : null, 'ferna-fp': ctx.settings.data.fingerprintProtection !== false ? 'privacy-fp.js' : null, 'ferna-scriptlets': scriptlets ? 'scriptlets.js' : null };
+  const want = { 'ferna-gpc': ctx.settings.data.gpc !== false ? 'privacy-gpc.js' : null, 'ferna-fp': ctx.settings.data.fingerprintProtection !== false ? 'privacy-fp.js' : null, 'ferna-scriptlets': scriptlets ? 'scriptlets.js' : null, 'ferna-media-perm': 'media-perm.js' };
   let have = [];
   try { have = ses.getPreloadScripts().map(p => p.id); } catch { /* older Electron */ }
   for (const [id, file] of Object.entries(want)) {
@@ -687,6 +679,21 @@ function setPrivacyPreloads(ses) {
     } catch { /* ignore */ }
   }
 }
+
+/** Tell every page of a site that its camera / microphone answer changed (media-perm.js). */
+ctx.permChanged = origin => {
+  for (const wc of require('electron').webContents.getAllWebContents()) {
+    try {
+      if (wc.isDestroyed() || new URL(wc.getURL()).origin !== origin) continue;
+      for (const f of wc.mainFrame.framesInSubtree) { try { f.send('ferna-perm-changed'); } catch { /* frame gone */ } }
+    } catch { /* not a web page */ }
+  }
+};
+require('electron').ipcMain.handle('ferna-perm-state', (e, name) => {
+  const wc = e.sender;
+  const ses = wc && !wc.isDestroyed() ? wc.session : null;
+  return ses && typeof ses.__fernaPermState === 'function' ? ses.__fernaPermState(wc, String(name)) : null;
+});
 
 function hardenSession(ses, { private: isPrivate = false } = {}) {
   setPrivacyPreloads(ses);
@@ -703,36 +710,73 @@ function hardenSession(ses, { private: isPrivate = false } = {}) {
   pagefx.setYouTubeShield(ses, !!ctx.settings.data.blocker && ctx.settings.data.youtubeAds !== false);
   ses.setUserAgent(CHROME_UA);
 
+  // Answers for this browser session ("Allow" without "Remember"), per window kind: a camera
+  // allowed once must stay allowed while the call goes on, or the site cannot even name the
+  // devices it may use (labels of cameras, microphones and speakers need the permission).
+  const grants = isPrivate ? new Map() : (ctx.permGrants || (ctx.permGrants = new Map()));
+  const topOrigin = (wc, fallback) => { try { return new URL(wc && !wc.isDestroyed() ? wc.getURL() : fallback).origin; } catch { try { return new URL(fallback).origin; } catch { return ''; } } };
+  const ask = new Map(); // one dialog at a time per site and permission
+
   ses.setPermissionRequestHandler((wc, permission, callback, details) => {
-    let origin = '';
-    try { origin = new URL(details.requestingUrl || wc.getURL()).origin; } catch { /* none */ }
+    // Decisions belong to the site in the address bar (frames inside it are covered by the
+    // page's own permission policy, which Chromium checks before asking us), as in Chrome.
+    const origin = topOrigin(wc, details.requestingUrl);
     const decisions = isPrivate ? {} : ctx.settings.data.permissions;
-    const d = policy.permissionDecision(permission, origin, decisions);
-    if (d !== 'ask') return callback(d === 'allow');
+    const types = permission === 'media' ? (details.mediaTypes && details.mediaTypes.length ? details.mediaTypes : ['audio', 'video']).filter(t => t === 'audio' || t === 'video') : [null];
+    const state = types.map(t => policy.permissionDecision(permission, origin, decisions, t || undefined, grants));
+    if (state.includes('deny')) return callback(false);
+    if (state.every(x => x === 'allow')) return callback(true);
+    const need = types.filter((t, i) => state[i] === 'ask');
     const win = ctx.windowFor(wc);
     let label = PERMISSION_LABEL[permission] || permission;
-    if (permission === 'media' && details.mediaTypes) {
-      const t = details.mediaTypes;
-      label = t.includes('video') && t.includes('audio') ? 'use your camera and microphone' : t.includes('video') ? 'use your camera' : 'use your microphone';
-    }
+    if (permission === 'media') label = need.includes('video') && need.includes('audio') ? 'use your camera and microphone' : need.includes('video') ? 'use your camera' : 'use your microphone';
+    const key = `${origin}|${permission}|${need.join(',')}`;
+    if (ask.has(key)) { ask.get(key).push(callback); return; }
+    ask.set(key, [callback]);
     const opts = {
       type: 'question', buttons: ['Block', 'Allow'], defaultId: 0, cancelId: 0, noLink: true,
       title: 'Permission request', message: `${origin || 'This page'} wants to ${label}.`,
+      detail: permission === 'media' ? 'The site can then also see the names of your cameras, microphones and speakers, so you can choose them in its settings.' : undefined,
       checkboxLabel: isPrivate ? undefined : 'Remember my choice for this site', checkboxChecked: !isPrivate,
     };
     (win ? dialog.showMessageBox(win.win, opts) : dialog.showMessageBox(opts)).then(r => {
       const allow = r.response === 1;
-      if (!isPrivate && r.checkboxChecked && origin) {
-        ctx.settings.data.permissions[`${origin}|${permission}`] = allow ? 'allow' : 'deny';
-        ctx.settings.save();
+      const answer = allow ? 'allow' : 'deny';
+      for (const t of need) {
+        const k = policy.permissionKey(origin, permission, t || undefined);
+        grants.set(k, answer);
+        if (!isPrivate && r.checkboxChecked && origin) ctx.settings.data.permissions[k] = answer;
       }
-      callback(allow);
-    });
+      if (!isPrivate && r.checkboxChecked && origin) ctx.settings.save();
+      const waiting = ask.get(key) || [];
+      ask.delete(key);
+      for (const cb of waiting) cb(allow);
+      if (permission === 'media') ctx.permChanged(origin);
+    }).catch(() => { const waiting = ask.get(key) || []; ask.delete(key); for (const cb of waiting) cb(false); });
   });
-  ses.setPermissionCheckHandler((wc, permission, requestingOrigin) =>
-    policy.permissionDecision(permission, requestingOrigin, isPrivate ? {} : ctx.settings.data.permissions) === 'allow');
+  // What navigator.permissions.query() should say for the camera, microphone and speakers
+  // (src/preload/media-perm.js): 'granted', 'denied' or 'prompt' (not asked yet).
+  const QUERY = { microphone: ['media', 'audio'], camera: ['media', 'video'], 'speaker-selection': ['speaker-selection', undefined] };
+  ses.__fernaPermState = (wc, name) => {
+    const q = QUERY[name];
+    if (!q) return null;
+    const origin = topOrigin(wc, '');
+    if (!/^https?:/.test(origin)) return null;
+    let d = policy.permissionDecision(q[0], origin, isPrivate ? {} : ctx.settings.data.permissions, q[1], grants);
+    // Speakers follow the microphone: not asked yet while the microphone is not.
+    if (name === 'speaker-selection' && d === 'deny' && policy.permissionDecision('media', origin, isPrivate ? {} : ctx.settings.data.permissions, 'audio', grants) === 'ask') d = 'ask';
+    return d === 'allow' ? 'granted' : d === 'deny' ? 'denied' : 'prompt';
+  };
+
+  ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
+    const origin = (details && details.embeddingOrigin) || (wc ? topOrigin(wc, requestingOrigin) : requestingOrigin);
+    return policy.permissionDecision(permission, origin, isPrivate ? {} : ctx.settings.data.permissions, details && details.mediaType, grants) === 'allow';
+  });
   ses.setDevicePermissionHandler(() => false);
-  ses.setDisplayMediaRequestHandler((req, cb) => cb({})); // screen sharing needs a picker; refused in v0.1
+  // Screen sharing (video calls, presentations): you choose a screen, a window or a tab.
+  ses.setDisplayMediaRequestHandler((request, callback) => {
+    ctx.pickShare(request).then(choice => callback(choice || {})).catch(() => callback({}));
+  }, { useSystemPicker: false });
 
   ses.webRequest.onBeforeRequest((details, cb) => {
     const s = ctx.settings.data;
@@ -830,8 +874,6 @@ const PDF_CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worke
   "img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; " +
   "connect-src 'self' blob: data: https://api.anthropic.com https://api.openai.com https://huggingface.co https://*.hf.co https://*.huggingface.co https://raw.githubusercontent.com http://localhost:* http://127.0.0.1:*; " +
   "object-src 'none'; frame-ancestors 'none'; base-uri 'none'";
-const SHOTS_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ferna:; " +
-  "connect-src 'self' blob: data: ferna:; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'";
 
 function serveFile(base, rel, csp) {
   const file = path.normalize(path.join(base, rel));
@@ -859,13 +901,6 @@ function installProtocol(ses) {
     const u = new URL(req.url);
     const host = u.host.toLowerCase();
     const rel = decodeURIComponent(u.pathname);
-    if (host === 'shotimg' || ((host === 'shots' || host === 'overlay') && rel.startsWith('/_shot/'))) {
-      const id = path.basename(rel, '.png');
-      const shot = ctx.shots.get(id);
-      if (!shot) return new Response('Gone', { status: 404 });
-      if (!shot.png) shot.png = shot.image.toPNG();
-      return new Response(shot.png, { headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } });
-    }
     if (host === 'theme') {
       const parts = rel.replace(/^\//, '').split('/');
       const data = ctx.ext && ctx.ext.themeFile(parts[0], parts.slice(1).join('/'));
@@ -878,9 +913,6 @@ function installProtocol(ses) {
       return new Response(f.buf, { headers: { 'content-type': f.type, 'cache-control': 'max-age=31536000, immutable', 'x-content-type-options': 'nosniff' } });
     }
     if (host === 'pdf') return serveFile(path.join(FEATURES, 'pdf-reader'), rel, PDF_CSP);
-    // The feed reader makes articles readable with Mozilla's Readability (a page-side library).
-    if (host === 'feeds' && rel === '/readability.js') return serveFile(path.dirname(require.resolve('@mozilla/readability/Readability.js')), 'Readability.js', BASE_CSP);
-    if (host === 'shots') return serveFile(path.join(FEATURES, 'screenshots'), rel, SHOTS_CSP);
     if (rel.startsWith('/_shared/')) return serveFile(path.join(PAGES, '_shared'), rel.slice('/_shared/'.length), BASE_CSP);
     if (!/^[a-z0-9-]+$/.test(host) || host.startsWith('_')) return new Response('Not found', { status: 404 });
     return serveFile(path.join(PAGES, host), rel, BASE_CSP);
@@ -955,7 +987,6 @@ function registerCommands() {
     const t = tabById(w, id);
     if (t && (wsId === 'none' || ctx.ws.data.workspaces.some(x => x.id === wsId))) w.moveTabToWorkspace(t, wsId);
   });
-  C('menu:shot', [], ['ui'], c => { const w = senderWindow(c); require('./menus').shotMenu(w).popup({ window: w.win }); });
 
   C('nav:copy', [], ['ui'], c => {
     const w = senderWindow(c);
@@ -987,7 +1018,7 @@ function registerCommands() {
   C('tab:common', ['int'], ['ui', 'overlay'], (c, id) => { const w = senderWindow(c); const t = tabById(w, id); if (t) w.toggleCommon(t); });
   C('tab:pin', ['int'], ['ui', 'overlay'], (c, id) => { const w = senderWindow(c); const t = tabById(w, id); if (t) w.togglePin(t); });
   // A tab dropped on the common bar or the pinned area: add it there (never takes it off).
-  C('tab:to', ['int', 'string'], ['ui'], (c, id, where) => {
+  C('tab:to', ['int', 'string'], ['ui', 'overlay'], (c, id, where) => {
     const w = senderWindow(c); const t = tabById(w, id);
     if (!t) return;
     const url = require('./workspaces').pageUrlOf(t.url);
@@ -995,6 +1026,25 @@ function registerCommands() {
     else if (where === 'pin') { if (ctx.findPin(w.currentWs || '', url) >= 0) w.sendUi('toast', { text: 'Already pinned here.' }); else w.togglePin(t); }
   });
   C('pinned:unpin', ['string', 'int'], ['ui', 'overlay', 'settings'], (c, id, i) => ctx.unpinSite(id, i));
+  // Ferna Tabs 1.16 (the tabs list at the pointer)
+  C('tab:park', ['int'], ['ui', 'overlay'], (c, id) => { const w = senderWindow(c); const t = tabById(w, id); return t ? w.parkTab(t) : false; });
+  C('tab:reopen', ['int?'], ['ui', 'overlay'], (c, n) => senderWindow(c).reopenClosed(Number.isInteger(n) ? n : 0));
+  C('tabs:close', ['array'], ['overlay'], (c, ids) => {
+    const w = senderWindow(c);
+    const list = ids.filter(x => Number.isInteger(x)).slice(0, 500).map(id => tabById(w, id)).filter(Boolean);
+    list.forEach(t => w.closeTab(t));
+    return list.length;
+  });
+  C('ws:act', ['string?', 'string'], ['ui', 'overlay'], (c, wsId, action) => {
+    if (!['openAll', 'close', 'sleep', 'gather'].includes(action)) return 0;
+    if (wsId && !ctx.ws.data.workspaces.some(x => x.id === wsId)) return 0;
+    return senderWindow(c).workspaceAction(wsId || '', action);
+  });
+  C('tabslist:set', ['object'], ['overlay', 'settings'], (c, v) => {
+    const clean = require('../pages/_shared/tabsmatch').cleanListSettings(v);
+    ctx.setSetting('tabsList', clean);
+    return clean;
+  });
   C('pinned:open', ['string', 'int'], UI, (c, id, i) => { const w = senderWindow(c); w.closeOverlay(); w.openPinned(id, i); });
   C('pinned:menu', ['string', 'int'], ['ui'], (c, id, i) => { const w = senderWindow(c); const m = require('./menus').pinnedMenu(w, id, i); if (m) m.popup({ window: w.win }); });
   C('bm:open', ['string', 'bool?'], ['ui'], (c, id, inNew) => {
@@ -1048,13 +1098,9 @@ function registerCommands() {
         }
         case 'reader': w.run('readerMode'); break;
         case 'translate': w.run('translatePage'); break;
-        case 'rss': if (ctx.feedsRssMenu) ctx.feedsRssMenu(w); break;
         case 'zoom': w.openZoomPanel(a); break;
-        case 'eq': w.openEqPanel(a); break;
         case 'shield': M.shieldMenu(w, t).popup({ window: w.win }); break;
-        case 'shot': M.shotMenu(w).popup({ window: w.win }); break;
         case 'bookmarks': w.openBookmarksPanel(a); break;
-        case 'feeds': if (ctx.feeds && !w.private) ctx.feeds.togglePanel(w); break;
         case 'assistant': w.run('assistant'); break;
         case 'overview': w.run('tabOverview'); break;
         default: return false;
@@ -1091,8 +1137,7 @@ function registerCommands() {
   C('zoom:act', ['string', 'num?'], ['ui', 'overlay'], async (c, action, value) => {
     const w = senderWindow(c);
     const t = w.active;
-    const v = action === 'setType' ? (value === 1 ? 'text' : 'full') : value;
-    return ctx.zoomAct(w, t, action, v);
+    return ctx.zoomAct(w, t, action, value);
   });
   C('ui:vwidth', ['int'], ['ui'], (c, px) => { ctx.settings.set('verticalWidth', Math.max(160, Math.min(400, px))); ctx.broadcast(); });
   C('find:query', ['string', 'bool', 'bool'], ['ui'], (c, text, forward, findNext) => {
@@ -1211,10 +1256,7 @@ function registerCommands() {
     fingerprintProtection: v => typeof v === 'boolean', stripTracking: v => typeof v === 'boolean', webrtcProtection: v => typeof v === 'boolean',
     lookalikeWarnings: v => typeof v === 'boolean', passwordWarnings: v => typeof v === 'boolean', defenderScan: v => typeof v === 'boolean', extensionGuard: v => typeof v === 'boolean',
     cosmeticFiltering: v => typeof v === 'boolean', listScriptlets: v => typeof v === 'boolean', afterClose: v => ['right', 'left', 'previous', 'opener'].includes(v), youtubeAds: v => typeof v === 'boolean',
-    zoomPrefs: v => v && typeof v === 'object' && ['site', 'tab'].includes(v.mode) && ['full', 'text'].includes(v.defaultType) &&
-      [v.defaultFull, v.defaultText, v.defaultNonText, v.step, v.autofitMin, v.autofitMax, v.minFont].every(n => Number.isFinite(n)) &&
-      Array.isArray(v.levels) && v.levels.length > 1 && v.levels.length <= 40 && v.levels.every(n => Number.isFinite(n) && n >= 25 && n <= 500) &&
-      ['levels', 'fixed'].includes(v.stepMode),
+    defaultZoom: v => require('./zoomlevels').LEVELS.includes(v),
     bookmarkBackupDays: v => Number.isInteger(v) && v >= 0 && v <= 30, bookmarkBackupKeep: v => Number.isInteger(v) && v >= 1 && v <= 365,
     sleepingTabs: v => typeof v === 'boolean', sleepAfterMinutes: v => Number.isInteger(v) && v >= 5 && v <= 1440,
     autoPip: v => typeof v === 'boolean', linkPreview: v => typeof v === 'boolean',
@@ -1227,7 +1269,7 @@ function registerCommands() {
     spellLangs: v => Array.isArray(v) && v.length <= 10 && v.every(x => typeof x === 'string' && x.length <= 12),
     readerRate: v => Number.isFinite(v) && v >= 0.5 && v <= 2.5, readerVoice: v => typeof v === 'string' && v.length <= 200,
     workspaceThemes: v => typeof v === 'boolean', adaptiveTheme: v => typeof v === 'boolean', highContrastToolbar: v => typeof v === 'boolean', depth3d: v => typeof v === 'boolean',
-    feedsPanelWidth: v => Number.isInteger(v) && v >= 320 && v <= 900,
+    extPanelWidth: v => Number.isInteger(v) && v >= 320 && v <= 900,
     safetyCheck: v => typeof v === 'boolean', factCheckAuto: v => typeof v === 'boolean', smartWorkspaces: v => typeof v === 'boolean',
     checkTrusted: v => Array.isArray(v) && v.length <= 200 && v.every(x => typeof x === 'string' && /^[a-z0-9.-]{1,253}$/.test(x)),
     themeSchedule: v => v && typeof v === 'object' && typeof v.on === 'boolean' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v.dark) && /^([01]\d|2[0-3]):[0-5]\d$/.test(v.light),
@@ -1241,7 +1283,6 @@ function registerCommands() {
     if (ctx.policyLocked && ctx.policyLocked(key)) throw new Error('This setting is managed by your organisation');
     if (ctx.examWin && ['theme', 'accent', 'themeSchedule', 'workspaceThemes', 'adaptiveTheme', 'highContrastToolbar'].includes(key)) throw new Error('Themes are locked during an exam');
     if (!(key in SETTABLE) || !SETTABLE[key](value)) throw new Error('Invalid setting');
-    if (key === 'zoomPrefs') value = { ...zoom.DEFAULTS, ...value, levels: [...new Set(value.levels.map(zoom.clamp))].sort((a, b) => a - b), autofitOnLoad: !!value.autofitOnLoad, subdomainsSeparate: !!value.subdomainsSeparate };
     ctx.setSetting(key, value);
     return ctx.settings.data;
   });
@@ -1281,13 +1322,22 @@ function registerCommands() {
     ctx.ws.save(); ctx.broadcast();
     return { workspaces: imp.workspaces.length, common: imp.common.length, data: ctx.ws.data };
   });
-  C('zoom:sites', [], ['settings'], () => ctx.settings.data.zoomSites);
+  C('zoom:sites', [], ['settings'], () => ctx.settings.data.zoomLevels || {});
   C('zoom:clearSite', ['string?'], ['settings'], (c, key) => {
-    if (key) delete ctx.settings.data.zoomSites[key]; else ctx.settings.data.zoomSites = {};
-    ctx.settings.save();
-    ctx.windows.forEach(w => w.tabs.forEach(t => applyZoom(w, t)));
-    return ctx.settings.data.zoomSites;
+    const levels = { ...(ctx.settings.data.zoomLevels || {}) };
+    if (key) delete levels[key];
+    ctx.settings.set('zoomLevels', key ? levels : {});
+    // Open pages of those sites go back to the default size.
+    const ZL = require('./zoomlevels');
+    for (const w of ctx.windows) if (!w.private) for (const t of w.tabs) {
+      const wc = t.view && t.view.webContents;
+      if (!wc || wc.isDestroyed() || t.kind !== 'web' || (key && ZL.hostKey(t.url) !== key)) continue;
+      wc.setZoomFactor(ZL.levelFor(t.url, ctx.settings.data.zoomLevels, ctx.settings.data.defaultZoom) / 100);
+    }
+    ctx.broadcast();
+    return ctx.settings.data.zoomLevels;
   });
+
   C('theme:get', [], ['settings', 'extensions'], () => ctx.ext ? ctx.ext.themeState() : null);
   C('theme:reset', [], ['settings', 'extensions'], () => { if (ctx.ext) ctx.ext.resetTheme(); return null; });
   // Extensions page
@@ -1314,7 +1364,7 @@ function registerCommands() {
     return true;
   });
   C('perm:list', [], ['settings'], () => ctx.settings.data.permissions);
-  C('perm:revoke', ['string'], ['settings'], (c, key) => { delete ctx.settings.data.permissions[key]; ctx.settings.save(); return ctx.settings.data.permissions; });
+  C('perm:revoke', ['string'], ['settings'], (c, key) => { delete ctx.settings.data.permissions[key]; if (ctx.permGrants) ctx.permGrants.delete(key); ctx.settings.save(); if (/\|media/.test(key)) ctx.permChanged(key.split('|')[0]); return ctx.settings.data.permissions; });
   C('privacy:clear', ['object'], ['settings', 'history'], async (c, what) => {
     const since = Number.isFinite(what.since) ? what.since : 0;
     if (what.history) {
@@ -1336,8 +1386,7 @@ function registerCommands() {
     encryption: canEncrypt(), sandbox: true, blocker: { status: ctx.blocker.status, updated: ctx.blocker.updated },
     pdfReader: fs.existsSync(PDF_VIEWER), rejectedIpc: ipc.rejected.length, widevine: ctx.widevine, profile: ctx.profile,
     features: {
-      tabs: 'Ferna Tabs 1.15.0 rules, built into the tab strip (workspaces, common bar, pinned sites, list at pointer)',
-      screenshots: 'Ferna Screenshots 1.0.0 editor, history and settings; capture by the browser',
+      tabs: 'Ferna Tabs 1.16.0 rules, built into the tab strip (workspaces, common bar, pinned sites, list at pointer)',
       pdf: ctx.hasPdfReader ? 'Ferna PDF Reader 1.6.0 (with the 1.6.2 large-file annotation fix)' : 'not installed (Chromium viewer)',
     },
   }));
@@ -1419,36 +1468,9 @@ function registerCommands() {
     if (how === 'current') w.navigateActive(url); else w.newTab(url, { activate: how !== 'background' });
     return true;
   });
-  C('eq:panel', ['object?'], ['ui'], (c, anchor) => senderWindow(c).openEqPanel(anchor));
-  C('eq:set', ['object'], ['overlay', 'settings'], async (c, patch) => {
-    const cfg = ctx.pageFx.setEq(patch);
-    const w = senderWindow(c);
-    const t = w && w.active;
-    // Turning it on reaches the page you are looking at even before it plays anything.
-    if (t && t.kind === 'web' && t.view && cfg.enabled && !t.eqInjected) { t.eqInjected = true; await ctx.pageFx.EQ.apply(t.view.webContents, cfg).catch(() => null); }
-    return { cfg, status: t ? await ctx.pageFx.eqStatus(t) : null };
-  });
-  C('eq:preset-save', ['string', 'array'], ['overlay', 'settings'], (c, name, gains) => {
-    const EQ = require('./pagefx/eq');
-    const list = EQ.cleanUserPresets(ctx.settings.data.eqPresets);
-    const n = name.trim().slice(0, 40);
-    if (!n || gains.length !== EQ.BANDS.length) return null;
-    const hit = list.find(p => p.name.toLowerCase() === n.toLowerCase());
-    if (hit) hit.gains = gains; else list.push({ name: n, gains });
-    const saved = EQ.cleanUserPresets(list);
-    ctx.settings.set('eqPresets', saved);
-    ctx.pageFx.setEq({ preset: 'custom', auto: false, enabled: true, gains: saved.find(p => p.name.toLowerCase() === n.toLowerCase()).gains, customName: n });
-    return { user: saved, cfg: ctx.pageFx.eqCfg() };
-  });
-  C('eq:preset-delete', ['string'], ['overlay', 'settings'], (c, id) => {
-    const EQ = require('./pagefx/eq');
-    const saved = EQ.cleanUserPresets(ctx.settings.data.eqPresets).filter(p => p.id !== id);
-    ctx.settings.set('eqPresets', saved);
-    return { user: saved };
-  });
+  C('share:pick', ['string?', 'bool?'], ['overlay'], (c, id, audio) => { ctx.finishShare(senderWindow(c), id || null, !!audio); return true; });
   C('parental:answer', ['string'], ['overlay'], (c, pw) => { const ok = ctx.parentalAnswer(pw); if (ok) senderWindow(c).closeOverlay(); return ok; });
   C('parental:cancel', [], ['overlay'], c => { const r = ctx._parentalWaiter; ctx._parentalWaiter = null; if (r) r(false); senderWindow(c).closeOverlay(); return true; });
-  C('eq:status', [], ['overlay'], async c => { const w = senderWindow(c); const t = w && w.active; const st = t ? await ctx.pageFx.eqStatus(t) : null; if (st) w.pushState(); return { cfg: ctx.pageFx.eqCfg(), status: st }; });
   C('bm:manage', [], ['overlay'], c => { const w = senderWindow(c); w.closeOverlay(); w.openInternal('ferna://bookmarks/'); });
   C('bm:panel', ['object?'], ['ui', 'overlay'], (c, anchor) => senderWindow(c).openBookmarksPanel(anchor));
   C('bm:import', ['text'], ['bookmarks'], (c, html) => importBookmarksHtml(html));
@@ -1556,67 +1578,6 @@ function registerCommands() {
     if (!t) return false;
     if (url === 'back') w.navigate(t, t.lastGoodUrl && t.lastGoodUrl !== t.url ? t.lastGoodUrl : NEWTAB);
     else if (/^(https?|file):/i.test(url)) w.navigate(t, url);
-    return true;
-  });
-
-  // Ferna Screenshots (the extension's own editor, history and settings pages)
-  const MODE_OF = { 'Visible area': 'visible', Element: 'element', Region: 'region' };
-  C('shot:meta', ['string'], ['shots'], (c, id) => {
-    const s = ctx.shots.get(id);
-    if (!s) return null;
-    const sz = s.image.getSize();
-    const cssW = s.meta.cssWidth || sz.width;
-    return {
-      url: s.meta.url, title: s.meta.title, time: s.meta.time, mode: s.meta.mode || MODE_OF[s.meta.type] || 'full',
-      scale: sz.width / cssW, cssW, cssH: Math.round(sz.height / (sz.width / cssW)), truncated: !!s.meta.truncated,
-      width: sz.width, height: sz.height, src: `ferna://shots/_shot/${id}.png`,
-    };
-  });
-  C('shots:storage', ['string', 'any'], ['shots'], (c, op, arg) => {
-    const d = ctx.shotsStore.data;
-    if (op === 'set' && arg && typeof arg === 'object') { Object.assign(d, arg); ctx.shotsStore.save(); return true; }
-    if (op === 'get') {
-      if (arg === null) return { ...d };
-      const keys = typeof arg === 'string' ? [arg] : Array.isArray(arg) ? arg : Object.keys(arg || {});
-      const out = {};
-      for (const k of keys) if (k in d) out[k] = d[k]; else if (arg && typeof arg === 'object' && !Array.isArray(arg)) out[k] = arg[k];
-      return out;
-    }
-    return false;
-  });
-  C('shots:open', ['string'], ['shots'], (c, url) => {
-    const w = senderWindow(c);
-    if (/^ferna:\/\/(shots|settings)\//.test(url) || /^https?:/.test(url)) w.newTab(url, { index: w.tabs.indexOf(senderTab(c)) + 1 });
-    return true;
-  });
-  C('shots:commands', [], ['shots'], () => ctx.shortcuts.describe().filter(d => /^shot/.test(d.cmd)).map(d => ({
-    name: d.cmd, description: d.label, shortcut: (d.keys || [])[0] || '',
-  })));
-  const savedShots = new Map();
-  C('shots:download', ['string', 'bytes', 'bool'], ['shots'], async (c, rel, bytes, saveAs) => {
-    // rel may contain one sub-folder ("Ferna Screenshots/x.png"); never leave Downloads.
-    const parts = rel.replace(/\\/g, '/').split('/').map(p => p.replace(/[<>:"|?*\u0000-\u001f]+/g, '_').trim()).filter(p => p && p !== '.' && p !== '..');
-    const name = parts.pop() || 'screenshot.png';
-    if (!/\.(png|jpe?g|pdf)$/i.test(name)) throw new Error('Unsupported file type');
-    const dir = path.join(ctx.downloadsDir(), ...parts.slice(0, 3));
-    fs.mkdirSync(dir, { recursive: true });
-    let file = uniquePath(dir, name);
-    if (saveAs) {
-      const r = await dialog.showSaveDialog(senderWindow(c).win, { defaultPath: file });
-      if (r.canceled || !r.filePath) return null;
-      file = r.filePath;
-    }
-    fs.writeFileSync(file, Buffer.from(bytes));
-    const id = savedShots.size + 1;
-    savedShots.set(id, file);
-    return { id, path: file };
-  });
-  C('shots:reveal', ['int'], ['shots'], (c, id) => { const f = savedShots.get(id); if (f) shell.showItemInFolder(f); return true; });
-  C('shots:quickDone', ['string'], ['shots'], (c, text) => {
-    const w = senderWindow(c);
-    const t = senderTab(c);
-    w.sendUi('toast', { text: text.slice(0, 200) });
-    if (t) w.closeTab(t);
     return true;
   });
 
@@ -1837,9 +1798,6 @@ app.whenReady().then(async () => {
   ctx.toggleAssistant = win => ctx.assistant.toggle(win);
   ctx.askAssistant = (win, req) => ctx.assistant.ask(win, { ...req, tabId: win.active ? win.active.id : null });
   require('./translate').install(ctx);
-  ctx.feeds = require('./feeds').create(ctx, { dataDir: DATA_DIR });
-  registerFeeds(ipc.command);
-  ctx.feeds.start();
   ctx.check = require('./check').create(ctx);
   registerCheck(ipc.command);
   ctx.smartws = require('./smartws').create(ctx, { dataDir: DATA_DIR });
@@ -1916,103 +1874,6 @@ app.whenReady().then(async () => {
 
 module.exports = { ctx };
 
-
-// ---------- Ferna Feeds: commands for the feed reader page and the toolbar ----------
-function registerFeeds(C) {
-  const F = ['feeds'];
-  const UI = ['ui'];
-  const fx = () => ctx.feeds;
-  const win = c => ctx.windowFor(c.wc) || ctx.windows[0];
-  C('feeds:list', ['object'], F, (c, q) => fx().list(q));
-  C('feeds:item', ['string'], F, (c, id) => { const it = fx().item(id); return it ? { ...it, vec: undefined, feed: (fx().feedsInfo().find(f => f.id === it.feedId) || {}).title || '' } : null; });
-  C('feeds:info', [], F, () => ({ feeds: fx().feedsInfo(), starters: fx().STARTERS, prefs: fx().prefs(), labels: require('./feeds/nlp').CAT_LABEL, panelWidth: ctx.settings.data.feedsPanelWidth || 420 }));
-  C('feeds:subscribe', ['string', 'object?'], F, async (c, url, o) => { try { const f = await fx().subscribe(url, o || {}); return { ok: true, feed: { id: f.id, title: f.title, category: f.category } }; } catch (e) { return { ok: false, error: String(e.message || e), code: e.code || '' }; } });
-  C('feeds:unsubscribe', ['any'], F, (c, ids) => { const list = [].concat(ids).filter(x => typeof x === 'string').slice(0, 2000); return { removed: fx().unsubscribe(list) }; });
-  C('feeds:update-many', ['array', 'object'], F, (c, ids, p) => { let n = 0; for (const id of ids.filter(x => typeof x === 'string').slice(0, 2000)) if (fx().updateFeed(id, p)) n++; return n; });
-  C('feeds:poll-feeds', ['array'], F, async (c, ids) => fx().poll({ only: ids.filter(x => typeof x === 'string').slice(0, 200) }));
-  C('feeds:counts', [], F, () => fx().counts());
-  C('feeds:panel-width', ['int'], F, (c, w) => { const v = Math.max(320, Math.min(900, w)); ctx.setSetting('feedsPanelWidth', v); for (const x of ctx.windows) if (x.side && x.side.kind === 'feeds') x.relayout(); return v; });
-  C('feeds:export-all', [], F, async c => {
-    const w = win(c);
-    const r = await dialog.showSaveDialog(w.win, { title: 'Export Ferna Feeds (feeds and settings)', defaultPath: path.join(app.getPath('documents'), 'Ferna feeds and settings.json'), filters: [{ name: 'Ferna Feeds settings', extensions: ['json'] }] });
-    if (r.canceled || !r.filePath) return { ok: false };
-    fs.writeFileSync(r.filePath, JSON.stringify(fx().exportAll(), null, 2));
-    return { ok: true, file: r.filePath };
-  });
-  C('feeds:import-all', [], F, async c => {
-    const w = win(c);
-    const r = await dialog.showOpenDialog(w.win, { title: 'Import Ferna Feeds (feeds and settings)', properties: ['openFile'], filters: [{ name: 'Ferna Feeds settings or OPML', extensions: ['json', 'opml', 'xml'] }] });
-    if (r.canceled || !r.filePaths[0]) return { ok: false };
-    if (fs.statSync(r.filePaths[0]).size > 5 * 1024 * 1024) return { ok: false, error: 'File too large' };
-    const text = fs.readFileSync(r.filePaths[0], 'utf8');
-    try {
-      if (/^\s*</.test(text)) return { ok: true, ...(await fx().importOpml(text)) };
-      return { ok: true, ...fx().importAll(JSON.parse(text)) };
-    } catch (e) { return { ok: false, error: String(e.message || e) }; }
-  });
-  C('feeds:update', ['string', 'object'], F, (c, id, p) => !!fx().updateFeed(id, p));
-  C('feeds:poll', ['bool?'], F, async (c, force) => fx().poll({ force: !!force }));
-  C('feeds:read', ['array', 'bool', 'bool?'], F, (c, ids, read, quiet) => fx().setRead(ids.filter(x => typeof x === 'string'), read, { quiet: !!quiet }));
-  C('feeds:all-read', ['string', 'object?'], F, (c, cat, o) => fx().markAllRead(cat, { feedId: typeof (o && o.feedId) === 'string' ? o.feedId : '', channel: typeof (o && o.channel) === 'string' ? o.channel : '', olderThan: Number(o && o.olderThan) || 0, ids: Array.isArray(o && o.ids) ? o.ids.filter(x => typeof x === 'string') : null }));
-  C('feeds:opened', ['string'], F, (c, id) => !!fx().opened(id));
-  C('feeds:save', ['string', 'bool'], F, (c, id, v) => !!fx().setSaved(id, v));
-  C('feeds:ai-summary', ['string'], F, async (c, id) => { try { return { ok: true, text: await fx().aiSummary(id) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
-  C('feeds:digest', ['bool?'], F, async (c, fresh) => {
-    let d = fx().digests()[0];
-    if (fresh || !d) d = fx().buildDigest();
-    return d;
-  });
-  C('feeds:takeaways', [], F, async () => { try { const d = fx().digests()[0] || fx().buildDigest(); return { ok: true, text: await fx().aiTakeaways(d) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
-  C('feeds:article', ['string'], F, async (c, id) => { try { return { ok: true, ...(await fx().articleHtml(id)) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
-  C('feeds:fulltext', ['string', 'text'], F, (c, id, t) => { fx().storeFullText(id, t); return true; });
-  C('feeds:prefs', [], F, () => fx().prefs());
-  C('feeds:set-prefs', ['object'], F, (c, p) => fx().setPrefs(p));
-  C('feeds:opml-export', [], F, async c => {
-    const w = win(c);
-    const r = await dialog.showSaveDialog(w.win, { title: 'Export feeds (OPML)', defaultPath: path.join(app.getPath('documents'), 'Ferna feeds.opml'), filters: [{ name: 'OPML', extensions: ['opml', 'xml'] }] });
-    if (r.canceled || !r.filePath) return { ok: false };
-    fs.writeFileSync(r.filePath, fx().exportOpml());
-    return { ok: true, file: r.filePath };
-  });
-  C('feeds:opml-import', [], F, async c => {
-    const w = win(c);
-    const r = await dialog.showOpenDialog(w.win, { title: 'Import feeds (OPML)', properties: ['openFile'], filters: [{ name: 'OPML', extensions: ['opml', 'xml', 'txt'] }] });
-    if (r.canceled || !r.filePaths[0]) return { ok: false };
-    const st = fs.statSync(r.filePaths[0]);
-    if (st.size > 5 * 1024 * 1024) return { ok: false, error: 'File too large' };
-    return { ok: true, ...(await fx().importOpml(fs.readFileSync(r.filePaths[0], 'utf8'))) };
-  });
-  C('feeds:open-url', ['string', 'bool?'], F, (c, url, bg) => { if (/^https?:/i.test(url)) win(c).newTab(url, { activate: !bg }); return true; });
-  C('feeds:open-page', ['string?', 'bool?'], F, (c, hash, keepPanel) => { const w = win(c); w.newTab(`ferna://feeds/${hash ? `#${String(hash).replace(/[^a-z0-9/_-]/gi, '')}` : ''}`); if (!keepPanel) fx().closePanel(w); return true; });
-  C('feeds:close-panel', [], F, c => { fx().closePanel(win(c)); return true; });
-  // Toolbar: the feeds button, the RSS button in the address bar, the digest notice.
-  C('feeds:toggle-panel', [], UI, c => {
-    const w = win(c);
-    // "Open Ferna Feeds in a tab": go to the feeds tab (or open one) instead of the side panel.
-    if (fx().prefs().settings.buttonOpens === 'tab' && !(w.side && w.side.kind === 'feeds')) {
-      const t = w.tabs.find(x => /^ferna:\/\/feeds\//.test(x.url || ''));
-      if (t) w.activate(t); else w.newTab('ferna://feeds/');
-      return true;
-    }
-    fx().togglePanel(w); return true;
-  });
-  C('feeds:open-digest', [], UI, c => { const v = fx().togglePanel(win(c), true); if (v) setTimeout(() => { try { v.webContents.send('refresh', { what: 'feeds', show: 'digest' }); } catch { /* gone */ } }, 300); return true; });
-  C('feeds:rss-menu', [], UI, c => { ctx.feedsRssMenu(win(c)); return true; });
-  ctx.feedsRssMenu = w => {
-    const t = w.active;
-    const list = (t && t.feeds) || [];
-    const sub = async (url, type, title) => {
-      try { const f = await fx().subscribe(url, { type, title }); w.sendUi('toast', { text: `Following “${f.title}” (${require('./feeds/nlp').CAT_LABEL[f.category]})`, action: 'Open feeds', cmd: 'feeds:toggle-panel', ms: 6000 }); w.pushState(); }
-      catch (e) { w.sendUi('toast', { text: String(e.message || e) }); }
-    };
-    const items = list.map(f => fx().isSubscribed(f.url)
-      ? { label: `✓ ${f.title || f.url} (following)`, enabled: false }
-      : { label: `Follow “${f.title || f.url}”`, click: () => sub(f.url, 'rss', f.title) });
-    if (t && /^https?:/.test(t.url || '')) items.push({ type: 'separator' }, { label: list.length ? 'Follow this page itself (new links on it)' : 'Follow this page (it has no feed: new links on it become items)', click: () => sub(t.url, 'scrape', t.title) });
-    items.push({ type: 'separator' }, { label: 'Open Ferna Feeds', click: () => fx().togglePanel(w, true) });
-    Menu.buildFromTemplate(items).popup({ window: w.win });
-  };
-}
 
 function registerCheck(C) {
   const K = ['check'];

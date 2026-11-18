@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Ferna Screenshot",
+  "short_name": "Ferna Shot",
+  "version": "1.1.0",
+  "description": "Full-page, region & element screenshots stamped with the page address and time. Mark up, then save PNG, JPG or PDF.",
+  "author": "Ferna Software Solutions",
+  "homepage_url": "https://tgi25.github.io/ferna-software/",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": {
+    "default_title": "Ferna Screenshot",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+  },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_page": "options.html",
+  "permissions": ["activeTab", "scripting", "downloads", "storage", "contextMenus", "notifications", "unlimitedStorage", "clipboardWrite"],
+  "commands": {
+    "capture-visible": { "suggested_key": { "default": "Alt+Shift+V" }, "description": "Capture the visible area" },
+    "capture-full": { "suggested_key": { "default": "Alt+Shift+F" }, "description": "Capture the entire page" },
+    "capture-region": { "suggested_key": { "default": "Alt+Shift+R" }, "description": "Select a region to capture" },
+    "capture-element": { "suggested_key": { "default": "Alt+Shift+E" }, "description": "Select an element to capture" }
+  }
+}

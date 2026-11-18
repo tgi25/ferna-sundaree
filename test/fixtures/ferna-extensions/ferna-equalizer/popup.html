@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ferna Equalizer</title>
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div class="eqp" id="eqp">
+  <header>
+    <img src="icons/icon48.png" alt="">
+    <label class="eq-switch"><input type="checkbox" id="eq-on"><span></span><b>Ferna Equalizer</b></label>
+    <span class="grow"></span>
+    <label class="eq-auto" title="Detect the genre of what is playing and pick a preset"><input type="checkbox" id="eq-auto"> Auto-EQ</label>
+  </header>
+  <div class="eq-detect" id="eq-detect" hidden></div>
+  <div class="eq-presets" id="eq-presets" role="radiogroup" aria-label="Presets"></div>
+  <div class="eq-bands" id="eq-bands"></div>
+  <div class="eq-save"><input id="eq-name" maxlength="40" placeholder="Name this sound (e.g. My Baila, Car stereo)"><button class="btn small" id="eq-save">Save preset</button></div>
+  <div class="foot"><span id="eq-note" class="muted"></span><span class="grow"></span>
+    <label class="site" title="Leave this site's sound as it is"><input type="checkbox" id="site-off"> Off on <b id="site"></b></label>
+  </div>
+  <div class="foot links"><a href="#" id="eq-reset">Reset to flat</a><span class="grow"></span><a href="#" id="settings">Settings and help</a></div>
+</div>
+<script type="module" src="popup.js"></script>
+</body>
+</html>

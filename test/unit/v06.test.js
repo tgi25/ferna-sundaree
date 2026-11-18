@@ -3,30 +3,10 @@
 // parental-control lists and SafeSearch, contextual theme colours.
 const test = require('node:test');
 const assert = require('node:assert');
-const eq = require('../../src/main/pagefx/eq');
 const secret = require('../../src/main/secret');
 const exam = require('../../src/main/exam');
 const par = require('../../src/main/parental');
 const th = require('../../src/main/ctxtheme');
-
-test('equalizer: new genres have presets, keywords and a sound family; script compiles', () => {
-  for (const g of ['reggae', 'dub', 'synthwave', 'bossanova', 'afrobeats', 'bhangra', 'ambient', 'baila']) {
-    assert.ok(eq.PRESETS[g] && eq.PRESETS[g].gains.length === 10 && eq.KEYWORDS[g].length && eq.AUTO_GENRES.includes(g), g);
-    assert.ok(eq.PRESETS[g].gains.every(v => v >= -12 && v <= 12));
-    assert.ok(eq.FAMILY[g] in eq.PRESETS);
-  }
-  assert.ok(!eq.KEYWORDS.electronic.includes('synthwave') && !eq.KEYWORDS.jazz.includes('bossa nova'));
-  assert.doesNotThrow(() => new Function(eq.SCRIPT));
-});
-
-test('equalizer: your presets are cleaned and a named custom preset keeps its name', () => {
-  const list = eq.cleanUserPresets([{ name: '  My Baila ', gains: [13, -20, 1.26, 0, 0, 0, 0, 0, 0, 0] }, { name: '', gains: [] }, { name: 'bad', gains: [1] }]);
-  assert.strictEqual(list.length, 1);
-  assert.deepStrictEqual([list[0].name, list[0].gains.slice(0, 3)], ['My Baila', [12, -12, 1.5]]);
-  assert.match(list[0].id, /^u/);
-  assert.strictEqual(eq.clean({ preset: 'custom', gains: list[0].gains, customName: 'My Baila', enabled: true }).customName, 'My Baila');
-  assert.strictEqual(eq.clean({ preset: 'rock', customName: 'x' }).customName, undefined);
-});
 
 test('passwords for parents and invigilators: scrypt hash, constant-time verify', () => {
   const h = secret.hash('invigilator-1');

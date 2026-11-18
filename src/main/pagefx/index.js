@@ -1,12 +1,11 @@
 'use strict';
 // Page features injected into web pages from the browser process, each in its own isolated
 // world (no page access to their code, no channel back to the browser):
-//   selection menu (7784), equalizer (7786), YouTube ad handling (7787), cosmetic ad hiding
+//   selection menu (7784), YouTube ad handling (7787), cosmetic ad hiding
 //   (CSS inserted by the browser), Picture-in-Picture (on request).
 
 const path = require('path');
 const selection = require('./selection');
-const eq = require('./eq');
 const pip = require('./pip');
 const yt = require('./youtube');
 const picker = require('./picker');
@@ -125,17 +124,13 @@ function create(ctx) {
     if (blockingOn(tab) && S().youtubeAds !== false && yt.isYouTubeHost(host(tab.url), testYt)) {
       wc.executeJavaScriptInIsolatedWorld(yt.WORLD, [{ code: yt.WATCH }]).catch(() => {});
     }
-    if (eqCfg().enabled) eq.apply(wc, eqCfg()).catch(() => {});
     if (ctx.passwords && !win.private) ctx.passwords.attach(win, tab);
     cosmetics(win, tab, wc);
     // A second pass (styles only) once late content (ads load late) is in.
     setTimeout(() => { if (live(tab) === wc && !wc.isDestroyed()) cosmetics(win, tab, wc); }, 2500);
   }
 
-  function mediaStarted(win, tab) {
-    const wc = live(tab);
-    if (wc && eqCfg().enabled) eq.apply(wc, eqCfg()).catch(() => {});
-  }
+  function mediaStarted() { /* the equalizer is the Ferna Equalizer extension now */ }
 
   async function togglePip(win, tab) {
     const wc = live(tab);
@@ -146,36 +141,6 @@ function create(ctx) {
     else if (r === 'none') win.sendUi('toast', { text: 'No video on this page to show in Picture-in-Picture.' });
     else win.sendUi('toast', { text: 'This video could not be shown in Picture-in-Picture.' });
     win.pushState();
-  }
-
-  // ---------- equalizer ----------
-  function eqCfg() { return eq.clean(S().equalizer); }
-  function setEq(patch) {
-    const base = { ...eqCfg() };
-    if (patch.preset && patch.preset !== 'custom') delete base.customName;
-    if (patch.gains && !patch.customName && patch.preset === 'custom') delete base.customName;
-    const next = eq.clean({ ...base, ...patch });
-    ctx.settings.set('equalizer', next);
-    for (const w of ctx.windows) for (const t of w.tabs) {
-      const wc = live(t);
-      // Enable only where media has played; turning off reaches every page that has it.
-      if (wc && isWeb(t) && (t.hasMedia || t.hasVideo || t.eqInjected)) { t.eqInjected = true; eq.apply(wc, next).catch(() => {}); }
-    }
-    ctx.broadcast();
-    return next;
-  }
-  function eqDisplay(tab) {
-    const c = eqCfg();
-    if (!c.enabled) return { enabled: false, label: 'Off' };
-    const label = c.auto ? `Auto${tab && tab.eqGenre ? ` (${eq.PRESETS[tab.eqGenre] ? eq.PRESETS[tab.eqGenre].label : tab.eqGenre})` : ''}` : c.preset === 'custom' ? (c.customName || 'Custom') : (eq.PRESETS[c.preset] || eq.PRESETS.flat).label;
-    return { enabled: true, label };
-  }
-  async function eqStatus(tab) {
-    const wc = live(tab);
-    if (!wc || !isWeb(tab)) return null;
-    const s = await eq.status(wc).catch(() => null);
-    if (s && s.applied && tab.eqGenre !== s.applied) { tab.eqGenre = s.applied; }
-    return s;
   }
 
   // ---------- reading mode and read aloud ----------
@@ -221,7 +186,7 @@ function create(ctx) {
     try { return await wc.executeJavaScriptInIsolatedWorld(reader.WORLD + 10, [{ code: reader.EXTRACT() }]); } catch { return null; }
   }
 
-  return { domReady, mediaStarted, pip: togglePip, eqCfg, setEq, eqDisplay, eqStatus, cosmetics, scriptletsFor, pickElement, EQ: eq, reader: openReader, readAloud, extract };
+  return { domReady, mediaStarted, pip: togglePip, cosmetics, scriptletsFor, pickElement, reader: openReader, readAloud, extract };
 }
 
 /** Register or remove the YouTube document-start preload on a session. */

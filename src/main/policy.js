@@ -91,14 +91,38 @@ function zoneIdentifier(url, referrer) {
 
 // Permissions a site may ask the user for; anything else is refused outright.
 const PROMPTABLE = new Set(['media', 'geolocation', 'notifications', 'midi', 'midiSysex', 'clipboard-read',
-  'display-capture', 'idle-detection', 'window-management', 'storage-access', 'top-level-storage-access']);
-// Harmless permissions granted without asking.
-const AUTO_ALLOW = new Set(['fullscreen', 'pointerLock', 'clipboard-sanitized-write', 'keyboardLock']);
+  'idle-detection', 'window-management', 'storage-access', 'top-level-storage-access']);
+// Harmless permissions granted without asking. Screen wake lock keeps the screen on during a
+// video call or a presentation (Chrome grants it without asking too). Screen sharing
+// (display-capture) always goes through Ferna's picker, which is where you agree to it.
+const AUTO_ALLOW = new Set(['fullscreen', 'pointerLock', 'clipboard-sanitized-write', 'keyboardLock', 'screen-wake-lock', 'display-capture']);
 
-function permissionDecision(permission, origin, decisions = {}) {
+/** The key a decision is saved under. Camera and microphone are separate, as in Chrome. */
+function permissionKey(origin, permission, mediaType) {
+  return permission === 'media' && (mediaType === 'audio' || mediaType === 'video') ? `${origin}|media:${mediaType}` : `${origin}|${permission}`;
+}
+
+/**
+ * 'allow' | 'deny' | 'ask' for a permission of a site. decisions: saved answers; grants: answers
+ * for this browser session only ("Allow" without "Remember"). For media, mediaType 'audio' or
+ * 'video' picks microphone or camera; 'speaker-selection' (choosing speakers, as video-call sites
+ * do) follows the microphone, as in Chrome.
+ */
+function permissionDecision(permission, origin, decisions = {}, mediaType, grants) {
   if (AUTO_ALLOW.has(permission)) return 'allow';
+  if (permission === 'speaker-selection') return permissionDecision('media', origin, decisions, 'audio', grants) === 'allow' ? 'allow' : 'deny';
   if (!PROMPTABLE.has(permission)) return 'deny';
-  const saved = decisions[`${origin}|${permission}`];
+  const look = key => (grants && grants.get(key)) || decisions[key];
+  if (permission === 'media' && (mediaType === 'audio' || mediaType === 'video')) {
+    const own = look(permissionKey(origin, 'media', mediaType));
+    if (own === 'allow' || own === 'deny') return own;
+  } else if (permission === 'media') {
+    // A check without a type (some device lists): either answer counts.
+    const a = look(permissionKey(origin, 'media', 'audio')), v = look(permissionKey(origin, 'media', 'video'));
+    if (a === 'allow' || v === 'allow') return 'allow';
+    if (a === 'deny' && v === 'deny') return 'deny';
+  }
+  const saved = look(`${origin}|${permission}`); // also older saves of 'media' for both
   if (saved === 'allow' || saved === 'deny') return saved;
   return 'ask';
 }
@@ -115,5 +139,5 @@ function screenshotName(url, date, ext) {
 
 module.exports = {
   SEARCH_ENGINES, DOH_PROVIDERS, isPrivateHost, shouldUpgrade, upgradeUrl, normalizeInput,
-  isRiskyDownload, zoneIdentifier, permissionDecision, PROMPTABLE, AUTO_ALLOW, screenshotName,
+  isRiskyDownload, zoneIdentifier, permissionDecision, permissionKey, PROMPTABLE, AUTO_ALLOW, screenshotName,
 };

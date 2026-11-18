@@ -8,46 +8,22 @@ const path = require('path');
 module.exports = async function v06({ step, assert, main, win, page, H, base, shot, freshTab, evalActive, profile }) {
   const ui = () => page('ferna://ui/');
 
-  await step('0.6 equalizer: new genres listed; save, use and delete your own preset', async () => {
-    await freshTab(`${base}/video.html?eq6`);
-    await main(() => global.__ferna.windows[0].openEqPanel());
-    const ov = await page('ferna://overlay/');
-    await H.until(() => ov.evaluate(() => !!document.querySelector('[data-preset=baila]') && !!document.querySelector('[data-preset=reggae]') && !!document.querySelector('[data-preset=synthwave]')), 4000, 'genre chips');
-    await ov.evaluate(() => { const r = document.querySelectorAll('#eqp [data-band]'); r[0].value = 7; r[9].value = -3; r[0].dispatchEvent(new Event('input', { bubbles: true })); });
-    await H.sleep(300);
-    await ov.fill('#eq-name', 'My Baila');
-    await ov.click('#eq-save');
-    await H.until(() => ov.evaluate(() => [...document.querySelectorAll('[data-user]')].some(b => b.textContent.includes('My Baila') && b.classList.contains('on'))), 4000, 'user preset on');
-    const cfg = await main(() => global.__ferna.pageFx.eqCfg());
-    assert(cfg.customName === 'My Baila' && cfg.gains[0] === 7 && cfg.gains[9] === -3, JSON.stringify(cfg));
-    const label = await main(() => global.__ferna.windows[0].state().nav.eq.label);
-    assert(label === 'My Baila', label);
-    await shot('v06-01-eq-presets');
-    await ov.click('[data-preset=reggae]');
-    await H.until(async () => (await main(() => global.__ferna.pageFx.eqCfg().preset)) === 'reggae', 3000, 'reggae');
-    const id = await main(() => global.__ferna.settings.data.eqPresets[0].id);
-    await ov.evaluate(i => window.ferna.cmd('eq:preset-delete', i), id);
-    assert((await main(() => global.__ferna.settings.data.eqPresets.length)) === 0, 'deleted');
-    await main(() => { global.__ferna.pageFx.setEq({ enabled: false, preset: 'flat' }); global.__ferna.windows[0].closeOverlay(); });
-  });
 
   await step('0.6 toolbar contrast: icons and "on" buttons stay ≥ 4.5:1 on light, dark and coloured bars', async () => {
     const u = await ui();
-    await main(() => global.__ferna.pageFx.setEq({ enabled: true, preset: 'rock' }));
     await H.sleep(400);
     let c = await u.evaluate(() => window.__fernaContrast());
-    assert(c.toolbar >= 4.5 && c.eqOn >= 4.5 && c.tabs >= 4.5, `default ${JSON.stringify(c)}`);
+    assert(c.toolbar >= 4.5 && c.onBtn >= 4.5 && c.tabs >= 4.5, `default ${JSON.stringify(c)}`);
     // A pale yellow workspace and a very dark one: the inks flip to stay readable.
     for (const colour of ['#facc15', '#111827', '#22d3ee']) {
       const id = await main((_, col) => { const ctx = global.__ferna; const w = ctx.createWorkspace(`C ${col}`); w.color = col; ctx.ws.save(); ctx.windows[0].switchWorkspace(w.id); return w.id; }, colour);
       await H.sleep(500);
       c = await u.evaluate(() => window.__fernaContrast());
       const bg = await u.evaluate(() => getComputedStyle(document.querySelector('#toolbar')).backgroundColor);
-      assert(c.toolbar >= 4.5 && c.eqOn >= 4.5 && c.tabs >= 4.5, `${colour} ${bg} ${JSON.stringify(c)}`);
+      assert(c.toolbar >= 4.5 && c.onBtn >= 4.5 && c.tabs >= 4.5, `${colour} ${bg} ${JSON.stringify(c)}`);
       if (colour === '#facc15') await shot('v06-02-workspace-colour');
       await main((_, i) => { const ctx = global.__ferna; ctx.windows[0].switchWorkspace(null); ctx.deleteWorkspace(i); }, id);
     }
-    await main(() => global.__ferna.pageFx.setEq({ enabled: false, preset: 'flat' }));
   });
 
   await step('0.6 themes: workspace colours the bars; adaptive colour follows the site; scheduled dark mode', async () => {

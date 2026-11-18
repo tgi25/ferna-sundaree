@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ferna Zoom — Settings</title>
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<div class="wrap">
+  <header><img src="icons/icon48.png" alt=""><div><h1>Ferna Zoom</h1><p class="muted">Settings</p></div></header>
+  <section class="welcome" id="welcome" hidden>
+    <b>Ferna Zoom is ready.</b> Click its button in the toolbar (pin it from the puzzle-piece menu) to zoom a page in full or text-only. Every site remembers its own zoom.
+  </section>
+
+  <section>
+    <h2>How zoom is kept</h2>
+    <label class="opt"><input type="radio" name="mode" value="site"> <span><b>Per site</b> — every page and tab of a site use the same zoom (remembered)</span></label>
+    <label class="opt"><input type="radio" name="mode" value="tab"> <span><b>Per tab</b> — each tab zooms on its own (not remembered after closing)</span></label>
+    <label class="check"><input type="checkbox" id="subdomainsSeparate"> Treat sub-sites separately (news.example.com and mail.example.com)</label>
+  </section>
+
+  <section>
+    <h2>Default zoom</h2>
+    <div class="grid">
+      <label>Type <select id="defaultType"><option value="full">Full</option><option value="text">Text only</option></select></label>
+      <label>Full zoom (%) <input type="number" id="defaultFull" min="25" max="500"></label>
+      <label>Text zoom (%) <input type="number" id="defaultText" min="25" max="500"></label>
+      <label>Page zoom while text-zoomed (%) <input type="number" id="defaultNonText" min="25" max="500"></label>
+      <label>Minimum font size <select id="minFont"></select></label>
+      <label>Line spacing with text zoom <input type="number" id="lineSpacing" min="0.8" max="2" step="0.05"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Steps</h2>
+    <label class="opt"><input type="radio" name="stepMode" value="levels"> <span>Zoom levels: <input type="text" id="levels" size="48"></span></label>
+    <label class="opt"><input type="radio" name="stepMode" value="fixed"> <span>Fixed step of <input type="number" id="step" min="1" max="100"> %</span></label>
+    <label>Small step (Shift) <input type="number" id="smallStep" min="1" max="20"> %</label>
+  </section>
+
+  <section>
+    <h2>AutoFit</h2>
+    <div class="grid">
+      <label>Smallest (%) <input type="number" id="autofitMin" min="25" max="500"></label>
+      <label>Largest (%) <input type="number" id="autofitMax" min="25" max="500"></label>
+    </div>
+    <label class="check"><input type="checkbox" id="autofitOnLoad"> AutoFit sites you have not zoomed yourself, when they load</label>
+  </section>
+
+  <section>
+    <h2>Other</h2>
+    <label class="check"><input type="checkbox" id="badge"> Show the zoom level on the toolbar button</label>
+    <label class="check"><input type="checkbox" id="wheel"> In text zoom, Ctrl + mouse wheel zooms the text</label>
+    <label class="check"><input type="checkbox" id="canvasFallback"> On pages that draw their text as pictures (Google Docs, Google Sheets), text zoom zooms the whole page</label>
+    <p class="muted">Keyboard shortcuts: <a href="#" id="keys">change them in Chrome</a>. The browser's own zoom (Ctrl + wheel, Ctrl +/−) is followed and remembered too.</p>
+  </section>
+
+  <section>
+    <h2>Sites with their own zoom <span class="muted" id="count"></span></h2>
+    <table id="sites"></table>
+    <p><button class="btn danger" id="clearAll">Forget all sites</button></p>
+  </section>
+  <p class="muted foot">Ferna Zoom keeps your settings in Chrome; nothing is sent anywhere. From Ferna Software Solutions.</p>
+</div>
+<div class="toast" id="toast"></div>
+<script type="module" src="options.js"></script>
+</body>
+</html>

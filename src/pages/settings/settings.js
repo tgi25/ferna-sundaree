@@ -25,7 +25,8 @@ async function loadSettings() {
     const [origin, perm] = k.split('|');
     const c = document.createElement('span');
     c.className = 'chip';
-    c.innerHTML = `<span>${esc(hostOf(origin) || origin)} · ${esc(perm)} · <b>${esc(perms[k])}</b></span><button title="Forget">×</button>`;
+    const PN = { 'media:audio': 'microphone', 'media:video': 'camera', media: 'camera and microphone', notifications: 'notifications', geolocation: 'location', 'clipboard-read': 'clipboard', 'display-capture': 'screen sharing' };
+    c.innerHTML = `<span>${esc(hostOf(origin) || origin)} · ${esc(PN[perm] || perm)} · <b>${esc(perms[k])}</b></span><button title="Forget">×</button>`;
     c.querySelector('button').onclick = async () => { await api.cmd('perm:revoke', k); loadSettings(); };
     $('#perms').append(c);
   });
@@ -85,32 +86,20 @@ async function loadTheme() {
 $('#theme-reset').onclick = async () => { await api.cmd('theme:reset'); loadTheme(); };
 
 // ---------- zoom ----------
-const ZDEF = { mode: 'site', defaultType: 'full', defaultFull: 100, defaultText: 100, defaultNonText: 100, levels: [30, 50, 67, 80, 90, 100, 110, 120, 133, 150, 170, 200, 240, 300, 400, 500], stepMode: 'levels', step: 10, autofitMin: 50, autofitMax: 200, autofitOnLoad: false, minFont: 0, lineSpacing: 1, subdomainsSeparate: false };
-let Z = null;
+const ZOOM_LEVELS = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 function loadZoom() {
-  Z = { ...ZDEF, ...(S.zoomPrefs || {}) };
-  $$('[data-z]').forEach(el => {
-    const v = Z[el.dataset.z];
-    if (el.type === 'checkbox') el.checked = !!v;
-    else el.value = Array.isArray(v) ? v.join(', ') : String(v);
-  });
+  const sel = $('#zoom-default');
+  const def = S.defaultZoom || 100;
+  sel.innerHTML = ZOOM_LEVELS.map(l => `<option value="${l}"${l === def ? ' selected' : ''}>${l}%</option>`).join('');
   api.cmd('zoom:sites').then(sites => {
-    const keys = Object.keys(sites);
-    chips('#zoom-sites', keys.map(k => `${k}: ${sites[k].type === 'text' ? 'text ' + sites[k].text : sites[k].full}%${sites[k].minFont ? `, min ${sites[k].minFont}px` : ''}`), label => {
-      api.cmd('zoom:clearSite', label.split(':')[0]).then(loadZoom);
+    const keys = Object.keys(sites || {}).sort();
+    chips('#zoom-sites', keys.map(k => `${k}: ${sites[k]}%`), label => {
+      api.cmd('zoom:clearSite', label.slice(0, label.lastIndexOf(':'))).then(loadZoom);
     });
   });
 }
-$$('[data-z]').forEach(el => el.addEventListener('change', async () => {
-  const k = el.dataset.z;
-  let v = el.type === 'checkbox' ? el.checked : el.value;
-  if (k === 'levels') v = v.split(/[\s,;]+/).map(Number).filter(n => n >= 25 && n <= 500);
-  else if (el.type === 'number' || el.dataset.num) v = Number(v);
-  const next = { ...Z, [k]: v };
-  try { S = await api.cmd('settings:set', 'zoomPrefs', next); } catch { alert('Please check the zoom values (levels between 25 and 500 %).'); }
-  loadZoom();
-}));
-$('#zoom-clear').onclick = async () => { if (confirm('Forget the saved zoom of every site?')) { await api.cmd('zoom:clearSite', null); loadZoom(); } };
+$('#zoom-default').onchange = async e => { S = await api.cmd('settings:set', 'defaultZoom', Number(e.target.value)); loadZoom(); };
+$('#zoom-clear').onclick = async () => { if (confirm('Forget the zoom of every site?')) { await api.cmd('zoom:clearSite', null); loadZoom(); } };
 $$('[data-open]').forEach(b => { b.onclick = () => { location.href = b.dataset.open; }; });
 
 // ---------- workspaces ----------
@@ -360,7 +349,6 @@ async function loadAbout() {
       <dt>Engine</dt><dd>Electron ${esc(a.electron)} · Chromium ${esc(a.chrome)} · Node ${esc(a.node)}</dd>
       <dt>Ferna Tabs</dt><dd>${esc(a.features.tabs)}</dd>
       <dt>Ferna PDF Reader</dt><dd>${esc(a.features.pdf)}</dd>
-      <dt>Ferna Screenshots</dt><dd>${esc(a.features.screenshots)}</dd>
       <dt>System</dt><dd>${esc(a.platform)}</dd>
       <dt>Profile</dt><dd>${esc(a.profile)} · ${esc(a.dataDir)}</dd>
       <dt>Protected video (Widevine)</dt><dd>${esc(a.widevine)}${a.widevine === 'not in this edition' ? ' — Netflix, Disney+, Prime Video and Spotify need the Streaming edition' : ''}</dd>

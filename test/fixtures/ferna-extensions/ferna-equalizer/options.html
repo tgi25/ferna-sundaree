@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ferna Equalizer — Settings</title>
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<div class="wrap">
+  <header><img src="icons/icon48.png" alt=""><div><h1>Ferna Equalizer</h1><p class="muted">Settings and help</p></div></header>
+  <section class="welcome" id="welcome" hidden>
+    <b>Ferna Equalizer is ready.</b> Click its button in the toolbar (pin it from the puzzle-piece menu), turn it on and pick a preset. It shapes the sound of YouTube and any video or music on the web, in every tab.
+  </section>
+  <section>
+    <h2>How it works</h2>
+    <ul>
+      <li><b>10 bands</b> from 31 Hz (deep bass) to 16 kHz (air), ±12 dB, with a safety limiter so boosts never clip.</li>
+      <li><b>28 presets</b>: Pop, Rock, Classical, Jazz, Electronic, Hip-hop, Speech, Bass Boost, Vocal, Baila, Bhangra, Indian classical, Lo-fi and more. Move a slider to make it <i>Custom</i>, then <i>Save preset</i> to keep it.</li>
+      <li><b>Auto-EQ</b> picks a genre preset for what is playing, from the page (title, description, YouTube's genre) and from the sound itself (bass and treble balance, beats, pauses typical of speech). A new genre must win twice in a row (about 8 s) before the sound changes, so it does not jump around.</li>
+      <li>Chrome lets a page's sound be processed only after you click or type on the page once. A video that starts by itself plays normally until then.</li>
+      <li>Some players stream from another site that does not allow sound processing; those are left untouched.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Your presets <span class="muted" id="ucount"></span></h2>
+    <table id="presets"></table>
+    <p class="row"><button class="btn" id="export">Export presets…</button><button class="btn" id="import">Import presets…</button><input type="file" id="file" accept=".json,application/json" hidden></p>
+  </section>
+  <section>
+    <h2>Sites where it is off</h2>
+    <table id="sites"></table>
+  </section>
+  <section>
+    <h2>Keyboard</h2>
+    <p class="muted">Turn on or off: <kbd>Alt+Shift+Q</kbd>. Auto-EQ and next preset can be given keys too: <a href="#" id="keys">set shortcuts in Chrome</a>.</p>
+  </section>
+  <p class="muted foot">Ferna Equalizer processes sound on your computer; nothing is recorded or sent anywhere. From Ferna Software Solutions.</p>
+</div>
+<div class="toast" id="toast"></div>
+<script type="module" src="options.js"></script>
+</body>
+</html>
