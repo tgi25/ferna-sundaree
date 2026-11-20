@@ -375,7 +375,7 @@ function renderToolbar() {
   const oi = $('#omni-icon');
   oi.className = 'omni-icon';
   if (!n.url) oi.innerHTML = icon('search');
-  else if (n.internal) { oi.innerHTML = '<span class="letter" style="background:var(--accent)">F</span>'; }
+  else if (n.internal) { oi.innerHTML = '<img class="favicon" src="/_shared/mark.png" alt="">'; }
   else if (n.secure) { oi.innerHTML = icon('lock'); oi.classList.add('secure'); oi.title = 'Connection is secure (HTTPS)'; }
   else if (/^http:/.test(n.url)) { oi.innerHTML = icon('warn'); oi.classList.add('insecure'); oi.title = 'Not secure: this site does not use HTTPS'; }
   else oi.innerHTML = icon('info');

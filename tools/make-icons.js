@@ -1,21 +1,30 @@
-// Renders build/icon.svg once at 1024 px with Electron, then scales to each size.
-// Run: npx electron tools/make-icons.js   (then python3 tools/make-ico.py)
-const { app, BrowserWindow } = require('electron');
+// Renders the icon at every size with Playwright's Chromium (a dev dependency):
+//   build/icon.svg        — 48 px and up (the full drawing)
+//   build/icon-small.svg  — 16, 24 and 32 px (drawn for small sizes: no stripes, bigger eyes)
+// Writes build/icon-<size>.png, build/icon.png (512) and build/icons/<size>x<size>.png (Linux).
+// Run: node tools/make-icons.js   (then python3 tools/make-ico.py)
+const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
-app.disableHardwareAcceleration();
-app.whenReady().then(async () => {
+const SMALL = [16, 24, 32];
+const LARGE = [48, 64, 128, 256, 512];
+(async () => {
   const dir = path.join(__dirname, '..', 'build');
-  const svg = fs.readFileSync(path.join(dir, 'icon.svg'), 'utf8').replace('width="128" height="128"', 'width="1024" height="1024"');
-  const w = new BrowserWindow({ width: 1024, height: 1024, show: false, transparent: true, frame: false, webPreferences: { offscreen: true } });
-  const file = path.join(app.getPath('temp'), 'ferna-icon.html');
-  fs.writeFileSync(file, `<html><body style="margin:0;background:transparent;overflow:hidden">${svg}</body></html>`);
-  await w.loadFile(file);
-  await new Promise(r => setTimeout(r, 400));
-  const big = await w.webContents.capturePage({ x: 0, y: 0, width: 1024, height: 1024 });
-  for (const size of [16, 24, 32, 48, 64, 128, 256, 512]) {
-    fs.writeFileSync(path.join(dir, `icon-${size}.png`), big.resize({ width: size, height: size, quality: 'best' }).toPNG());
+  // ICON_CHROME: a Chromium to use when Playwright's own browser is not downloaded.
+  const browser = await chromium.launch(process.env.ICON_CHROME ? { executablePath: process.env.ICON_CHROME } : {});
+  const page = await browser.newPage({ deviceScaleFactor: 1 });
+  const shot = async (file, size) => {
+    const svg = fs.readFileSync(path.join(dir, file), 'utf8');
+    await page.setContent(`<html><head><style>html,body{margin:0;background:transparent}svg{display:block;width:${size}px;height:${size}px}</style></head><body>${svg}</body></html>`);
+    return page.locator('svg').screenshot({ omitBackground: true });
+  };
+  fs.mkdirSync(path.join(dir, 'icons'), { recursive: true });
+  for (const size of [...SMALL, ...LARGE]) {
+    const png = await shot(SMALL.includes(size) ? 'icon-small.svg' : 'icon.svg', size);
+    fs.writeFileSync(path.join(dir, `icon-${size}.png`), png);
+    fs.writeFileSync(path.join(dir, 'icons', `${size}x${size}.png`), png);
+    if (size === 512) fs.writeFileSync(path.join(dir, 'icon.png'), png);
   }
-  fs.writeFileSync(path.join(dir, 'icon.png'), big.resize({ width: 512, height: 512, quality: 'best' }).toPNG());
-  app.quit();
-});
+  await browser.close();
+  console.log('icons written');
+})();

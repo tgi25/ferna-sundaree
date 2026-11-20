@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -6 140 140">
+  <!-- Ferna Sundaree icon for 16–32 px: no stripes, seam or mouth; bigger eyes -->
+  <defs>
+    <path id="sil" d="M10 54 L12 4 L46 26 Q56 23 64 23 Q72 23 82 26 L116 4 L118 54 Q126 68 124 82 A60 46 0 0 1 4 82 Q2 68 10 54 Z"/>
+    <clipPath id="L"><rect width="64" height="128"/></clipPath>
+    <clipPath id="R"><rect x="64" width="64" height="128"/></clipPath>
+  </defs>
+  <use href="#sil" fill="none" stroke="#2F6BFF" stroke-width="12" stroke-linejoin="round"/>
+  <use href="#sil" fill="#F97316" clip-path="url(#L)"/>
+  <use href="#sil" fill="#14151C" clip-path="url(#R)"/>
+  <ellipse cx="34" cy="68" rx="11" ry="14" fill="#1F2937"/><circle cx="38" cy="62" r="4" fill="#fff"/>
+  <circle cx="94" cy="68" r="17" fill="#FFD43B" stroke="#F3F4F6" stroke-width="6"/>
+  <ellipse cx="94" cy="68" rx="4.5" ry="10" fill="#14151C"/>
+</svg>

@@ -1,32 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 136 136">
+  <!-- Ferna Sundaree icon: Sundaree (orange tabby) and Siri (black cat with glasses) share one face. 48 px and up; build/icon-small.svg is drawn for 32 px and below. -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient>
+    <linearGradient id="or" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#FFA23A"/><stop offset="1" stop-color="#F0590A"/></linearGradient>
+    <linearGradient id="bk" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#3A3D4A"/><stop offset="1" stop-color="#101118"/></linearGradient>
+    <path id="sil" d="M14 52 L17 8 L45 27 Q53 24 58 24 L62 23 L66 23 L70 24 Q75 24 83 27 L111 8 L114 52 Q122 66 120 80 A56 48 0 0 1 8 80 Q6 66 14 52 Z"/>
+    <clipPath id="L"><path d="M0 0 H66 Q58 50 66 70 Q74 96 62 128 H0Z"/></clipPath>
+    <clipPath id="R"><path d="M128 0 H66 Q58 50 66 70 Q74 96 62 128 H128Z"/></clipPath>
   </defs>
-  <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#bg)"/>
-  <!-- browser window: tab strip + address bar -->
-  <rect x="16" y="18" width="96" height="66" rx="10" fill="#ffffff" opacity=".96"/>
-  <path d="M16 34 V28 a10 10 0 0 1 10 -10 H50 a6 6 0 0 1 6 6 V34Z" fill="#dbeafe"/>
-  <rect x="24" y="40" width="80" height="8" rx="4" fill="#bfdbfe"/>
-  <circle cx="30" cy="44" r="2.4" fill="#2563eb"/>
-  <!-- Siri: black cat with glasses (behind, right) -->
-  <g transform="translate(88 84) scale(.82)">
-    <path d="M-19 -5 L-16 -26 L-4 -15 Q0 -16 4 -15 L16 -26 L19 -5 Q21 14 0 17 Q-21 14 -19 -5Z" fill="#111827" stroke="#1d4ed8" stroke-width="2"/>
-    <path d="M-14 -20 L-11 -13 L-7 -16Z M14 -20 L11 -13 L7 -16Z" fill="#f472b6" opacity=".85"/>
-    <circle cx="-7.5" cy="0" r="6" fill="#facc15" stroke="#e5e7eb" stroke-width="2.4"/>
-    <circle cx="7.5" cy="0" r="6" fill="#facc15" stroke="#e5e7eb" stroke-width="2.4"/>
-    <path d="M-1.5 0 h3" stroke="#e5e7eb" stroke-width="2.4"/>
-    <ellipse cx="-7.5" cy="0" rx="1.5" ry="3.6" fill="#111827"/><ellipse cx="7.5" cy="0" rx="1.5" ry="3.6" fill="#111827"/>
-    <path d="M-2 7.5 h4 l-2 2.4z" fill="#f472b6"/>
-  </g>
-  <!-- Sundaree: orange tabby (front, centre-left, larger) -->
-  <g transform="translate(52 88) scale(1.12)">
-    <path d="M-20 -6 L-17 -28 L-4 -16 Q0 -17 4 -16 L17 -28 L20 -6 Q22 14 0 18 Q-22 14 -20 -6Z" fill="#fb923c" stroke="#1d4ed8" stroke-width="1.8"/>
-    <path d="M-15 -22 L-12 -14 L-8 -17Z M15 -22 L12 -14 L8 -17Z" fill="#fed7aa"/>
-    <path d="M-4 -16 l1 7 M0 -17 v7 M4 -16 l-1 7" stroke="#c2410c" stroke-width="2.2" stroke-linecap="round"/>
-    <path d="M-20 0 h6 M-20 5 h6 M20 0 h-6 M20 5 h-6" stroke="#c2410c" stroke-width="2" stroke-linecap="round"/>
-    <ellipse cx="-7.5" cy="-1" rx="3.2" ry="4" fill="#1f2937"/><ellipse cx="7.5" cy="-1" rx="3.2" ry="4" fill="#1f2937"/>
-    <circle cx="-6.5" cy="-2.3" r="1.1" fill="#fff"/><circle cx="8.5" cy="-2.3" r="1.1" fill="#fff"/>
-    <path d="M-2.2 5.5 h4.4 l-2.2 2.6z" fill="#be185d"/>
-    <path d="M0 8 q-3 3 -6 1 M0 8 q3 3 6 1" stroke="#7c2d12" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-  </g>
+  <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#38BDF8"/><stop offset="1" stop-color="#4F46E5"/></linearGradient>
+  <use href="#sil" fill="none" stroke="url(#rim)" stroke-width="9" stroke-linejoin="round"/>
+  <use href="#sil" fill="url(#or)" clip-path="url(#L)"/>
+  <use href="#sil" fill="url(#bk)" clip-path="url(#R)"/>
+  <!-- inner ears -->
+  <path d="M21 18 L23 40 L38 30Z" fill="#FFD9B3"/>
+  <path d="M107 18 L105 40 L90 30Z" fill="#F472B6" opacity=".9"/>
+  <!-- Sundaree: tabby stripes + dark eyes -->
+  <path d="M30 34 q3 6 2 12 M40 30 q2 7 1 13" stroke="#C2410C" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <ellipse cx="34" cy="66" rx="7" ry="9" fill="#1F2937"/><circle cx="36.5" cy="62.5" r="2.6" fill="#fff"/>
+  <!-- Siri: yellow eyes in glasses -->
+  <circle cx="92" cy="66" r="12" fill="#FFD43B" stroke="#E5E7EB" stroke-width="4"/>
+  <ellipse cx="92" cy="66" rx="3" ry="7.5" fill="#101118"/>
+  <path d="M80 66 H70" stroke="#E5E7EB" stroke-width="4" stroke-linecap="round"/>
+  <!-- where the two cats meet -->
+  <path d="M66 23 Q58 50 66 70 Q74 96 62 120" stroke="#fff" stroke-opacity=".55" stroke-width="2.2" fill="none"/>
+  <!-- one shared nose and smile -->
+  <path d="M59 82 h11 l-5.5 6.5z" fill="#F472B6"/>
+  <path d="M64.5 88.5 q-5 5 -10 2 M64.5 88.5 q5 5 10 2" stroke="#7C2D12" stroke-width="2.4" fill="none" stroke-linecap="round"/>
 </svg>

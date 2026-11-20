@@ -99,7 +99,8 @@ function faviconHtml(url, favicon, cls = '') {
   const host = hostOf(url);
   const letter = (host || url || '?').replace(/^ferna:\/\//, '').charAt(0).toUpperCase() || '?';
   const color = LETTER_COLORS[[...host].reduce((a, c) => a + c.charCodeAt(0), 0) % LETTER_COLORS.length];
-  if (/^ferna:/.test(url || '')) return `<span class="letter ${cls}" style="background:var(--accent)">F</span>`;
+  // Sundaree's own pages show its icon (the 32 px drawing, sharp on high-DPI screens).
+  if (/^ferna:/.test(url || '')) return `<img class="favicon ${cls}" src="/_shared/mark.png" alt="">`;
   if (favicon && (/^(https?|data):/.test(favicon) || /^ferna:\/\/favicon\//.test(favicon))) {
     return `<img class="favicon ${cls}" src="${esc(favicon)}" alt="" data-letter="${esc(letter)}" data-color="${color}" referrerpolicy="no-referrer">`;
   }
