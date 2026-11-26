@@ -1,7 +1,7 @@
 # Ferna Sundaree
 
 A security-hardened browser for Windows 10/11 and Linux with **Ferna Tabs** and **Ferna PDF Reader**
-built in. Built on Electron 45.4.1 (Chromium 156.0.8078.100 with the latest security fixes). Version 0.9.3.
+built in. Built on Electron 45.5.0 (Chromium 156.0.8078.109). Version 0.9.4.
 
 Since 0.9.0 the feed reader, the equalizer, text-only zoom and the screenshot tool are extensions — **Ferna Feeds**,
 **Ferna Equalizer**, **Ferna Zoom** and **Ferna Screenshot** — installed from the Chrome Web Store or a zip, and they
