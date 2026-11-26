@@ -217,13 +217,16 @@ class Updater {
     const dir = path.join(os.tmpdir(), 'ferna-sundaree-update');
     fs.mkdirSync(dir, { recursive: true });
     const out = path.join(dir, f.name);
+    // Each download writes its own part file, so two downloads at once (two profiles, or two
+    // windows checking together) never move one another's file away.
+    const part = `${out}.${process.pid}-${crypto.randomBytes(4).toString('hex')}.part`;
     let last;
     // Try each location in turn; a broken or tampered copy on one mirror falls through to the next.
     for (const url of urls) {
       try {
         const r = await this.get(url, 'file');
         const hash = crypto.createHash('sha256');
-        const ws = fs.createWriteStream(`${out}.part`);
+        const ws = fs.createWriteStream(part);
         let got = 0;
         try {
           for await (const chunk of r.body) {
@@ -236,12 +239,12 @@ class Updater {
         } finally { await new Promise(res => ws.end(res)); }
         const digest = hash.digest('hex');
         if (got !== f.size || digest !== f.sha256) throw new Error('the download does not match the signed checksum — update refused');
-        fs.renameSync(`${out}.part`, out);
+        fs.renameSync(part, out);
         this.set({ status: 'ready', file: out, kind: key, progress: 100 });
         return out;
       } catch (e) {
         last = e;
-        fs.rmSync(`${out}.part`, { force: true });
+        fs.rmSync(part, { force: true });
       }
     }
     this.set({ status: 'error', error: String(last && last.message || last) });
